@@ -1,0 +1,71 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { email, password, full_name, phone_number, make_admin } = await req.json();
+
+    if (!email || !password) {
+      return new Response(JSON.stringify({ error: "email and password are required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || Deno.env.get("PROJECT_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !serviceKey) {
+      return new Response(JSON.stringify({ error: "Missing service credentials" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const admin = createClient(supabaseUrl, serviceKey);
+
+    // Create auth user
+    const { data: createRes, error: createErr } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name, phone_number },
+    });
+    if (createErr) throw createErr;
+
+    const newUserId = createRes.user?.id;
+
+    if (!newUserId) {
+      throw new Error("User creation failed: missing id");
+    }
+
+    // Optionally assign admin role
+    if (make_admin) {
+      const { error: roleErr } = await admin.from("user_roles").insert({ user_id: newUserId, role: "admin" });
+      if (roleErr) throw roleErr;
+    }
+
+    // Update profile with provided fields if not covered by trigger
+    await admin.from("profiles").update({ full_name, phone_number: phone_number || null, email }).eq("id", newUserId);
+
+    return new Response(JSON.stringify({ id: newUserId }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: String(e.message || e) }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
+
+

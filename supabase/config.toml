@@ -1,0 +1,10 @@
+project_id = "lxlhszovqelgpqtvnpvx"
+
+[functions.send-otp]
+verify_jwt = false
+
+[functions.verify-otp]
+verify_jwt = false
+
+[functions.scrape-website]
+verify_jwt = true
