@@ -162,11 +162,11 @@ export const AdminUsers = () => {
 
   return (
     <>
-      <div className="flex justify-between items-center mb-3">
-        <Input placeholder="Search users" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setInviteOpen(true)}>Invite by email</Button>
-          <Button onClick={() => setAddOpen(true)}>Add new user</Button>
+      <div className="flex flex-wrap gap-2 justify-between items-center mb-3">
+        <Input placeholder="Search users" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs flex-1 min-w-[200px]" />
+        <div className="flex gap-2 w-full sm:w-auto justify-end">
+          <Button className="w-full sm:w-auto" onClick={() => setAddOpen(true)}>Add new user</Button>
+          <Button className="w-full sm:w-auto" variant="outline" onClick={() => setInviteOpen(true)}>Invite by email</Button>
         </div>
       </div>
     <div className="rounded-md border overflow-x-auto">

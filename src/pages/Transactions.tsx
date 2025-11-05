@@ -51,16 +51,16 @@ const Transactions = () => {
               Manage all your payment transactions
             </p>
           </div>
-          <div className="flex gap-2 w-full sm:w-auto justify-end">
+          <div className="flex gap-2 w-full sm:w-auto justify-end order-last sm:order-none">
+            <Button className="w-full sm:w-auto" onClick={() => setIsDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Transaction
+            </Button>
             <Button className="w-full sm:w-auto" variant="secondary" onClick={() => setUploadOpen(true)}>
               Import Payouts
             </Button>
             <Button className="w-full sm:w-auto" variant="outline" onClick={() => setManagePortalsOpen(true)}>
               Manage Portals
-            </Button>
-            <Button className="w-full sm:w-auto" onClick={() => setIsDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Transaction
             </Button>
           </div>
         </div>

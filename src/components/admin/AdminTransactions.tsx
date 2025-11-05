@@ -202,8 +202,8 @@ export const AdminTransactions = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="relative flex-1 min-w-[220px] max-w-sm">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search transactions..."
@@ -212,10 +212,12 @@ export const AdminTransactions = () => {
             className="pl-10"
           />
         </div>
-        <Button onClick={exportToCSV} variant="outline">
-          <Download className="mr-2 h-4 w-4" />
-          Export CSV
-        </Button>
+        <div className="flex gap-2 w-full sm:w-auto justify-end">
+          <Button className="w-full sm:w-auto" onClick={exportToCSV} variant="outline">
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-md border overflow-x-auto">
