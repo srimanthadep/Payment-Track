@@ -218,7 +218,7 @@ export const AdminTransactions = () => {
         </Button>
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
     <Table>
       <TableHeader>
         <TableRow>
@@ -228,10 +228,10 @@ export const AdminTransactions = () => {
           <TableHead>Type</TableHead>
               <TableHead className="text-right">Amount</TableHead>
               <TableHead className="text-right">Commission</TableHead>
-              <TableHead className="text-right">Site Fee</TableHead>
-              <TableHead className="text-right">Profit</TableHead>
-          <TableHead>Reference</TableHead>
-          <TableHead>Status</TableHead>
+              <TableHead className="text-right hidden sm:table-cell">Site Fee</TableHead>
+              <TableHead className="text-right hidden sm:table-cell">Profit</TableHead>
+          <TableHead className="hidden md:table-cell">Reference</TableHead>
+          <TableHead className="hidden md:table-cell">Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
@@ -263,10 +263,10 @@ export const AdminTransactions = () => {
                   <TableCell className="text-right font-semibold">
                     {formatCurrency(tx.commission || 0)}
                   </TableCell>
-            <TableCell className="font-mono text-sm">
+            <TableCell className="font-mono text-sm hidden md:table-cell">
               {tx.reference_number || "-"}
             </TableCell>
-            <TableCell>
+            <TableCell className="hidden md:table-cell">
               <Badge variant={tx.status === "completed" ? "default" : "secondary"}>
                 {tx.status}
               </Badge>

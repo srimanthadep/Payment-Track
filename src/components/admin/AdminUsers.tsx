@@ -169,7 +169,8 @@ export const AdminUsers = () => {
           <Button onClick={() => setAddOpen(true)}>Add new user</Button>
         </div>
       </div>
-      <Table>
+    <div className="rounded-md border overflow-x-auto">
+    <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Email</TableHead>
@@ -213,7 +214,8 @@ export const AdminUsers = () => {
             </TableRow>
           ))}
         </TableBody>
-      </Table>
+    </Table>
+    </div>
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent>

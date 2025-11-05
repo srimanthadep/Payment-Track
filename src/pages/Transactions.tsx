@@ -44,21 +44,21 @@ const Transactions = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center gap-3 flex-wrap">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Transactions</h1>
             <p className="text-muted-foreground">
               Manage all your payment transactions
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => setUploadOpen(true)}>
+          <div className="flex gap-2 w-full sm:w-auto justify-end">
+            <Button className="w-full sm:w-auto" variant="secondary" onClick={() => setUploadOpen(true)}>
               Import Payouts
             </Button>
-            <Button variant="outline" onClick={() => setManagePortalsOpen(true)}>
+            <Button className="w-full sm:w-auto" variant="outline" onClick={() => setManagePortalsOpen(true)}>
               Manage Portals
             </Button>
-            <Button onClick={() => setIsDialogOpen(true)}>
+            <Button className="w-full sm:w-auto" onClick={() => setIsDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Add Transaction
             </Button>

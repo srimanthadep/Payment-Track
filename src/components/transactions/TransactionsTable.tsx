@@ -308,7 +308,72 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
         </div>
       </div>
 
-      <div className="rounded-md border">
+      {/* Mobile cards */}
+      <div className="grid gap-3 sm:hidden">
+        {isLoading ? (
+          <div className="py-8 text-center text-muted-foreground">Loading...</div>
+        ) : filteredTransactions.length === 0 ? (
+          <div className="py-8 text-center text-muted-foreground">No transactions found</div>
+        ) : (
+          filteredTransactions.map((transaction) => (
+            <div key={transaction.id} className="rounded-lg border p-4 bg-card">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Checkbox checked={selectedIds.has(transaction.id)} onCheckedChange={() => toggleSelect(transaction.id)} />
+                  <div>
+                    <div className="text-sm font-medium">{formatDate(transaction.transaction_date)}</div>
+                    <div className="text-xs text-muted-foreground">{transaction.portals.name}</div>
+                  </div>
+                </div>
+                <Badge
+                  variant={
+                    transaction.status === "completed"
+                      ? "default"
+                      : transaction.status === "pending"
+                      ? "secondary"
+                      : "destructive"
+                  }
+                >
+                  {transaction.status}
+                </Badge>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <div className="text-muted-foreground">Type</div>
+                  <div className="capitalize">{transaction.transaction_type}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-muted-foreground">Amount</div>
+                  <div className="font-medium">{formatCurrency(transaction.amount)}</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">Commission</div>
+                  <div className="text-success">{formatCurrency(transaction.commission)}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-muted-foreground">Profit</div>
+                  <div className="font-semibold">{formatCurrency(transaction.commission)}</div>
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center justify-end gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDeleteClick(transaction.id)}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop/tablet table */}
+      <div className="hidden sm:block rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -318,9 +383,9 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
               <TableHead>Type</TableHead>
               <TableHead className="text-right">Amount</TableHead>
               <TableHead className="text-right">Commission</TableHead>
-              <TableHead className="text-right">Site Fee</TableHead>
-              <TableHead className="text-right">Profit</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead className="text-right hidden sm:table-cell">Site Fee</TableHead>
+              <TableHead className="text-right hidden sm:table-cell">Profit</TableHead>
+              <TableHead className="hidden md:table-cell">Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -358,13 +423,13 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
                   <TableCell className="text-right text-success">
                     {formatCurrency(transaction.commission)}
                   </TableCell>
-                  <TableCell className="text-right text-destructive">
+                  <TableCell className="text-right text-destructive hidden sm:table-cell">
                     {formatCurrency(transaction.site_fee)}
                   </TableCell>
-                  <TableCell className="text-right font-semibold">
+                  <TableCell className="text-right font-semibold hidden sm:table-cell">
                     {formatCurrency(transaction.commission)}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell">
                     <Badge
                       variant={
                         transaction.status === "completed"
@@ -393,6 +458,18 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
           </TableBody>
         </Table>
       </div>
+
+      {/* Mobile sticky bulk actions */}
+      {selectedIds.size > 0 && (
+        <div className="sm:hidden fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-3">
+          <div className="flex items-center justify-between">
+            <div className="text-sm">Selected: {selectedIds.size}</div>
+            <Button variant="destructive" onClick={bulkDelete}>
+              <Trash2 className="mr-2 h-4 w-4" /> Delete selected
+            </Button>
+          </div>
+        </div>
+      )}
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
