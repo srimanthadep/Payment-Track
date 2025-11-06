@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 interface ProfitChartProps {
   userId: string;
@@ -52,47 +52,126 @@ export const ProfitChart = ({ userId }: ProfitChartProps) => {
         return;
       }
 
-      // Group by period
+      // Generate all dates in range for better visualization
+      const allDates: Date[] = [];
+      const currentDate = new Date(startDate);
+      
+      while (currentDate <= now) {
+        allDates.push(new Date(currentDate));
+        if (period === "daily") {
+          currentDate.setDate(currentDate.getDate() + 1);
+        } else if (period === "weekly") {
+          currentDate.setDate(currentDate.getDate() + 7);
+        } else {
+          // monthly
+          currentDate.setMonth(currentDate.getMonth() + 1);
+        }
+      }
+
+      // Group transactions by period
       let groupedData: any = {};
 
       transactions?.forEach((transaction) => {
         const date = new Date(transaction.transaction_date);
         let key: string;
+        let dateKey: Date;
 
         if (period === "daily") {
-          key = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          dateKey = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+          key = dateKey.toLocaleDateString("en-US", { month: "short", day: "numeric" });
         } else if (period === "weekly") {
           const weekStart = new Date(date);
           weekStart.setDate(date.getDate() - date.getDay());
-          key = `Week ${weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+          weekStart.setHours(0, 0, 0, 0);
+          dateKey = weekStart;
+          key = weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" });
         } else {
           // monthly
-          key = date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+          dateKey = new Date(date.getFullYear(), date.getMonth(), 1);
+          key = dateKey.toLocaleDateString("en-US", { month: "short", year: "numeric" });
         }
 
         if (!groupedData[key]) {
           groupedData[key] = {
             date: key,
-            commission: 0,
+            dateKey: dateKey.getTime(),
             profit: 0,
           };
         }
 
-        groupedData[key].commission += Number(transaction.commission || 0);
         groupedData[key].profit += Number(transaction.commission || 0);
       });
 
-      const formattedData = Object.values(groupedData);
-      setChartData(formattedData);
+      // Fill in missing dates with zero values
+      const formattedData = allDates.map((date) => {
+        let key: string;
+        let dateKey: Date;
+        if (period === "daily") {
+          dateKey = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+          key = dateKey.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        } else if (period === "weekly") {
+          const weekStart = new Date(date);
+          weekStart.setDate(date.getDate() - date.getDay());
+          weekStart.setHours(0, 0, 0, 0);
+          dateKey = weekStart;
+          key = weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        } else {
+          dateKey = new Date(date.getFullYear(), date.getMonth(), 1);
+          key = dateKey.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+        }
+
+        return groupedData[key] || {
+          date: key,
+          dateKey: dateKey.getTime(),
+          profit: 0,
+        };
+      });
+
+      // Remove duplicates and sort
+      const uniqueData = formattedData.reduce((acc: any[], curr: any) => {
+        const existing = acc.find((item) => item.date === curr.date);
+        if (!existing) {
+          acc.push(curr);
+        } else {
+          existing.profit += curr.profit;
+        }
+        return acc;
+      }, []);
+
+      uniqueData.sort((a, b) => a.dateKey - b.dateKey);
+      setChartData(uniqueData);
       setIsLoading(false);
     };
 
     fetchChartData();
   }, [userId, period]);
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="rounded-lg border bg-card p-3 shadow-md">
+          <p className="text-xs font-medium text-muted-foreground mb-1">{payload[0].payload.date}</p>
+          <p className="text-sm font-semibold text-success">
+            Profit: {formatCurrency(payload[0].value)}
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
-    <Card>
-      <CardHeader className="pb-4">
+    <Card className="h-full flex flex-col">
+      <CardHeader className="pb-3">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <CardTitle className="text-lg sm:text-xl">Profit Trends</CardTitle>
           <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
@@ -104,53 +183,60 @@ export const ProfitChart = ({ userId }: ProfitChartProps) => {
           </Tabs>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-1 pb-4 pt-0">
         {isLoading ? (
-          <div className="h-[250px] sm:h-[300px] flex items-center justify-center">
+          <div className="h-[280px] sm:h-[350px] flex items-center justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
           </div>
         ) : chartData.length === 0 ? (
-          <div className="h-[250px] sm:h-[300px] flex items-center justify-center">
+          <div className="h-[280px] sm:h-[350px] flex items-center justify-center">
             <p className="text-sm text-muted-foreground">No data available</p>
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis 
-                dataKey="date" 
-                className="text-xs"
-                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
-              />
-              <YAxis 
-                className="text-xs"
-                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
-              />
-              <Tooltip 
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "var(--radius)",
-                  fontSize: "12px",
-                }}
-              />
-              <Legend wrapperStyle={{ fontSize: "12px" }} />
-              <Line 
-                type="monotone" 
-                dataKey="commission" 
-                stroke="hsl(var(--primary))" 
-                strokeWidth={2}
-                dot={{ fill: "hsl(var(--primary))", r: 3 }}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="profit" 
-                stroke="hsl(var(--success))" 
-                strokeWidth={2}
-                dot={{ fill: "hsl(var(--success))", r: 3 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <div className="w-full h-[280px] sm:h-[350px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart 
+                data={chartData}
+                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--success))" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="hsl(var(--success))" stopOpacity={0.05}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid 
+                  strokeDasharray="3 3" 
+                  stroke="hsl(var(--muted))" 
+                  vertical={false}
+                />
+                <XAxis 
+                  dataKey="date" 
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                  tickLine={{ stroke: "hsl(var(--muted))" }}
+                  axisLine={{ stroke: "hsl(var(--muted))" }}
+                  interval="preserveStartEnd"
+                />
+                <YAxis 
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                  tickLine={{ stroke: "hsl(var(--muted))" }}
+                  axisLine={{ stroke: "hsl(var(--muted))" }}
+                  tickFormatter={(value) => formatCurrency(value)}
+                  width={60}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Area 
+                  type="monotone" 
+                  dataKey="profit" 
+                  stroke="hsl(var(--success))" 
+                  strokeWidth={2.5}
+                  fill="url(#colorProfit)"
+                  dot={{ fill: "hsl(var(--success))", r: 3, strokeWidth: 2, stroke: "hsl(var(--card))" }}
+                  activeDot={{ r: 5, strokeWidth: 2, stroke: "hsl(var(--success))" }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         )}
       </CardContent>
     </Card>
