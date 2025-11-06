@@ -43,23 +43,23 @@ const Transactions = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="space-y-4">
+      <div className="space-y-4 sm:space-y-6">
+        <div className="space-y-3">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Transactions</h1>
-            <p className="text-sm sm:text-base text-muted-foreground">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">Transactions</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
               Manage all your payment transactions
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
-            <Button className="w-full sm:w-auto" onClick={() => setIsDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
+            <Button className="w-full sm:w-auto text-sm h-9" onClick={() => setIsDialogOpen(true)}>
+              <Plus className="mr-2 h-3.5 w-3.5" />
               Add Transaction
             </Button>
-            <Button className="w-full sm:w-auto" variant="secondary" onClick={() => setUploadOpen(true)}>
+            <Button className="w-full sm:w-auto text-sm h-9" variant="secondary" onClick={() => setUploadOpen(true)}>
               Import Payouts
             </Button>
-            <Button className="w-full sm:w-auto" variant="outline" onClick={() => setManagePortalsOpen(true)}>
+            <Button className="w-full sm:w-auto text-sm h-9" variant="outline" onClick={() => setManagePortalsOpen(true)}>
               Manage Portals
             </Button>
           </div>

@@ -284,45 +284,46 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
+    <div className="space-y-3 sm:space-y-4">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-4">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
           <Input
             placeholder="Search transactions..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-8 sm:pl-10 h-9 text-sm"
           />
         </div>
         <div className="flex items-center gap-2">
         {selectedIds.size > 0 && (
-          <Button variant="destructive" onClick={bulkDelete}>
-            <Trash2 className="mr-2 h-4 w-4" />Delete selected ({selectedIds.size})
+          <Button variant="destructive" onClick={bulkDelete} className="text-xs sm:text-sm h-9 px-3">
+            <Trash2 className="mr-1.5 h-3.5 w-3.5" />Delete ({selectedIds.size})
           </Button>
         )}
-        <Button onClick={exportToCSV} variant="outline">
-          <Download className="mr-2 h-4 w-4" />
-          Export CSV
+        <Button onClick={exportToCSV} variant="outline" className="text-xs sm:text-sm h-9 px-3">
+          <Download className="mr-1.5 h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Export CSV</span>
+          <span className="sm:hidden">Export</span>
         </Button>
         </div>
       </div>
 
       {/* Mobile cards */}
-      <div className="grid gap-3 sm:hidden">
+      <div className="grid gap-2 sm:hidden">
         {isLoading ? (
-          <div className="py-8 text-center text-muted-foreground">Loading...</div>
+          <div className="py-6 text-center text-muted-foreground text-sm">Loading...</div>
         ) : filteredTransactions.length === 0 ? (
-          <div className="py-8 text-center text-muted-foreground">No transactions found</div>
+          <div className="py-6 text-center text-muted-foreground text-sm">No transactions found</div>
         ) : (
           filteredTransactions.map((transaction) => (
-            <div key={transaction.id} className="rounded-lg border p-4 bg-card">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Checkbox checked={selectedIds.has(transaction.id)} onCheckedChange={() => toggleSelect(transaction.id)} />
-                  <div>
-                    <div className="text-sm font-medium">{formatDate(transaction.transaction_date)}</div>
-                    <div className="text-xs text-muted-foreground">{transaction.portals.name}</div>
+            <div key={transaction.id} className="rounded-lg border p-3 bg-card">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <Checkbox checked={selectedIds.has(transaction.id)} onCheckedChange={() => toggleSelect(transaction.id)} className="flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-medium truncate">{formatDate(transaction.transaction_date)}</div>
+                    <div className="text-[10px] text-muted-foreground truncate">{transaction.portals.name}</div>
                   </div>
                 </div>
                 <Badge
@@ -333,38 +334,39 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
                       ? "secondary"
                       : "destructive"
                   }
+                  className="text-[10px] px-1.5 py-0 flex-shrink-0"
                 >
                   {transaction.status}
                 </Badge>
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <div className="text-muted-foreground">Type</div>
-                  <div className="capitalize">{transaction.transaction_type}</div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-muted-foreground">Type</span>
+                  <span className="capitalize font-medium">{transaction.transaction_type}</span>
                 </div>
-                <div className="text-right">
-                  <div className="text-muted-foreground">Amount</div>
-                  <div className="font-medium">{formatCurrency(transaction.amount)}</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-muted-foreground">Amount</span>
+                  <span className="font-semibold">{formatCurrency(transaction.amount)}</span>
                 </div>
-                <div>
-                  <div className="text-muted-foreground">Commission</div>
-                  <div className="text-success">{formatCurrency(transaction.commission)}</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-muted-foreground">Commission</span>
+                  <span className="text-success font-medium">{formatCurrency(transaction.commission)}</span>
                 </div>
-                <div className="text-right">
-                  <div className="text-muted-foreground">Profit</div>
-                  <div className="font-semibold">{formatCurrency(transaction.commission)}</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-muted-foreground">Profit</span>
+                  <span className="text-success font-semibold">{formatCurrency(transaction.commission)}</span>
                 </div>
               </div>
 
-              <div className="mt-3 flex items-center justify-end gap-2">
+              <div className="mt-2 flex items-center justify-end">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => handleDeleteClick(transaction.id)}
-                  className="text-destructive hover:text-destructive"
+                  className="text-destructive hover:text-destructive h-7 px-2"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
             </div>
@@ -461,11 +463,11 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
 
       {/* Mobile sticky bulk actions */}
       {selectedIds.size > 0 && (
-        <div className="sm:hidden fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-3">
-          <div className="flex items-center justify-between">
-            <div className="text-sm">Selected: {selectedIds.size}</div>
-            <Button variant="destructive" onClick={bulkDelete}>
-              <Trash2 className="mr-2 h-4 w-4" /> Delete selected
+        <div className="sm:hidden fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-xs font-medium">Selected: {selectedIds.size}</div>
+            <Button variant="destructive" onClick={bulkDelete} className="h-8 text-xs px-3">
+              <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete
             </Button>
           </div>
         </div>
