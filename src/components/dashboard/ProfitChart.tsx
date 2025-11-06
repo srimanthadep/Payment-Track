@@ -92,61 +92,62 @@ export const ProfitChart = ({ userId }: ProfitChartProps) => {
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-        <CardTitle>Profit Trends</CardTitle>
+      <CardHeader className="pb-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <CardTitle className="text-lg sm:text-xl">Profit Trends</CardTitle>
           <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
-            <TabsList>
-              <TabsTrigger value="daily">Daily</TabsTrigger>
-              <TabsTrigger value="weekly">Weekly</TabsTrigger>
-              <TabsTrigger value="monthly">Monthly</TabsTrigger>
+            <TabsList className="grid grid-cols-3 w-full sm:w-auto">
+              <TabsTrigger value="daily" className="text-xs sm:text-sm">Daily</TabsTrigger>
+              <TabsTrigger value="weekly" className="text-xs sm:text-sm">Weekly</TabsTrigger>
+              <TabsTrigger value="monthly" className="text-xs sm:text-sm">Monthly</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="h-[300px] flex items-center justify-center">
+          <div className="h-[250px] sm:h-[300px] flex items-center justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
           </div>
         ) : chartData.length === 0 ? (
-          <div className="h-[300px] flex items-center justify-center">
-            <p className="text-muted-foreground">No data available</p>
+          <div className="h-[250px] sm:h-[300px] flex items-center justify-center">
+            <p className="text-sm text-muted-foreground">No data available</p>
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis 
                 dataKey="date" 
                 className="text-xs"
-                tick={{ fill: "hsl(var(--muted-foreground))" }}
+                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
               />
               <YAxis 
                 className="text-xs"
-                tick={{ fill: "hsl(var(--muted-foreground))" }}
+                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
               />
               <Tooltip 
                 contentStyle={{
                   backgroundColor: "hsl(var(--card))",
                   border: "1px solid hsl(var(--border))",
                   borderRadius: "var(--radius)",
+                  fontSize: "12px",
                 }}
               />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: "12px" }} />
               <Line 
                 type="monotone" 
                 dataKey="commission" 
                 stroke="hsl(var(--primary))" 
                 strokeWidth={2}
-                dot={{ fill: "hsl(var(--primary))" }}
+                dot={{ fill: "hsl(var(--primary))", r: 3 }}
               />
               <Line 
                 type="monotone" 
                 dataKey="profit" 
                 stroke="hsl(var(--success))" 
                 strokeWidth={2}
-                dot={{ fill: "hsl(var(--success))" }}
+                dot={{ fill: "hsl(var(--success))", r: 3 }}
               />
             </LineChart>
           </ResponsiveContainer>

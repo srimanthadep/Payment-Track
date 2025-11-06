@@ -71,8 +71,8 @@ export const RecentTransactions = ({ userId }: RecentTransactionsProps) => {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Recent Transactions</CardTitle>
+      <CardHeader className="pb-4">
+        <CardTitle className="text-lg sm:text-xl">Recent Transactions</CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -89,43 +89,43 @@ export const RecentTransactions = ({ userId }: RecentTransactionsProps) => {
           </div>
         ) : transactions.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-muted-foreground">No transactions yet</p>
+            <p className="text-sm text-muted-foreground">No transactions yet</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {transactions.map((transaction) => (
               <div
                 key={transaction.id}
-                className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0"
+                className="flex items-center justify-between gap-3 border-b pb-3 sm:pb-4 last:border-0 last:pb-0"
               >
-                <div className="flex items-center space-x-4">
-                  <div className={`p-2 rounded-lg ${
+                <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
+                  <div className={`p-1.5 sm:p-2 rounded-lg flex-shrink-0 ${
                     transaction.transaction_type === "withdrawal"
                       ? "bg-primary/10"
                       : "bg-blue-500/10"
                   }`}>
                     {transaction.transaction_type === "withdrawal" ? (
-                      <ArrowDownCircle className="h-4 w-4 text-primary" />
+                      <ArrowDownCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
                     ) : (
-                      <ArrowUpCircle className="h-4 w-4 text-blue-500" />
+                      <ArrowUpCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500" />
                     )}
                   </div>
-                  <div>
-                    <p className="font-medium capitalize">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-sm sm:text-base capitalize truncate">
                       {transaction.transaction_type}
                     </p>
-                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                      <span>{transaction.portals.name}</span>
+                    <div className="flex items-center space-x-1.5 sm:space-x-2 text-xs sm:text-sm text-muted-foreground flex-wrap">
+                      <span className="truncate">{transaction.portals.name}</span>
                       <span>•</span>
                       <span>{formatDate(transaction.transaction_date)}</span>
                     </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-semibold">
+                <div className="text-right flex-shrink-0">
+                  <p className="font-semibold text-sm sm:text-base">
                     {formatCurrency(transaction.amount)}
                   </p>
-                  <p className="text-sm text-success">
+                  <p className="text-xs sm:text-sm text-success">
                     +{formatCurrency(transaction.commission)}
                   </p>
                 </div>
