@@ -19,13 +19,22 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import { TransactionTemplates } from "./TransactionTemplates";
 
-interface AddTransactionDialogProps {
-  userId: string;
+interface EditTransactionDialogProps {
+  transaction: {
+    id: string;
+    portal_id: string;
+    transaction_type: string;
+    amount: number;
+    commission: number;
+    site_fee: number;
+    reference_number: string | null;
+    status: string;
+    transaction_date: string;
+  } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  portalsRefreshKey?: number;
+  onUpdated: () => void;
 }
 
 interface Portal {
@@ -35,40 +44,25 @@ interface Portal {
   default_site_fee: number;
 }
 
-interface Template {
-  id: string;
-  name: string;
-  portal_id: string;
-  transaction_type: string;
-  amount: number | null;
-  commission: number | null;
-  site_fee: number | null;
-  portals: {
-    name: string;
-  };
-}
-
-// Card type support removed; commission uses portal default rate
-
-export const AddTransactionDialog = ({
-  userId,
+export const EditTransactionDialog = ({
+  transaction,
   open,
   onOpenChange,
-  portalsRefreshKey,
-}: AddTransactionDialogProps) => {
+  onUpdated,
+}: EditTransactionDialogProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [portals, setPortals] = useState<Portal[]>([]);
-  // No portalRates state
   
   const [formData, setFormData] = useState({
     portal_id: "",
-    
     transaction_type: "withdrawal",
     amount: "",
     commission: "",
     site_fee: "",
     reference_number: "",
+    status: "completed",
+    transaction_date: "",
   });
 
   useEffect(() => {
@@ -86,9 +80,22 @@ export const AddTransactionDialog = ({
     };
 
     fetchPortals();
-  }, [portalsRefreshKey]);
+  }, []);
 
-  // No rates fetching
+  useEffect(() => {
+    if (transaction) {
+      setFormData({
+        portal_id: transaction.portal_id,
+        transaction_type: transaction.transaction_type,
+        amount: transaction.amount.toString(),
+        commission: transaction.commission.toString(),
+        site_fee: transaction.site_fee.toString(),
+        reference_number: transaction.reference_number || "",
+        status: transaction.status,
+        transaction_date: transaction.transaction_date.split("T")[0],
+      });
+    }
+  }, [transaction]);
 
   const handlePortalChange = (portalId: string) => {
     const portal = portals.find((p) => p.id === portalId);
@@ -96,10 +103,8 @@ export const AddTransactionDialog = ({
       const next = {
         ...formData,
         portal_id: portalId,
-        
         site_fee: portal.default_site_fee.toString(),
       };
-      // If user already typed amount, recompute commission using portal default
       if (next.amount) {
         const commissionAmount = (parseFloat(next.amount) * portal.default_commission_rate) / 100;
         next.commission = commissionAmount.toFixed(2);
@@ -126,39 +131,30 @@ export const AddTransactionDialog = ({
     }
   };
 
-  // Card type handler removed
-
-  const handleUseTemplate = (template: Template) => {
-    setFormData({
-      portal_id: template.portal_id,
-      transaction_type: template.transaction_type,
-      amount: template.amount?.toString() || "",
-      commission: template.commission?.toString() || "",
-      site_fee: template.site_fee?.toString() || "",
-      reference_number: "",
-    });
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!transaction) return;
+
     setIsLoading(true);
 
-    const basePayload: any = {
-      user_id: userId,
+    const updatePayload: any = {
       portal_id: formData.portal_id,
       transaction_type: formData.transaction_type,
       amount: parseFloat(formData.amount),
       commission: parseFloat(formData.commission),
       site_fee: parseFloat(formData.site_fee),
       reference_number: formData.reference_number || null,
-      status: "completed",
+      status: formData.status,
     };
 
-    // No card_type field
+    if (formData.transaction_date) {
+      updatePayload.transaction_date = new Date(formData.transaction_date).toISOString();
+    }
 
-    let { error } = await supabase.from("transactions").insert(basePayload);
-
-    // No retry needed
+    const { error } = await supabase
+      .from("transactions")
+      .update(updatePayload)
+      .eq("id", transaction.id);
 
     setIsLoading(false);
 
@@ -171,36 +167,26 @@ export const AddTransactionDialog = ({
     } else {
       toast({
         title: "Success",
-        description: "Transaction added successfully",
+        description: "Transaction updated successfully",
       });
-      
-      setFormData({
-        portal_id: "",
-        
-        transaction_type: "withdrawal",
-        amount: "",
-        commission: "",
-        site_fee: "",
-        reference_number: "",
-      });
-      
+      onUpdated();
       onOpenChange(false);
     }
   };
 
+  if (!transaction) return null;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Add Transaction</DialogTitle>
+          <DialogTitle>Edit Transaction</DialogTitle>
           <DialogDescription>
-            Add a new transaction manually or use a template for quick entry.
+            Update transaction details below.
           </DialogDescription>
         </DialogHeader>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-2">
-            <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="portal">Portal</Label>
             <Select
@@ -221,23 +207,58 @@ export const AddTransactionDialog = ({
             </Select>
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="type">Transaction Type</Label>
+              <Select
+                value={formData.transaction_type}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, transaction_type: value })
+                }
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="withdrawal">Withdrawal</SelectItem>
+                  <SelectItem value="repayment">Repayment</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select
+                value={formData.status}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, status: value })
+                }
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div className="space-y-2">
-            <Label htmlFor="type">Transaction Type</Label>
-            <Select
-              value={formData.transaction_type}
-              onValueChange={(value) =>
-                setFormData({ ...formData, transaction_type: value })
+            <Label htmlFor="date">Transaction Date</Label>
+            <Input
+              id="date"
+              type="date"
+              value={formData.transaction_date}
+              onChange={(e) =>
+                setFormData({ ...formData, transaction_date: e.target.value })
               }
               required
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="withdrawal">Withdrawal</SelectItem>
-                <SelectItem value="repayment">Repayment</SelectItem>
-              </SelectContent>
-            </Select>
+            />
           </div>
 
           <div className="space-y-2">
@@ -306,20 +327,16 @@ export const AddTransactionDialog = ({
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adding...
+                  Updating...
                 </>
               ) : (
-                "Add Transaction"
+                "Update Transaction"
               )}
             </Button>
           </div>
-            </form>
-          </div>
-          <div className="md:border-l md:pl-4 pt-4 md:pt-0">
-            <TransactionTemplates userId={userId} onUseTemplate={handleUseTemplate} />
-          </div>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );
 };
+

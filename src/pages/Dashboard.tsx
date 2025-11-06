@@ -6,6 +6,8 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatsCards } from "@/components/dashboard/StatsCards";
 import { ProfitChart } from "@/components/dashboard/ProfitChart";
 import { RecentTransactions } from "@/components/dashboard/RecentTransactions";
+import { Goals } from "@/components/dashboard/Goals";
+import { PortalComparisonChart } from "@/components/dashboard/PortalComparisonChart";
 import { useToast } from "@/hooks/use-toast";
 
 const Dashboard = () => {
@@ -71,6 +73,10 @@ const Dashboard = () => {
           <ProfitChart userId={user.id} />
           <RecentTransactions userId={user.id} />
         </div>
+
+        <PortalComparisonChart userId={user.id} />
+
+        <Goals userId={user.id} />
       </div>
     </DashboardLayout>
   );

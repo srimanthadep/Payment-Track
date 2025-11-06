@@ -11,9 +11,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Download, Search, Trash2 } from "lucide-react";
+import { Download, Search, Trash2, Edit, FileText } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { TransactionFilters, FilterState } from "./TransactionFilters";
+import { EditTransactionDialog } from "./EditTransactionDialog";
+import { exportToPDF } from "@/utils/pdfExport";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +34,7 @@ interface TransactionsTableProps {
 
 interface Transaction {
   id: string;
+  portal_id: string;
   transaction_type: string;
   amount: number;
   commission: number;
@@ -54,6 +58,16 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
+  const [filters, setFilters] = useState<FilterState>({
+    dateRange: { from: null, to: null },
+    portals: [],
+    status: [],
+    transactionType: [],
+    amountRange: { min: null, max: null },
+  });
+  const [portals, setPortals] = useState<Array<{ id: string; name: string }>>([]);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -61,6 +75,7 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
         .from("transactions")
         .select(`
           id,
+          portal_id,
           transaction_type,
           amount,
           commission,
@@ -75,6 +90,16 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
         `)
         .eq("user_id", userId)
         .order("transaction_date", { ascending: false });
+
+      // Fetch portals for filters
+      const { data: portalsData } = await supabase
+        .from("portals")
+        .select("id, name")
+        .eq("is_active", true);
+      
+      if (portalsData) {
+        setPortals(portalsData);
+      }
 
       if (error) {
         console.error("Error fetching transactions:", error);
@@ -116,18 +141,58 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
   }, [userId, toast]);
 
   useEffect(() => {
+    let filtered = [...transactions];
+
+    // Text search
     if (searchQuery) {
-      const filtered = transactions.filter(
+      filtered = filtered.filter(
         (t) =>
           t.portals.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           t.transaction_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
           t.reference_number?.toLowerCase().includes(searchQuery.toLowerCase())
       );
-      setFilteredTransactions(filtered);
-    } else {
-      setFilteredTransactions(transactions);
     }
-  }, [searchQuery, transactions]);
+
+    // Date range filter
+    if (filters.dateRange.from) {
+      filtered = filtered.filter((t) => {
+        const txDate = new Date(t.transaction_date);
+        return txDate >= filters.dateRange.from!;
+      });
+    }
+    if (filters.dateRange.to) {
+      filtered = filtered.filter((t) => {
+        const txDate = new Date(t.transaction_date);
+        txDate.setHours(23, 59, 59, 999);
+        return txDate <= filters.dateRange.to!;
+      });
+    }
+
+    // Portal filter
+    if (filters.portals.length > 0) {
+      filtered = filtered.filter((t) => filters.portals.includes(t.portal_id));
+    }
+
+    // Status filter
+    if (filters.status.length > 0) {
+      filtered = filtered.filter((t) => filters.status.includes(t.status));
+    }
+
+    // Transaction type filter
+    if (filters.transactionType.length > 0) {
+      filtered = filtered.filter((t) => filters.transactionType.includes(t.transaction_type));
+    }
+
+    // Amount range filter
+    if (filters.amountRange.min !== null) {
+      filtered = filtered.filter((t) => t.amount >= filters.amountRange.min!);
+    }
+    if (filters.amountRange.max !== null) {
+      filtered = filtered.filter((t) => t.amount <= filters.amountRange.max!);
+    }
+
+    setFilteredTransactions(filtered);
+  }, [searchQuery, transactions, filters]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -150,6 +215,38 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
   const handleDeleteClick = (transactionId: string) => {
     setTransactionToDelete(transactionId);
     setDeleteDialogOpen(true);
+  };
+
+  const handleEditClick = (transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setEditDialogOpen(true);
+  };
+
+  const handleEditUpdated = async () => {
+    // Refresh transactions
+    const { data, error } = await supabase
+      .from("transactions")
+      .select(`
+        id,
+        portal_id,
+        transaction_type,
+        amount,
+        commission,
+        site_fee,
+        profit,
+        transaction_date,
+        reference_number,
+        status,
+        portals (
+          name
+        )
+      `)
+      .eq("user_id", userId)
+      .order("transaction_date", { ascending: false });
+
+    if (!error && data) {
+      setTransactions(data as Transaction[]);
+    }
   };
 
   const handleDeleteConfirm = async () => {
@@ -283,6 +380,17 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
     });
   };
 
+  const handleExportPDF = () => {
+    exportToPDF({
+      transactions: filteredTransactions,
+      dateRange: filters.dateRange,
+    });
+    toast({
+      title: "Success",
+      description: "PDF report generated",
+    });
+  };
+
   return (
     <div className="space-y-3 sm:space-y-4">
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-4">
@@ -304,10 +412,18 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
         <Button onClick={exportToCSV} variant="outline" className="text-xs sm:text-sm h-9 px-3">
           <Download className="mr-1.5 h-3.5 w-3.5" />
           <span className="hidden sm:inline">Export CSV</span>
-          <span className="sm:hidden">Export</span>
+          <span className="sm:hidden">CSV</span>
+        </Button>
+        <Button onClick={handleExportPDF} variant="outline" className="text-xs sm:text-sm h-9 px-3">
+          <FileText className="mr-1.5 h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Export PDF</span>
+          <span className="sm:hidden">PDF</span>
         </Button>
         </div>
       </div>
+
+      {/* Advanced Filters */}
+      <TransactionFilters portals={portals} onFiltersChange={setFilters} />
 
       {/* Mobile cards */}
       <div className="grid gap-2 sm:hidden">
@@ -339,6 +455,14 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
                   >
                     {transaction.status}
                   </Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleEditClick(transaction)}
+                    className="h-6 w-6 p-0"
+                  >
+                    <Edit className="h-3 w-3" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -444,14 +568,23 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteClick(transaction.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditClick(transaction)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteClick(transaction.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -471,6 +604,13 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
           </div>
         </div>
       )}
+
+      <EditTransactionDialog
+        transaction={editingTransaction}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onUpdated={handleEditUpdated}
+      />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
