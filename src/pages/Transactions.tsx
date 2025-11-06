@@ -44,14 +44,14 @@ const Transactions = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex justify-between items-center gap-3 flex-wrap">
+        <div className="space-y-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Transactions</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Transactions</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
               Manage all your payment transactions
             </p>
           </div>
-          <div className="flex gap-2 w-full sm:w-auto justify-end order-last sm:order-none">
+          <div className="flex flex-col sm:flex-row gap-2">
             <Button className="w-full sm:w-auto" onClick={() => setIsDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Add Transaction
