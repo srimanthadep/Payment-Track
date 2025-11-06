@@ -73,20 +73,20 @@ const Admin = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          <p className="text-muted-foreground">Manage users, transactions, and portals</p>
+      <div className="space-y-4 sm:space-y-6">
+        <div className="space-y-2">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">Manage users, transactions, and portals</p>
         </div>
 
         <AdminStats />
 
-        <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="transactions">Transactions</TabsTrigger>
-            <TabsTrigger value="portals">Portals</TabsTrigger>
+        <Tabs defaultValue="overview" className="space-y-3 sm:space-y-4">
+          <TabsList className="grid grid-cols-4 w-full">
+            <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
+            <TabsTrigger value="users" className="text-xs sm:text-sm">Users</TabsTrigger>
+            <TabsTrigger value="transactions" className="text-xs sm:text-sm">Transactions</TabsTrigger>
+            <TabsTrigger value="portals" className="text-xs sm:text-sm">Portals</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">

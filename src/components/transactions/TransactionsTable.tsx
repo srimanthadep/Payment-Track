@@ -326,18 +326,28 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
                     <div className="text-[10px] text-muted-foreground truncate">{transaction.portals.name}</div>
                   </div>
                 </div>
-                <Badge
-                  variant={
-                    transaction.status === "completed"
-                      ? "default"
-                      : transaction.status === "pending"
-                      ? "secondary"
-                      : "destructive"
-                  }
-                  className="text-[10px] px-1.5 py-0 flex-shrink-0"
-                >
-                  {transaction.status}
-                </Badge>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <Badge
+                    variant={
+                      transaction.status === "completed"
+                        ? "default"
+                        : transaction.status === "pending"
+                        ? "secondary"
+                        : "destructive"
+                    }
+                    className="text-[10px] px-1.5 py-0"
+                  >
+                    {transaction.status}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDeleteClick(transaction.id)}
+                    className="text-destructive hover:text-destructive h-6 w-6 p-0"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs">
@@ -357,17 +367,6 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
                   <span className="text-[10px] text-muted-foreground">Profit</span>
                   <span className="text-success font-semibold">{formatCurrency(transaction.commission)}</span>
                 </div>
-              </div>
-
-              <div className="mt-2 flex items-center justify-end">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleDeleteClick(transaction.id)}
-                  className="text-destructive hover:text-destructive h-7 px-2"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
               </div>
             </div>
           ))

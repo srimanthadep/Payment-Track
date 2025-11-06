@@ -162,60 +162,73 @@ export const AdminUsers = () => {
 
   return (
     <>
-      <div className="flex flex-wrap gap-2 justify-between items-center mb-3">
-        <Input placeholder="Search users" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs flex-1 min-w-[200px]" />
-        <div className="flex gap-2 w-full sm:w-auto justify-end">
-          <Button className="w-full sm:w-auto" onClick={() => setAddOpen(true)}>Add new user</Button>
-          <Button className="w-full sm:w-auto" variant="outline" onClick={() => setInviteOpen(true)}>Invite by email</Button>
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Input 
+            placeholder="Search users" 
+            value={search} 
+            onChange={(e) => setSearch(e.target.value)} 
+            className="w-full sm:max-w-xs text-sm h-9" 
+          />
+          <div className="flex gap-2">
+            <Button className="flex-1 sm:flex-none text-sm h-9" onClick={() => setAddOpen(true)}>Add new user</Button>
+            <Button className="flex-1 sm:flex-none text-sm h-9" variant="outline" onClick={() => setInviteOpen(true)}>Invite by email</Button>
+          </div>
+        </div>
+        <div className="rounded-md border overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs sm:text-sm">Email</TableHead>
+                <TableHead className="text-xs sm:text-sm hidden sm:table-cell">Name</TableHead>
+                <TableHead className="text-xs sm:text-sm hidden md:table-cell">Phone</TableHead>
+                <TableHead className="text-xs sm:text-sm">Role</TableHead>
+                <TableHead className="text-xs sm:text-sm hidden lg:table-cell">Joined</TableHead>
+                <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell className="font-medium text-xs sm:text-sm">
+                    <div className="truncate max-w-[150px] sm:max-w-none">{user.email}</div>
+                    <div className="text-[10px] text-muted-foreground sm:hidden mt-0.5">{user.full_name || "-"}</div>
+                  </TableCell>
+                  <TableCell className="text-xs sm:text-sm hidden sm:table-cell">{user.full_name || "-"}</TableCell>
+                  <TableCell className="text-xs sm:text-sm hidden md:table-cell">{user.phone_number || "-"}</TableCell>
+                  <TableCell>
+                    {user.is_admin ? (
+                      <Badge className="text-[10px] sm:text-xs">Admin</Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-[10px] sm:text-xs">User</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs sm:text-sm hidden lg:table-cell">
+                    {new Date(user.created_at).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => toggleAdminRole(user.id, user.is_admin)}
+                        className="h-7 w-7"
+                      >
+                        {user.is_admin ? (
+                          <ShieldOff className="h-3.5 w-3.5" />
+                        ) : (
+                          <Shield className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => startEdit(user)} className="h-7 text-xs px-2">Edit</Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       </div>
-    <div className="rounded-md border overflow-x-auto">
-    <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Email</TableHead>
-            <TableHead>Name</TableHead>
-            <TableHead>Phone</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead>Joined</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filtered.map((user) => (
-            <TableRow key={user.id}>
-              <TableCell className="font-medium">{user.email}</TableCell>
-              <TableCell>{user.full_name || "-"}</TableCell>
-              <TableCell>{user.phone_number || "-"}</TableCell>
-              <TableCell>
-                {user.is_admin ? (
-                  <Badge>Admin</Badge>
-                ) : (
-                  <Badge variant="secondary">User</Badge>
-                )}
-              </TableCell>
-              <TableCell>
-                {new Date(user.created_at).toLocaleDateString()}
-              </TableCell>
-              <TableCell className="space-x-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => toggleAdminRole(user.id, user.is_admin)}
-                >
-                  {user.is_admin ? (
-                    <ShieldOff className="h-4 w-4" />
-                  ) : (
-                    <Shield className="h-4 w-4" />
-                  )}
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => startEdit(user)}>Edit</Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-    </Table>
-    </div>
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent>

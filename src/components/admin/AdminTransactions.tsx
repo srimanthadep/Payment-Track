@@ -201,93 +201,93 @@ export const AdminTransactions = () => {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="relative flex-1 min-w-[220px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+    <div className="space-y-3 sm:space-y-4">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
           <Input
             placeholder="Search transactions..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-8 sm:pl-10 h-9 text-sm"
           />
         </div>
-        <div className="flex gap-2 w-full sm:w-auto justify-end">
-          <Button className="w-full sm:w-auto" onClick={exportToCSV} variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Export CSV
-          </Button>
-        </div>
+        <Button className="w-full sm:w-auto text-sm h-9" onClick={exportToCSV} variant="outline">
+          <Download className="mr-1.5 h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Export CSV</span>
+          <span className="sm:hidden">Export</span>
+        </Button>
       </div>
 
       <div className="rounded-md border overflow-x-auto">
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Date</TableHead>
-          <TableHead>User</TableHead>
-          <TableHead>Portal</TableHead>
-          <TableHead>Type</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
-              <TableHead className="text-right">Commission</TableHead>
-              <TableHead className="text-right hidden sm:table-cell">Site Fee</TableHead>
-              <TableHead className="text-right hidden sm:table-cell">Profit</TableHead>
-          <TableHead className="hidden md:table-cell">Reference</TableHead>
-          <TableHead className="hidden md:table-cell">Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-xs sm:text-sm">Date</TableHead>
+              <TableHead className="text-xs sm:text-sm">User</TableHead>
+              <TableHead className="text-xs sm:text-sm hidden sm:table-cell">Portal</TableHead>
+              <TableHead className="text-xs sm:text-sm hidden md:table-cell">Type</TableHead>
+              <TableHead className="text-xs sm:text-sm text-right">Amount</TableHead>
+              <TableHead className="text-xs sm:text-sm text-right hidden lg:table-cell">Commission</TableHead>
+              <TableHead className="text-xs sm:text-sm text-right hidden sm:table-cell">Site Fee</TableHead>
+              <TableHead className="text-xs sm:text-sm text-right hidden sm:table-cell">Profit</TableHead>
+              <TableHead className="text-xs sm:text-sm hidden lg:table-cell">Reference</TableHead>
+              <TableHead className="text-xs sm:text-sm hidden md:table-cell">Status</TableHead>
+              <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {filteredTransactions.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={11} className="text-center py-8">
-                  <p className="text-muted-foreground">No transactions found</p>
+                  <p className="text-sm text-muted-foreground">No transactions found</p>
                 </TableCell>
               </TableRow>
             ) : (
               filteredTransactions.map((tx) => (
-          <TableRow key={tx.id}>
-            <TableCell>
-              {new Date(tx.transaction_date).toLocaleDateString()}
-            </TableCell>
-                  <TableCell className="font-medium">
-              {tx.profiles?.full_name || tx.profiles?.email || "-"}
-            </TableCell>
-            <TableCell>{tx.portals?.name || "-"}</TableCell>
-            <TableCell className="capitalize">{tx.transaction_type}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(tx.amount)}</TableCell>
-                  <TableCell className="text-right text-success">
+                <TableRow key={tx.id}>
+                  <TableCell className="text-xs sm:text-sm">
+                    {new Date(tx.transaction_date).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell className="font-medium text-xs sm:text-sm">
+                    <div className="truncate max-w-[120px] sm:max-w-none">{tx.profiles?.full_name || tx.profiles?.email || "-"}</div>
+                    <div className="text-[10px] text-muted-foreground sm:hidden mt-0.5">{tx.portals?.name || "-"}</div>
+                  </TableCell>
+                  <TableCell className="text-xs sm:text-sm hidden sm:table-cell">{tx.portals?.name || "-"}</TableCell>
+                  <TableCell className="capitalize text-xs sm:text-sm hidden md:table-cell">{tx.transaction_type}</TableCell>
+                  <TableCell className="text-right text-xs sm:text-sm font-semibold">{formatCurrency(tx.amount)}</TableCell>
+                  <TableCell className="text-right text-success text-xs sm:text-sm hidden lg:table-cell">
                     {formatCurrency(tx.commission || 0)}
                   </TableCell>
-                  <TableCell className="text-right text-destructive">
+                  <TableCell className="text-right text-destructive text-xs sm:text-sm hidden sm:table-cell">
                     {formatCurrency(tx.site_fee || 0)}
                   </TableCell>
-                  <TableCell className="text-right font-semibold">
+                  <TableCell className="text-right font-semibold text-xs sm:text-sm hidden sm:table-cell">
                     {formatCurrency(tx.commission || 0)}
                   </TableCell>
-            <TableCell className="font-mono text-sm hidden md:table-cell">
-              {tx.reference_number || "-"}
-            </TableCell>
-            <TableCell className="hidden md:table-cell">
-              <Badge variant={tx.status === "completed" ? "default" : "secondary"}>
-                {tx.status}
-              </Badge>
-            </TableCell>
+                  <TableCell className="font-mono text-xs sm:text-sm hidden lg:table-cell">
+                    {tx.reference_number || "-"}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <Badge variant={tx.status === "completed" ? "default" : "secondary"} className="text-[10px] sm:text-xs">
+                      {tx.status}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="icon"
                       onClick={() => handleDeleteClick(tx.id)}
-                      className="text-destructive hover:text-destructive"
+                      className="text-destructive hover:text-destructive h-7 w-7"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </TableCell>
-          </TableRow>
+                </TableRow>
               ))
             )}
-      </TableBody>
-    </Table>
+          </TableBody>
+        </Table>
       </div>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

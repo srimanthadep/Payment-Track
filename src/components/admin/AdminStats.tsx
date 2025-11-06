@@ -129,16 +129,16 @@ export const AdminStats = () => {
 
   if (loading) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         {[...Array(4)].map((_, i) => (
           <Card key={i}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div className="h-4 w-24 bg-muted animate-pulse rounded" />
-              <div className="h-8 w-8 bg-muted animate-pulse rounded" />
+            <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+              <div className="h-3 w-20 bg-muted animate-pulse rounded" />
+              <div className="h-6 w-6 bg-muted animate-pulse rounded" />
             </CardHeader>
-            <CardContent>
-              <div className="h-8 w-32 bg-muted animate-pulse rounded mb-2" />
-              <div className="h-3 w-24 bg-muted animate-pulse rounded" />
+            <CardContent className="pt-0">
+              <div className="h-6 w-24 bg-muted animate-pulse rounded mb-1" />
+              <div className="h-2.5 w-16 bg-muted animate-pulse rounded" />
             </CardContent>
           </Card>
         ))}
@@ -147,7 +147,7 @@ export const AdminStats = () => {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
       {statCards.map((card) => {
         const Icon = card.icon;
         const displayValue = card.title.includes("Revenue") || card.title.includes("Profit")
@@ -156,17 +156,17 @@ export const AdminStats = () => {
 
         return (
           <Card key={card.title} className="overflow-hidden relative">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+            <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium leading-tight pr-2">
                 {card.title}
               </CardTitle>
-              <div className={`p-2 rounded-lg bg-gradient-to-br ${card.gradient}`}>
-                <Icon className="h-4 w-4 text-white" />
+              <div className={`p-1.5 sm:p-2 rounded-lg bg-gradient-to-br ${card.gradient} flex-shrink-0`}>
+                <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{displayValue}</div>
-              <p className="text-xs text-muted-foreground mt-1">
+            <CardContent className="pt-0">
+              <div className="text-lg sm:text-2xl font-bold">{displayValue}</div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
                 {card.subtitle}
               </p>
             </CardContent>

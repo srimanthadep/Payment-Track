@@ -220,82 +220,85 @@ export const AdminPortals = () => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       <div className="flex justify-end">
-        <Button onClick={handleAddClick}>
-          <Plus className="mr-2 h-4 w-4" />
+        <Button onClick={handleAddClick} className="text-sm h-9">
+          <Plus className="mr-2 h-3.5 w-3.5" />
           Add Portal
         </Button>
       </div>
 
-      <div className="rounded-md border">
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Name</TableHead>
-          <TableHead>Commission Rate</TableHead>
-          <TableHead>Site Fee</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Created</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
+      <div className="rounded-md border overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-xs sm:text-sm">Name</TableHead>
+              <TableHead className="text-xs sm:text-sm">Commission Rate</TableHead>
+              <TableHead className="text-xs sm:text-sm hidden sm:table-cell">Site Fee</TableHead>
+              <TableHead className="text-xs sm:text-sm">Status</TableHead>
+              <TableHead className="text-xs sm:text-sm hidden lg:table-cell">Created</TableHead>
+              <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {portals.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8">
-                  <p className="text-muted-foreground">No portals found</p>
+                  <p className="text-sm text-muted-foreground">No portals found</p>
                 </TableCell>
               </TableRow>
             ) : (
               portals.map((portal) => (
-          <TableRow key={portal.id}>
-            <TableCell className="font-medium">{portal.name}</TableCell>
-            <TableCell>{portal.default_commission_rate}%</TableCell>
-                  <TableCell>{formatCurrency(portal.default_site_fee)}</TableCell>
-            <TableCell>
-              <Badge variant={portal.is_active ? "default" : "secondary"}>
-                {portal.is_active ? "Active" : "Inactive"}
-              </Badge>
-            </TableCell>
-            <TableCell>
-              {new Date(portal.created_at).toLocaleDateString()}
-            </TableCell>
+                <TableRow key={portal.id}>
+                  <TableCell className="font-medium text-xs sm:text-sm">{portal.name}</TableCell>
+                  <TableCell className="text-xs sm:text-sm">{portal.default_commission_rate}%</TableCell>
+                  <TableCell className="text-xs sm:text-sm hidden sm:table-cell">{formatCurrency(portal.default_site_fee)}</TableCell>
+                  <TableCell>
+                    <Badge variant={portal.is_active ? "default" : "secondary"} className="text-[10px] sm:text-xs">
+                      {portal.is_active ? "Active" : "Inactive"}
+                    </Badge>
+                    <div className="text-[10px] text-muted-foreground sm:hidden mt-0.5">{formatCurrency(portal.default_site_fee)}</div>
+                  </TableCell>
+                  <TableCell className="text-xs sm:text-sm hidden lg:table-cell">
+                    {new Date(portal.created_at).toLocaleDateString()}
+                  </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-1">
                       <Button
                         variant="ghost"
-                        size="sm"
+                        size="icon"
                         onClick={() => toggleActive(portal)}
+                        className="h-7 w-7"
                       >
                         {portal.is_active ? (
-                          <ToggleRight className="h-4 w-4" />
+                          <ToggleRight className="h-3.5 w-3.5" />
                         ) : (
-                          <ToggleLeft className="h-4 w-4" />
+                          <ToggleLeft className="h-3.5 w-3.5" />
                         )}
                       </Button>
                       <Button
                         variant="ghost"
-                        size="sm"
+                        size="icon"
                         onClick={() => handleEditClick(portal)}
+                        className="h-7 w-7"
                       >
-                        <Edit className="h-4 w-4" />
+                        <Edit className="h-3.5 w-3.5" />
                       </Button>
                       <Button
                         variant="ghost"
-                        size="sm"
+                        size="icon"
                         onClick={() => handleDeleteClick(portal.id)}
-                        className="text-destructive hover:text-destructive"
+                        className="text-destructive hover:text-destructive h-7 w-7"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </TableCell>
-          </TableRow>
+                </TableRow>
               ))
             )}
-      </TableBody>
-    </Table>
+          </TableBody>
+        </Table>
       </div>
 
       {/* Edit/Add Dialog */}
