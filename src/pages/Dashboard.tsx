@@ -6,8 +6,10 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatsCards } from "@/components/dashboard/StatsCards";
 import { ProfitChart } from "@/components/dashboard/ProfitChart";
 import { RecentTransactions } from "@/components/dashboard/RecentTransactions";
-import { Goals } from "@/components/dashboard/Goals";
 import { PortalComparisonChart } from "@/components/dashboard/PortalComparisonChart";
+import { DashboardSkeleton } from "@/components/ui/skeletons";
+import { PullToRefresh } from "@/components/ui/PullToRefresh";
+import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
 const Dashboard = () => {
@@ -16,6 +18,12 @@ const Dashboard = () => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleRefresh = async () => {
+    setRefreshKey((k) => k + 1);
+    // Force re-render of child components
+  };
 
   useEffect(() => {
     // Set up auth state listener
@@ -46,12 +54,9 @@ const Dashboard = () => {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading...</p>
-        </div>
-      </div>
+      <DashboardLayout>
+        <DashboardSkeleton />
+      </DashboardLayout>
     );
   }
 
@@ -59,25 +64,47 @@ const Dashboard = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="space-y-2">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Overview of your payment transactions and profits
-          </p>
-        </div>
+      <PullToRefresh onRefresh={handleRefresh}>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="space-y-4 sm:space-y-6"
+        >
+          <div className="space-y-2">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
+              Overview of your payment transactions and profits
+            </p>
+          </div>
 
-        <StatsCards userId={user.id} />
-        
-        <div className="grid gap-6 lg:grid-cols-2">
-          <ProfitChart userId={user.id} />
-          <RecentTransactions userId={user.id} />
-        </div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.1 }}
+          >
+            <StatsCards userId={user.id} key={refreshKey} />
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="grid gap-6 lg:grid-cols-2"
+          >
+            <ProfitChart userId={user.id} />
+            <RecentTransactions userId={user.id} />
+          </motion.div>
 
-        <PortalComparisonChart userId={user.id} />
-
-        <Goals userId={user.id} />
-      </div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
+            <PortalComparisonChart userId={user.id} />
+          </motion.div>
+        </motion.div>
+      </PullToRefresh>
     </DashboardLayout>
   );
 };

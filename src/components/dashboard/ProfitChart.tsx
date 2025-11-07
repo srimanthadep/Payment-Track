@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { motion } from "framer-motion";
 
 interface ProfitChartProps {
   userId: string;
@@ -170,7 +171,12 @@ export const ProfitChart = ({ userId }: ProfitChartProps) => {
   };
 
   return (
-    <Card className="h-full flex flex-col">
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.3 }}
+    >
+      <Card className="h-full flex flex-col">
       <CardHeader className="pb-3">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <CardTitle className="text-lg sm:text-xl">Profit Trends</CardTitle>
@@ -210,35 +216,36 @@ export const ProfitChart = ({ userId }: ProfitChartProps) => {
                   stroke="hsl(var(--muted))" 
                   vertical={false}
                 />
-                <XAxis 
-                  dataKey="date" 
+              <XAxis 
+                dataKey="date" 
                   tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
                   tickLine={{ stroke: "hsl(var(--muted))" }}
                   axisLine={{ stroke: "hsl(var(--muted))" }}
                   interval="preserveStartEnd"
-                />
-                <YAxis 
+              />
+              <YAxis 
                   tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
                   tickLine={{ stroke: "hsl(var(--muted))" }}
                   axisLine={{ stroke: "hsl(var(--muted))" }}
                   tickFormatter={(value) => formatCurrency(value)}
                   width={60}
-                />
+              />
                 <Tooltip content={<CustomTooltip />} />
                 <Area 
-                  type="monotone" 
-                  dataKey="profit" 
-                  stroke="hsl(var(--success))" 
+                type="monotone" 
+                dataKey="profit" 
+                stroke="hsl(var(--success))" 
                   strokeWidth={2.5}
                   fill="url(#colorProfit)"
                   dot={{ fill: "hsl(var(--success))", r: 3, strokeWidth: 2, stroke: "hsl(var(--card))" }}
                   activeDot={{ r: 5, strokeWidth: 2, stroke: "hsl(var(--success))" }}
-                />
+              />
               </AreaChart>
-            </ResponsiveContainer>
+          </ResponsiveContainer>
           </div>
         )}
       </CardContent>
     </Card>
+    </motion.div>
   );
 };

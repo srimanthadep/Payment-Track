@@ -19,7 +19,12 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import { TransactionTemplates } from "./TransactionTemplates";
+import {
+  calculateCommission,
+  getCardTypesForTransaction,
+  getCardTypeDisplayNameWithRate,
+  type CardType,
+} from "@/utils/commissionCalculator";
 
 interface AddTransactionDialogProps {
   userId: string;
@@ -35,21 +40,6 @@ interface Portal {
   default_site_fee: number;
 }
 
-interface Template {
-  id: string;
-  name: string;
-  portal_id: string;
-  transaction_type: string;
-  amount: number | null;
-  commission: number | null;
-  site_fee: number | null;
-  portals: {
-    name: string;
-  };
-}
-
-// Card type support removed; commission uses portal default rate
-
 export const AddTransactionDialog = ({
   userId,
   open,
@@ -59,12 +49,11 @@ export const AddTransactionDialog = ({
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [portals, setPortals] = useState<Portal[]>([]);
-  // No portalRates state
   
   const [formData, setFormData] = useState({
     portal_id: "",
-    
-    transaction_type: "withdrawal",
+    card_type: "" as CardType | "",
+    transaction_type: "withdrawal" as "withdrawal" | "repayment",
     amount: "",
     commission: "",
     site_fee: "",
@@ -96,65 +85,101 @@ export const AddTransactionDialog = ({
       const next = {
         ...formData,
         portal_id: portalId,
-        
-        site_fee: portal.default_site_fee.toString(),
+        // Only set site_fee if it's empty, otherwise keep user's value
+        site_fee: formData.site_fee || portal.default_site_fee.toString(),
       };
-      // If user already typed amount, recompute commission using portal default
-      if (next.amount) {
-        const commissionAmount = (parseFloat(next.amount) * portal.default_commission_rate) / 100;
+      // Recalculate commission if amount and card type are set
+      if (next.amount && next.card_type) {
+        const commissionAmount = calculateCommission(
+          parseFloat(next.amount),
+          next.card_type,
+          next.transaction_type
+        );
         next.commission = commissionAmount.toFixed(2);
       }
       setFormData(next);
     }
   };
 
-  const handleAmountChange = (amount: string) => {
-    const portal = portals.find((p) => p.id === formData.portal_id);
-    const rate = portal?.default_commission_rate;
-    if (rate != null && amount) {
-      const commissionAmount = (parseFloat(amount) * Number(rate)) / 100;
-      setFormData({
-        ...formData,
-        amount,
-        commission: commissionAmount.toFixed(2),
-      });
-    } else {
-      setFormData({
-        ...formData,
-        amount,
-      });
+  const handleCardTypeChange = (cardType: CardType) => {
+    const next = {
+      ...formData,
+      card_type: cardType,
+    };
+    // Recalculate commission if amount is set
+    if (next.amount && cardType) {
+      const commissionAmount = calculateCommission(
+        parseFloat(next.amount),
+        cardType,
+        next.transaction_type
+      );
+      next.commission = commissionAmount.toFixed(2);
     }
+    setFormData(next);
   };
 
-  // Card type handler removed
+  const handleTransactionTypeChange = (transactionType: "withdrawal" | "repayment") => {
+    const next = {
+      ...formData,
+      transaction_type: transactionType,
+      card_type: "" as CardType | "", // Reset card type when transaction type changes
+    };
+    // Recalculate commission if amount and card type are set
+    if (next.amount && next.card_type) {
+      const commissionAmount = calculateCommission(
+        parseFloat(next.amount),
+        next.card_type,
+        transactionType
+      );
+      next.commission = commissionAmount.toFixed(2);
+    }
+    setFormData(next);
+  };
 
-  const handleUseTemplate = (template: Template) => {
-    setFormData({
-      portal_id: template.portal_id,
-      transaction_type: template.transaction_type,
-      amount: template.amount?.toString() || "",
-      commission: template.commission?.toString() || "",
-      site_fee: template.site_fee?.toString() || "",
-      reference_number: "",
-    });
+  const handleAmountChange = (amount: string) => {
+    const next = {
+      ...formData,
+      amount,
+    };
+    // Recalculate commission if card type is set
+    if (amount && next.card_type) {
+      const commissionAmount = calculateCommission(
+        parseFloat(amount),
+        next.card_type,
+        next.transaction_type
+      );
+      next.commission = commissionAmount.toFixed(2);
+    } else {
+      next.commission = "";
+    }
+    setFormData(next);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!formData.card_type) {
+      toast({
+        title: "Error",
+        description: "Please select a card type",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     const basePayload: any = {
       user_id: userId,
       portal_id: formData.portal_id,
+      card_type: formData.card_type,
       transaction_type: formData.transaction_type,
       amount: parseFloat(formData.amount),
       commission: parseFloat(formData.commission),
-      site_fee: parseFloat(formData.site_fee),
+      site_fee: formData.site_fee ? parseFloat(formData.site_fee) : 0,
       reference_number: formData.reference_number || null,
       status: "completed",
     };
-
-    // No card_type field
 
     let { error } = await supabase.from("transactions").insert(basePayload);
 
@@ -176,7 +201,7 @@ export const AddTransactionDialog = ({
       
       setFormData({
         portal_id: "",
-        
+        card_type: "" as CardType | "",
         transaction_type: "withdrawal",
         amount: "",
         commission: "",
@@ -194,13 +219,11 @@ export const AddTransactionDialog = ({
         <DialogHeader>
           <DialogTitle>Add Transaction</DialogTitle>
           <DialogDescription>
-            Add a new transaction manually or use a template for quick entry.
+            Add a new transaction manually.
           </DialogDescription>
         </DialogHeader>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-2">
-            <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="portal">Portal</Label>
             <Select
@@ -225,9 +248,7 @@ export const AddTransactionDialog = ({
             <Label htmlFor="type">Transaction Type</Label>
             <Select
               value={formData.transaction_type}
-              onValueChange={(value) =>
-                setFormData({ ...formData, transaction_type: value })
-              }
+              onValueChange={handleTransactionTypeChange}
               required
             >
               <SelectTrigger>
@@ -236,6 +257,26 @@ export const AddTransactionDialog = ({
               <SelectContent>
                 <SelectItem value="withdrawal">Withdrawal</SelectItem>
                 <SelectItem value="repayment">Repayment</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="card_type">Card Type</Label>
+            <Select
+              value={formData.card_type}
+              onValueChange={handleCardTypeChange}
+              required
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select card type" />
+              </SelectTrigger>
+              <SelectContent>
+                {getCardTypesForTransaction(formData.transaction_type).map((cardType) => (
+                  <SelectItem key={cardType} value={cardType}>
+                    {getCardTypeDisplayNameWithRate(cardType, formData.transaction_type)}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -268,7 +309,7 @@ export const AddTransactionDialog = ({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="site_fee">Site Fee (₹)</Label>
+              <Label htmlFor="site_fee">Site Fee (₹) (Optional)</Label>
               <Input
                 id="site_fee"
                 type="number"
@@ -277,7 +318,6 @@ export const AddTransactionDialog = ({
                 onChange={(e) =>
                   setFormData({ ...formData, site_fee: e.target.value })
                 }
-                required
               />
             </div>
           </div>
@@ -313,12 +353,7 @@ export const AddTransactionDialog = ({
               )}
             </Button>
           </div>
-            </form>
-          </div>
-          <div className="md:border-l md:pl-4 pt-4 md:pt-0">
-            <TransactionTemplates userId={userId} onUseTemplate={handleUseTemplate} />
-          </div>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

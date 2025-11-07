@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, DollarSign, TrendingUp, Activity, ArrowUp, ArrowDown } from "lucide-react";
+import { Users, TrendingUp, Activity, ArrowUp, ArrowDown } from "lucide-react";
+import { RupeeIcon } from "@/components/icons/RupeeIcon";
 
 interface AdminStats {
   totalUsers: number;
@@ -89,11 +90,10 @@ export const AdminStats = () => {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
+    return `₹${amount.toLocaleString("en-IN", {
       minimumFractionDigits: 2,
-    }).format(amount);
+      maximumFractionDigits: 2,
+    })}`;
   };
 
   const statCards = [
@@ -114,7 +114,7 @@ export const AdminStats = () => {
     {
       title: "Total Revenue",
       value: stats.totalRevenue,
-      icon: DollarSign,
+      icon: RupeeIcon,
       gradient: "from-green-500 to-green-600",
       subtitle: `${formatCurrency(stats.revenueToday)} today`,
     },

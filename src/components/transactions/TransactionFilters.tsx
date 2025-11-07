@@ -114,25 +114,30 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
     filters.amountRange.max !== null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {/* Date Range Filter */}
-      <Popover open={dateRangeOpen} onOpenChange={setDateRangeOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            className={cn(
-              "h-9 text-xs sm:text-sm",
-              filters.dateRange.from || filters.dateRange.to ? "bg-primary/10" : ""
-            )}
-          >
-            <CalendarIcon className="mr-2 h-3.5 w-3.5" />
-            {filters.dateRange.from && filters.dateRange.to
-              ? `${format(filters.dateRange.from, "MMM d")} - ${format(filters.dateRange.to, "MMM d")}`
-              : filters.dateRange.from
-              ? format(filters.dateRange.from, "MMM d")
-              : "Date Range"}
-          </Button>
-        </PopoverTrigger>
+    <div className="w-full">
+      {/* Mobile: Grid layout for better space utilization - 3 columns */}
+      <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-2">
+        {/* Date Range Filter */}
+        <Popover open={dateRangeOpen} onOpenChange={setDateRangeOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn(
+                "h-9 text-xs sm:text-sm w-full sm:w-auto",
+                filters.dateRange.from || filters.dateRange.to ? "bg-primary/10" : ""
+              )}
+            >
+              <CalendarIcon className="mr-1.5 sm:mr-2 h-3 w-3 sm:h-3.5 sm:w-3.5" />
+              <span className="hidden sm:inline">
+                {filters.dateRange.from && filters.dateRange.to
+                  ? `${format(filters.dateRange.from, "MMM d")} - ${format(filters.dateRange.to, "MMM d")}`
+                  : filters.dateRange.from
+                  ? format(filters.dateRange.from, "MMM d")
+                  : "Date Range"}
+              </span>
+              <span className="sm:hidden">Date</span>
+            </Button>
+          </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
           <div className="p-3 space-y-3">
             <div className="flex flex-wrap gap-2">
@@ -177,16 +182,18 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
         </PopoverContent>
       </Popover>
 
-      {/* Portal Filter */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            className={cn("h-9 text-xs sm:text-sm", filters.portals.length > 0 ? "bg-primary/10" : "")}
-          >
-            Portal {filters.portals.length > 0 && `(${filters.portals.length})`}
-          </Button>
-        </PopoverTrigger>
+        {/* Portal Filter */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn("h-9 text-xs sm:text-sm w-full sm:w-auto", filters.portals.length > 0 ? "bg-primary/10" : "")}
+            >
+              <span className="hidden sm:inline">Portal</span>
+              <span className="sm:hidden">Portal</span>
+              {filters.portals.length > 0 && ` (${filters.portals.length})`}
+            </Button>
+          </PopoverTrigger>
         <PopoverContent className="w-56" align="start">
           <div className="space-y-2">
             <Label className="text-xs font-semibold">Select Portals</Label>
@@ -207,16 +214,16 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
         </PopoverContent>
       </Popover>
 
-      {/* Status Filter */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            className={cn("h-9 text-xs sm:text-sm", filters.status.length > 0 ? "bg-primary/10" : "")}
-          >
-            Status {filters.status.length > 0 && `(${filters.status.length})`}
-          </Button>
-        </PopoverTrigger>
+        {/* Status Filter */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn("h-9 text-xs sm:text-sm w-full sm:w-auto", filters.status.length > 0 ? "bg-primary/10" : "")}
+            >
+              Status {filters.status.length > 0 && `(${filters.status.length})`}
+            </Button>
+          </PopoverTrigger>
         <PopoverContent className="w-48" align="start">
           <div className="space-y-2">
             <Label className="text-xs font-semibold">Select Status</Label>
@@ -237,16 +244,16 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
         </PopoverContent>
       </Popover>
 
-      {/* Transaction Type Filter */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            className={cn("h-9 text-xs sm:text-sm", filters.transactionType.length > 0 ? "bg-primary/10" : "")}
-          >
-            Type {filters.transactionType.length > 0 && `(${filters.transactionType.length})`}
-          </Button>
-        </PopoverTrigger>
+        {/* Transaction Type Filter */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn("h-9 text-xs sm:text-sm w-full sm:w-auto", filters.transactionType.length > 0 ? "bg-primary/10" : "")}
+            >
+              Type {filters.transactionType.length > 0 && `(${filters.transactionType.length})`}
+            </Button>
+          </PopoverTrigger>
         <PopoverContent className="w-48" align="start">
           <div className="space-y-2">
             <Label className="text-xs font-semibold">Select Type</Label>
@@ -267,16 +274,17 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
         </PopoverContent>
       </Popover>
 
-      {/* Amount Range Filter */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            className={cn("h-9 text-xs sm:text-sm", filters.amountRange.min !== null || filters.amountRange.max !== null ? "bg-primary/10" : "")}
-          >
-            Amount Range
-          </Button>
-        </PopoverTrigger>
+        {/* Amount Range Filter */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn("h-9 text-xs sm:text-sm w-full sm:w-auto col-span-3 sm:col-span-1", filters.amountRange.min !== null || filters.amountRange.max !== null ? "bg-primary/10" : "")}
+            >
+              <span className="hidden sm:inline">Amount Range</span>
+              <span className="sm:hidden">Amount</span>
+            </Button>
+          </PopoverTrigger>
         <PopoverContent className="w-64" align="start">
           <div className="space-y-3">
             <Label className="text-xs font-semibold">Amount Range (₹)</Label>
@@ -320,13 +328,14 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
         </PopoverContent>
       </Popover>
 
-      {/* Clear All Filters */}
-      {hasActiveFilters && (
-        <Button variant="ghost" size="sm" onClick={clearAllFilters} className="h-9 text-xs sm:text-sm">
-          <X className="mr-1 h-3.5 w-3.5" />
-          Clear All
-        </Button>
-      )}
+        {/* Clear All Filters */}
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={clearAllFilters} className="h-9 text-xs sm:text-sm w-full sm:w-auto col-span-3 sm:col-span-1">
+            <X className="mr-1 h-3.5 w-3.5" />
+            Clear All
+          </Button>
+        )}
+      </div>
     </div>
   );
 };

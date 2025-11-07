@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowDownCircle, ArrowUpCircle } from "lucide-react";
+import { motion } from "framer-motion";
 
 interface RecentTransactionsProps {
   userId: string;
@@ -93,10 +94,15 @@ export const RecentTransactions = ({ userId }: RecentTransactionsProps) => {
           </div>
         ) : (
           <div className="space-y-3 sm:space-y-4">
-            {transactions.map((transaction) => (
-              <div
+            {transactions.map((transaction, index) => (
+              <motion.div
                 key={transaction.id}
-                className="flex items-center justify-between gap-3 border-b pb-3 sm:pb-4 last:border-0 last:pb-0"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <div
+                  className="flex items-center justify-between gap-3 border-b pb-3 sm:pb-4 last:border-0 last:pb-0"
               >
                 <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
                   <div className={`p-1.5 sm:p-2 rounded-lg flex-shrink-0 ${
@@ -130,6 +136,7 @@ export const RecentTransactions = ({ userId }: RecentTransactionsProps) => {
                   </p>
                 </div>
               </div>
+              </motion.div>
             ))}
           </div>
         )}

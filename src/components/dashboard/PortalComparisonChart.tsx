@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { motion } from "framer-motion";
 
 interface PortalComparisonProps {
   userId: string;
@@ -88,12 +89,44 @@ export const PortalComparisonChart = ({ userId, period = "all" }: PortalComparis
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
+    return `₹${amount.toLocaleString("en-IN", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(amount);
+    })}`;
+  };
+
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
+          <p className="font-semibold text-sm mb-1">{payload[0].name}</p>
+          <p className="text-xs text-muted-foreground">
+            Profit: <span className="text-success font-medium">{formatCurrency(payload[0].value)}</span>
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const RADIAN = Math.PI / 180;
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }: any) => {
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+    return (
+      <text
+        x={x}
+        y={y}
+        fill="white"
+        textAnchor={x > cx ? "start" : "end"}
+        dominantBaseline="central"
+        className="text-xs font-semibold"
+      >
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
   };
 
   if (isLoading) {
@@ -128,66 +161,87 @@ export const PortalComparisonChart = ({ userId, period = "all" }: PortalComparis
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-3">
         <CardTitle className="text-lg sm:text-xl">Portal Comparison</CardTitle>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
-            <XAxis
-              dataKey="name"
-              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-              tickLine={{ stroke: "hsl(var(--muted))" }}
-            />
-            <YAxis
-              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-              tickLine={{ stroke: "hsl(var(--muted))" }}
-              tickFormatter={(value) => formatCurrency(value)}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "hsl(var(--card))",
-                border: "1px solid hsl(var(--border))",
-                borderRadius: "var(--radius)",
-                fontSize: "12px",
-              }}
-              formatter={(value: number) => formatCurrency(value)}
-            />
-            <Legend wrapperStyle={{ fontSize: "12px" }} />
-            <Bar dataKey="totalProfit" name="Profit" fill="hsl(var(--success))" radius={[4, 4, 0, 0]}>
-              {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-              ))}
-            </Bar>
-            <Bar dataKey="totalCommission" name="Commission" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
+        <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
+          {/* Left side: Pie Chart and Legend */}
+          <div className="flex-1 space-y-3">
+            {/* Pie Chart for Profit Distribution */}
+            <div className="w-full h-[220px] sm:h-[280px] lg:h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={chartData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={renderCustomizedLabel}
+                    outerRadius={70}
+                    innerRadius={35}
+                    fill="#8884d8"
+                    dataKey="totalProfit"
+                  >
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
 
-        {/* Summary Table */}
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left p-2">Portal</th>
-                <th className="text-right p-2">Transactions</th>
-                <th className="text-right p-2">Total Amount</th>
-                <th className="text-right p-2">Total Profit</th>
-              </tr>
-            </thead>
-            <tbody>
+            {/* Legend */}
+            <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
               {chartData.map((portal, index) => (
-                <tr key={portal.name} className="border-b">
-                  <td className="p-2 font-medium">{portal.name}</td>
-                  <td className="text-right p-2">{portal.transactions}</td>
-                  <td className="text-right p-2">{formatCurrency(portal.totalAmount)}</td>
-                  <td className="text-right p-2 font-semibold text-success">
-                    {formatCurrency(portal.totalProfit)}
-                  </td>
-                </tr>
+                <div key={portal.name} className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                  />
+                  <span className="text-xs font-medium">{portal.name}</span>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </div>
+
+          {/* Right side: Summary Cards */}
+          <div className="flex-1 lg:max-w-[300px]">
+            <div className="grid grid-cols-2 lg:grid-cols-1 gap-2 sm:gap-3">
+              {chartData.map((portal, index) => (
+                <motion.div
+                  key={portal.name}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: index * 0.1 }}
+                  className="rounded-lg border p-2.5 sm:p-3 bg-card/50"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <div
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                    />
+                    <p className="text-xs font-semibold truncate">{portal.name}</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-muted-foreground">Txns</span>
+                      <span className="text-xs font-medium">{portal.transactions}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-muted-foreground">Amount</span>
+                      <span className="text-xs font-semibold truncate ml-1">{formatCurrency(portal.totalAmount)}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-1 border-t">
+                      <span className="text-[10px] text-muted-foreground">Profit</span>
+                      <span className="text-xs font-bold text-success truncate ml-1">{formatCurrency(portal.totalProfit)}</span>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>

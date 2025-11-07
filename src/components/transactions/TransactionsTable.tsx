@@ -16,7 +16,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { TransactionFilters, FilterState } from "./TransactionFilters";
 import { EditTransactionDialog } from "./EditTransactionDialog";
+import { getCardTypeDisplayName, type CardType } from "@/utils/commissionCalculator";
 import { exportToPDF } from "@/utils/pdfExport";
+import { TransactionsTableSkeleton } from "@/components/ui/skeletons";
+import { motion, AnimatePresence } from "framer-motion";
+import { useInView } from "react-intersection-observer";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,6 +47,7 @@ interface Transaction {
   transaction_date: string;
   reference_number: string | null;
   status: string;
+  card_type: string | null;
   portals: {
     name: string;
   };
@@ -68,9 +73,14 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
   const [portals, setPortals] = useState<Array<{ id: string; name: string }>>([]);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [displayedTransactions, setDisplayedTransactions] = useState<Transaction[]>([]);
+  const itemsPerPage = 20;
 
   useEffect(() => {
     const fetchTransactions = async () => {
+      setIsLoading(true);
       const { data, error } = await supabase
         .from("transactions")
         .select(`
@@ -84,12 +94,14 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
           transaction_date,
           reference_number,
           status,
+          card_type,
           portals (
             name
           )
         `)
         .eq("user_id", userId)
-        .order("transaction_date", { ascending: false });
+        .order("transaction_date", { ascending: false })
+        .range(0, itemsPerPage - 1);
 
       // Fetch portals for filters
       const { data: portalsData } = await supabase
@@ -111,6 +123,7 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
       } else {
         setTransactions(data as Transaction[]);
         setFilteredTransactions(data as Transaction[]);
+        setHasMore((data?.length || 0) === itemsPerPage);
       }
 
       setIsLoading(false);
@@ -191,8 +204,27 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
       filtered = filtered.filter((t) => t.amount <= filters.amountRange.max!);
     }
 
-    setFilteredTransactions(filtered);
+      setFilteredTransactions(filtered);
+    setDisplayedTransactions(filtered.slice(0, itemsPerPage));
+    setPage(1);
+    setHasMore(filtered.length > itemsPerPage);
   }, [searchQuery, transactions, filters]);
+
+  const { ref: loadMoreRef, inView } = useInView({
+    threshold: 0,
+    triggerOnce: false,
+  });
+
+  useEffect(() => {
+    if (inView && hasMore && !isLoading && filteredTransactions.length > displayedTransactions.length) {
+      const nextPage = page + 1;
+      const start = displayedTransactions.length;
+      const end = start + itemsPerPage;
+      setDisplayedTransactions(filteredTransactions.slice(0, end));
+      setPage(nextPage);
+      setHasMore(end < filteredTransactions.length);
+    }
+  }, [inView, hasMore, isLoading, filteredTransactions, displayedTransactions, page]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -308,7 +340,7 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
       setSelectedIds(new Set());
       setSelectAll(false);
     } else {
-      setSelectedIds(new Set(filteredTransactions.map((t) => t.id)));
+      setSelectedIds(new Set(displayedTransactions.map((t) => t.id)));
       setSelectAll(true);
     }
   };
@@ -317,7 +349,7 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
     const next = new Set(selectedIds);
     if (next.has(id)) next.delete(id); else next.add(id);
     setSelectedIds(next);
-    setSelectAll(next.size === filteredTransactions.length && next.size > 0);
+      setSelectAll(next.size === displayedTransactions.length && next.size > 0);
   };
 
   const bulkDelete = async () => {
@@ -338,22 +370,11 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
   };
 
   const exportToCSV = () => {
-    const headers = [
-      "Date",
-      "Portal",
-      "Type",
-      "Amount",
-      "Commission",
-      "Site Fee",
-      "Profit",
-      "Reference",
-      "Status",
-    ];
-
     const csvData = filteredTransactions.map((t) => [
       formatDate(t.transaction_date),
       t.portals.name,
       t.transaction_type,
+      t.card_type ? getCardTypeDisplayName(t.card_type as CardType) : "",
       t.amount,
       t.commission,
       t.site_fee,
@@ -361,6 +382,19 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
       t.reference_number || "",
       t.status,
     ]);
+
+    const headers = [
+      "Date",
+      "Portal",
+      "Type",
+      "Card Type",
+      "Amount",
+      "Commission",
+      "Site Fee",
+      "Profit",
+      "Reference",
+      "Status",
+    ];
 
     const csvContent = [
       headers.join(","),
@@ -382,7 +416,7 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
 
   const handleExportPDF = () => {
     exportToPDF({
-      transactions: filteredTransactions,
+      transactions: filteredTransactions, // Export all filtered, not just displayed
       dateRange: filters.dateRange,
     });
     toast({
@@ -393,7 +427,7 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
 
   return (
     <div className="space-y-3 sm:space-y-4">
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
           <Input
@@ -403,7 +437,7 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
             className="pl-8 sm:pl-10 h-9 text-sm"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="hidden sm:flex items-center gap-2">
         {selectedIds.size > 0 && (
           <Button variant="destructive" onClick={bulkDelete} className="text-xs sm:text-sm h-9 px-3">
             <Trash2 className="mr-1.5 h-3.5 w-3.5" />Delete ({selectedIds.size})
@@ -411,128 +445,164 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
         )}
         <Button onClick={exportToCSV} variant="outline" className="text-xs sm:text-sm h-9 px-3">
           <Download className="mr-1.5 h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Export CSV</span>
-          <span className="sm:hidden">CSV</span>
+          Export CSV
         </Button>
         <Button onClick={handleExportPDF} variant="outline" className="text-xs sm:text-sm h-9 px-3">
           <FileText className="mr-1.5 h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Export PDF</span>
-          <span className="sm:hidden">PDF</span>
+          Export PDF
         </Button>
         </div>
       </div>
 
-      {/* Advanced Filters */}
-      <TransactionFilters portals={portals} onFiltersChange={setFilters} />
+      {/* Mobile: Export buttons and filters in integrated grid */}
+      <div className="w-full">
+        <div className="grid grid-cols-3 gap-2 sm:hidden mb-2">
+          <Button onClick={exportToCSV} variant="outline" className="h-9 text-xs px-2">
+            <Download className="mr-1 h-3 w-3" />
+            CSV
+          </Button>
+          <Button onClick={handleExportPDF} variant="outline" className="h-9 text-xs px-2">
+            <FileText className="mr-1 h-3 w-3" />
+            PDF
+          </Button>
+        </div>
+        {selectedIds.size > 0 && (
+          <div className="sm:hidden mb-2">
+            <Button variant="destructive" onClick={bulkDelete} className="w-full text-xs h-9">
+              <Trash2 className="mr-1.5 h-3.5 w-3.5" />Delete ({selectedIds.size})
+            </Button>
+          </div>
+        )}
+        <TransactionFilters portals={portals} onFiltersChange={setFilters} />
+      </div>
 
       {/* Mobile cards */}
       <div className="grid gap-2 sm:hidden">
-        {isLoading ? (
-          <div className="py-6 text-center text-muted-foreground text-sm">Loading...</div>
+        {isLoading && filteredTransactions.length === 0 ? (
+          <TransactionsTableSkeleton />
         ) : filteredTransactions.length === 0 ? (
           <div className="py-6 text-center text-muted-foreground text-sm">No transactions found</div>
         ) : (
-          filteredTransactions.map((transaction) => (
-            <div key={transaction.id} className="rounded-lg border p-3 bg-card">
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <Checkbox checked={selectedIds.has(transaction.id)} onCheckedChange={() => toggleSelect(transaction.id)} className="flex-shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-medium truncate">{formatDate(transaction.transaction_date)}</div>
-                    <div className="text-[10px] text-muted-foreground truncate">{transaction.portals.name}</div>
+          <>
+            <AnimatePresence>
+              {displayedTransactions.map((transaction, index) => (
+                <motion.div
+                  key={transaction.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ delay: index * 0.02 }}
+                  className="rounded-lg border p-3 bg-card"
+                >
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <Checkbox checked={selectedIds.has(transaction.id)} onCheckedChange={() => toggleSelect(transaction.id)} className="flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-medium truncate">{formatDate(transaction.transaction_date)}</div>
+                        <div className="text-[10px] text-muted-foreground truncate">{transaction.portals.name}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <Badge
+                        variant={
+                          transaction.status === "completed"
+                            ? "default"
+                            : transaction.status === "pending"
+                            ? "secondary"
+                            : "destructive"
+                        }
+                        className="text-[10px] px-1.5 py-0"
+                      >
+                        {transaction.status}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEditClick(transaction)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteClick(transaction.id)}
+                        className="text-destructive hover:text-destructive h-6 w-6 p-0"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <Badge
-                    variant={
-                      transaction.status === "completed"
-                        ? "default"
-                        : transaction.status === "pending"
-                        ? "secondary"
-                        : "destructive"
-                    }
-                    className="text-[10px] px-1.5 py-0"
-                  >
-                    {transaction.status}
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleEditClick(transaction)}
-                    className="h-6 w-6 p-0"
-                  >
-                    <Edit className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteClick(transaction.id)}
-                    className="text-destructive hover:text-destructive h-6 w-6 p-0"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-muted-foreground">Type</span>
-                  <span className="capitalize font-medium">{transaction.transaction_type}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-muted-foreground">Amount</span>
-                  <span className="font-semibold">{formatCurrency(transaction.amount)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-muted-foreground">Commission</span>
-                  <span className="text-success font-medium">{formatCurrency(transaction.commission)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-muted-foreground">Profit</span>
-                  <span className="text-success font-semibold">{formatCurrency(transaction.commission)}</span>
-                </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">Type</span>
+                      <span className="capitalize font-medium text-right truncate">{transaction.transaction_type}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">Card Type</span>
+                      <span className="text-[10px] font-medium text-right truncate">
+                        {transaction.card_type ? getCardTypeDisplayName(transaction.card_type as CardType) : "-"}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">Amount</span>
+                      <span className="font-semibold text-right">{formatCurrency(transaction.amount)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">Commission</span>
+                      <span className="text-success font-medium text-right">{formatCurrency(transaction.commission)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 col-span-2">
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">Profit</span>
+                      <span className="text-success font-semibold text-right">{formatCurrency(transaction.commission)}</span>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+            {hasMore && (
+              <div ref={loadMoreRef} className="py-4 text-center">
+                {isLoading && <div className="text-sm text-muted-foreground">Loading more...</div>}
               </div>
-            </div>
-          ))
+            )}
+          </>
         )}
       </div>
 
       {/* Desktop/tablet table */}
       <div className="hidden sm:block rounded-md border overflow-x-auto">
+        {isLoading && filteredTransactions.length === 0 ? (
+          <TransactionsTableSkeleton />
+        ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[40px]"><Checkbox checked={selectAll} onCheckedChange={toggleSelectAll} /></TableHead>
+                <TableHead className="w-[40px]"><Checkbox checked={selectAll} onCheckedChange={toggleSelectAll} /></TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Portal</TableHead>
               <TableHead>Type</TableHead>
+              <TableHead className="hidden md:table-cell">Card Type</TableHead>
               <TableHead className="text-right">Amount</TableHead>
               <TableHead className="text-right">Commission</TableHead>
-              <TableHead className="text-right hidden sm:table-cell">Site Fee</TableHead>
-              <TableHead className="text-right hidden sm:table-cell">Profit</TableHead>
-              <TableHead className="hidden md:table-cell">Status</TableHead>
+                <TableHead className="text-right hidden sm:table-cell">Site Fee</TableHead>
+                <TableHead className="text-right hidden sm:table-cell">Profit</TableHead>
+                <TableHead className="hidden md:table-cell">Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
+              {filteredTransactions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8">
-                  <div className="flex justify-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : filteredTransactions.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-8">
+                <TableCell colSpan={10} className="text-center py-8">
                   <p className="text-muted-foreground">No transactions found</p>
                 </TableCell>
               </TableRow>
             ) : (
-              filteredTransactions.map((transaction) => (
+                <>
+                  {displayedTransactions.map((transaction) => (
                 <TableRow key={transaction.id}>
-                  <TableCell><Checkbox checked={selectedIds.has(transaction.id)} onCheckedChange={() => toggleSelect(transaction.id)} /></TableCell>
+                      <TableCell><Checkbox checked={selectedIds.has(transaction.id)} onCheckedChange={() => toggleSelect(transaction.id)} /></TableCell>
                   <TableCell className="font-medium">
                     {formatDate(transaction.transaction_date)}
                   </TableCell>
@@ -542,19 +612,22 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
                       {transaction.transaction_type}
                     </Badge>
                   </TableCell>
+                  <TableCell className="hidden md:table-cell text-xs">
+                    {transaction.card_type ? getCardTypeDisplayName(transaction.card_type as CardType) : "-"}
+                  </TableCell>
                   <TableCell className="text-right">
                     {formatCurrency(transaction.amount)}
                   </TableCell>
                   <TableCell className="text-right text-success">
                     {formatCurrency(transaction.commission)}
                   </TableCell>
-                  <TableCell className="text-right text-destructive hidden sm:table-cell">
+                      <TableCell className="text-right text-destructive hidden sm:table-cell">
                     {formatCurrency(transaction.site_fee)}
                   </TableCell>
-                  <TableCell className="text-right font-semibold hidden sm:table-cell">
-                    {formatCurrency(transaction.commission)}
+                      <TableCell className="text-right font-semibold hidden sm:table-cell">
+                        {formatCurrency(transaction.commission)}
                   </TableCell>
-                  <TableCell className="hidden md:table-cell">
+                      <TableCell className="hidden md:table-cell">
                     <Badge
                       variant={
                         transaction.status === "completed"
@@ -568,29 +641,38 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditClick(transaction)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteClick(transaction.id)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditClick(transaction)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteClick(transaction.id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {hasMore && (
+                    <TableRow>
+                      <TableCell colSpan={10} ref={loadMoreRef} className="text-center py-4">
+                        {isLoading && <div className="text-sm text-muted-foreground">Loading more...</div>}
                   </TableCell>
                 </TableRow>
-              ))
+                  )}
+                </>
             )}
           </TableBody>
         </Table>
+        )}
       </div>
 
       {/* Mobile sticky bulk actions */}
