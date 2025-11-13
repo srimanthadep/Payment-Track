@@ -212,7 +212,19 @@ export const EditTransactionDialog = ({
 
     setIsLoading(true);
 
-    const updatePayload: any = {
+    interface UpdatePayload {
+      portal_id: string;
+      card_type: string;
+      transaction_type: string;
+      amount: number;
+      commission: number;
+      site_fee: number;
+      reference_number: string | null;
+      status: string;
+      transaction_date?: string;
+    }
+
+    const updatePayload: UpdatePayload = {
       portal_id: formData.portal_id,
       card_type: formData.card_type,
       transaction_type: formData.transaction_type,

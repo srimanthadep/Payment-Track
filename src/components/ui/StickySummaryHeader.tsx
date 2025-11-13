@@ -37,6 +37,7 @@ export const StickySummaryHeader = ({ userId }: StickySummaryHeaderProps) => {
     return () => {
       supabase.removeChannel(channel);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
   const fetchSummary = async () => {

@@ -28,7 +28,7 @@ describe('commissionCalculator', () => {
     })
 
     it('returns 0 for invalid card type', () => {
-      const result = calculateCommission(10000, 'invalid_type' as any, 'withdrawal')
+      const result = calculateCommission(10000, 'invalid_type' as CardType, 'withdrawal')
       expect(result).toBe(0)
     })
 

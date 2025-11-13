@@ -169,7 +169,20 @@ export const AddTransactionDialog = ({
 
     setIsLoading(true);
 
-    const basePayload: any = {
+    interface TransactionPayload {
+      user_id: string;
+      portal_id: string;
+      card_type: string;
+      transaction_type: string;
+      amount: number;
+      commission: number;
+      site_fee: number;
+      reference_number: string | null;
+      status: string;
+      transaction_date?: string;
+    }
+
+    const basePayload: TransactionPayload = {
       user_id: userId,
       portal_id: formData.portal_id,
       card_type: formData.card_type,
@@ -181,7 +194,7 @@ export const AddTransactionDialog = ({
       status: "completed",
     };
 
-    let { error } = await supabase.from("transactions").insert(basePayload);
+    const { error } = await supabase.from("transactions").insert(basePayload);
 
     // No retry needed
 

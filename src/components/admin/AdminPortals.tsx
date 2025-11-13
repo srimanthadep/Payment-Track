@@ -55,6 +55,7 @@ export const AdminPortals = () => {
 
   useEffect(() => {
     fetchPortals();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchPortals = async () => {
@@ -137,11 +138,12 @@ export const AdminPortals = () => {
       }
 
       fetchPortals();
-    } catch (error: any) {
-      console.error("Error saving portal:", error);
+    } catch (error) {
+      const err = error as Error;
+      console.error("Error saving portal:", err);
       toast({
         title: "Error",
-        description: error.message || "Failed to save portal",
+        description: err.message || "Failed to save portal",
         variant: "destructive",
       });
     }
@@ -169,11 +171,12 @@ export const AdminPortals = () => {
       });
 
       fetchPortals();
-    } catch (error: any) {
-      console.error("Error deleting portal:", error);
+    } catch (error) {
+      const err = error as Error;
+      console.error("Error deleting portal:", err);
       toast({
         title: "Error",
-        description: error.message || "Failed to delete portal",
+        description: err.message || "Failed to delete portal",
         variant: "destructive",
       });
     } finally {
@@ -197,7 +200,7 @@ export const AdminPortals = () => {
       });
 
       fetchPortals();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error toggling portal status:", error);
       toast({
         title: "Error",

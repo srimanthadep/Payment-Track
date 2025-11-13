@@ -11,8 +11,13 @@ interface ProfitChartProps {
 
 type Period = "daily" | "weekly" | "monthly";
 
+interface ChartDataPoint {
+  date: string;
+  profit: number;
+}
+
 export const ProfitChart = ({ userId }: ProfitChartProps) => {
-  const [chartData, setChartData] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [period, setPeriod] = useState<Period>("daily");
 
@@ -70,7 +75,7 @@ export const ProfitChart = ({ userId }: ProfitChartProps) => {
       }
 
       // Group transactions by period
-      let groupedData: any = {};
+      const groupedData: Record<string, { profit: number }> = {};
 
       transactions?.forEach((transaction) => {
         const date = new Date(transaction.transaction_date);
@@ -129,7 +134,7 @@ export const ProfitChart = ({ userId }: ProfitChartProps) => {
       });
 
       // Remove duplicates and sort
-      const uniqueData = formattedData.reduce((acc: any[], curr: any) => {
+      const uniqueData = formattedData.reduce((acc: Array<ChartDataPoint & { dateKey: number }>, curr) => {
         const existing = acc.find((item) => item.date === curr.date);
         if (!existing) {
           acc.push(curr);
@@ -156,7 +161,7 @@ export const ProfitChart = ({ userId }: ProfitChartProps) => {
     }).format(amount);
   };
 
-  const CustomTooltip = ({ active, payload }: any) => {
+  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ value: number; payload: ChartDataPoint }> }) => {
     if (active && payload && payload.length) {
       return (
         <div className="rounded-lg border bg-card p-3 shadow-md">

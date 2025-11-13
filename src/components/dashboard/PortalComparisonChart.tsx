@@ -25,6 +25,7 @@ export const PortalComparisonChart = ({ userId, period = "all" }: PortalComparis
 
   useEffect(() => {
     fetchData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, period]);
 
   const fetchData = async () => {
@@ -61,7 +62,7 @@ export const PortalComparisonChart = ({ userId, period = "all" }: PortalComparis
       // Group by portal
       const portalMap: Record<string, PortalData> = {};
 
-      transactions?.forEach((tx: any) => {
+      transactions?.forEach((tx) => {
         const portalName = tx.portals?.name || "Unknown";
         if (!portalMap[portalName]) {
           portalMap[portalName] = {
@@ -95,7 +96,7 @@ export const PortalComparisonChart = ({ userId, period = "all" }: PortalComparis
     })}`;
   };
 
-  const CustomTooltip = ({ active, payload }: any) => {
+  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number }> }) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
@@ -110,7 +111,23 @@ export const PortalComparisonChart = ({ userId, period = "all" }: PortalComparis
   };
 
   const RADIAN = Math.PI / 180;
-  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }: any) => {
+  const renderCustomizedLabel = ({ 
+    cx, 
+    cy, 
+    midAngle, 
+    innerRadius, 
+    outerRadius, 
+    percent, 
+    name 
+  }: { 
+    cx: number; 
+    cy: number; 
+    midAngle: number; 
+    innerRadius: number; 
+    outerRadius: number; 
+    percent: number; 
+    name: string 
+  }) => {
     const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
