@@ -15,7 +15,7 @@ interface AddUserDialogProps {
 
 export const AddUserDialog = ({ open, onOpenChange, onCreated }: AddUserDialogProps) => {
   const { toast } = useToast();
-  const [form, setForm] = useState({ email: "", password: "", full_name: "", phone_number: "", make_admin: false });
+  const [form, setForm] = useState({ email: "", password: "", full_name: "", make_admin: false });
   const [saving, setSaving] = useState(false);
 
   const createUser = async () => {
@@ -32,7 +32,7 @@ export const AddUserDialog = ({ open, onOpenChange, onCreated }: AddUserDialogPr
       toast({ title: "User created", description: `User ID: ${data.id}` });
       onOpenChange(false);
       onCreated?.();
-      setForm({ email: "", password: "", full_name: "", phone_number: "", make_admin: false });
+      setForm({ email: "", password: "", full_name: "", make_admin: false });
     } catch (e: any) {
       toast({ title: "Failed", description: e.message || "Could not create user", variant: "destructive" });
     } finally {
@@ -50,10 +50,7 @@ export const AddUserDialog = ({ open, onOpenChange, onCreated }: AddUserDialogPr
         <div className="space-y-3">
           <div className="space-y-1"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
           <div className="space-y-1"><Label>Password</Label><Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Full name</Label><Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></div>
-            <div className="space-y-1"><Label>Phone</Label><Input value={form.phone_number} onChange={(e) => setForm({ ...form, phone_number: e.target.value })} /></div>
-          </div>
+          <div className="space-y-1"><Label>Full name</Label><Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></div>
           <div className="flex items-center gap-2">
             <Checkbox checked={form.make_admin} onCheckedChange={(v) => setForm({ ...form, make_admin: !!v })} />
             <Label>Make admin</Label>
