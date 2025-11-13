@@ -54,6 +54,7 @@ export const ManagePortalsDialog = ({ open, onOpenChange }: ManagePortalsDialogP
 
   useEffect(() => {
     if (open) load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, showInactive]);
 
   const resetForm = () => {

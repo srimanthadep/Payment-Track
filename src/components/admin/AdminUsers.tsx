@@ -24,7 +24,7 @@ export const AdminUsers = () => {
   const { toast } = useToast();
 
   const [search, setSearch] = useState("");
-  const [editing, setEditing] = useState<any | null>(null);
+  const [editing, setEditing] = useState<UserWithRole | null>(null);
   const [editForm, setEditForm] = useState({ full_name: "", business_name: "", email: "" });
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -32,6 +32,7 @@ export const AdminUsers = () => {
 
   useEffect(() => {
     fetchUsers();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchUsers = async () => {
@@ -45,7 +46,7 @@ export const AdminUsers = () => {
 
       // Get roles for each user
       const usersWithRoles = await Promise.all(
-        (profiles || []).map(async (profile: any) => {
+        (profiles || []).map(async (profile) => {
           const { data: roles } = await supabase
             .from("user_roles")
             .select("role")
@@ -105,11 +106,11 @@ export const AdminUsers = () => {
     }
   };
 
-  const startEdit = (u: any) => {
+  const startEdit = (u: UserWithRole) => {
     setEditing(u);
     setEditForm({
       full_name: u.full_name || "",
-      business_name: u.business_name || "",
+      business_name: "",
       email: u.email || "",
     });
   };
@@ -129,8 +130,9 @@ export const AdminUsers = () => {
       toast({ title: "Saved", description: "User profile updated" });
       setEditing(null);
       fetchUsers();
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message || "Failed to update user", variant: "destructive" });
+    } catch (e) {
+      const error = e as Error;
+      toast({ title: "Error", description: error.message || "Failed to update user", variant: "destructive" });
     }
   };
 
@@ -142,8 +144,9 @@ export const AdminUsers = () => {
       toast({ title: "Invitation sent", description: "Magic link sent if email auth is enabled." });
       setInviteOpen(false);
       setInviteEmail("");
-    } catch (e: any) {
-      toast({ title: "Invite failed", description: e.message || "Email auth may be disabled", variant: "destructive" });
+    } catch (e) {
+      const error = e as Error;
+      toast({ title: "Invite failed", description: error.message || "Email auth may be disabled", variant: "destructive" });
     }
   };
 
@@ -152,7 +155,7 @@ export const AdminUsers = () => {
   }
 
   const filtered = users.filter((u) =>
-    [u.email, (u as any).full_name].some((x) =>
+    [u.email, u.full_name].some((x) =>
       (x || "").toLowerCase().includes(search.toLowerCase())
     )
   );

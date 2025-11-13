@@ -33,8 +33,9 @@ export const AddUserDialog = ({ open, onOpenChange, onCreated }: AddUserDialogPr
       onOpenChange(false);
       onCreated?.();
       setForm({ email: "", password: "", full_name: "", make_admin: false });
-    } catch (e: any) {
-      toast({ title: "Failed", description: e.message || "Could not create user", variant: "destructive" });
+    } catch (e) {
+      const error = e as Error;
+      toast({ title: "Failed", description: error.message || "Could not create user", variant: "destructive" });
     } finally {
       setSaving(false);
     }

@@ -48,6 +48,7 @@ export const AdminTransactions = () => {
 
   useEffect(() => {
     fetchTransactions();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -94,8 +95,8 @@ export const AdminTransactions = () => {
         })
       );
 
-      setTransactions(txWithProfiles as any);
-      setFilteredTransactions(txWithProfiles as any);
+      setTransactions(txWithProfiles as TransactionWithUser[]);
+      setFilteredTransactions(txWithProfiles as TransactionWithUser[]);
     } catch (error) {
       console.error("Error fetching transactions:", error);
       toast({
