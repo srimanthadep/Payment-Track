@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { AdminUsers } from "@/components/admin/AdminUsers";
 import { AdminTransactions } from "@/components/admin/AdminTransactions";
 import { AdminPortals } from "@/components/admin/AdminPortals";
+import { AdminCardTypes } from "@/components/admin/AdminCardTypes";
 import { AdminStats } from "@/components/admin/AdminStats";
 import { useToast } from "@/hooks/use-toast";
 
@@ -82,11 +83,12 @@ const Admin = () => {
         <AdminStats />
 
         <Tabs defaultValue="overview" className="space-y-3 sm:space-y-4">
-          <TabsList className="grid grid-cols-4 w-full">
+          <TabsList className="grid grid-cols-5 w-full">
             <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
             <TabsTrigger value="users" className="text-xs sm:text-sm">Users</TabsTrigger>
             <TabsTrigger value="transactions" className="text-xs sm:text-sm">Transactions</TabsTrigger>
             <TabsTrigger value="portals" className="text-xs sm:text-sm">Portals</TabsTrigger>
+            <TabsTrigger value="card-types" className="text-xs sm:text-sm">Card Types</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -150,6 +152,17 @@ const Admin = () => {
               </CardHeader>
               <CardContent>
                 <AdminPortals />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="card-types">
+            <Card>
+              <CardHeader>
+                <CardTitle>Card Type Management</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AdminCardTypes />
               </CardContent>
             </Card>
           </TabsContent>

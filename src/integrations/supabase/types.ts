@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      card_types: {
+        Row: {
+          created_at: string
+          id: number
+          name: string
+          percentage: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          name: string
+          percentage: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          name?: string
+          percentage?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       portals: {
         Row: {
           created_at: string
