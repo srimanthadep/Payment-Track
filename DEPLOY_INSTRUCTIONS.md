@@ -21,9 +21,6 @@
    - Add these secrets:
      - `SUPABASE_URL` = Your project URL (found in Project Settings → API)
      - `SUPABASE_SERVICE_ROLE_KEY` = Your service role key (found in Project Settings → API)
-     - `TWILIO_ACCOUNT_SID` = Your Twilio Account SID (optional, for SMS)
-     - `TWILIO_AUTH_TOKEN` = Your Twilio Auth Token (optional, for SMS)
-     - `TWILIO_PHONE_NUMBER` = Your Twilio phone number (optional, for SMS)
 
 ## Option 2: Install Supabase CLI and Deploy
 
@@ -52,9 +49,6 @@ supabase functions deploy send-otp
 # Set secrets
 supabase secrets set SUPABASE_URL=your_project_url
 supabase secrets set SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-supabase secrets set TWILIO_ACCOUNT_SID=your_twilio_sid
-supabase secrets set TWILIO_AUTH_TOKEN=your_twilio_token
-supabase secrets set TWILIO_PHONE_NUMBER=your_twilio_phone
 ```
 
 ## Option 3: Quick Fix - Use Supabase Dashboard
@@ -82,7 +76,5 @@ After deployment, test the function:
 
 ## Notes
 
-- The function will work in **DEV MODE** even without Twilio if you have `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` set
-- In DEV MODE, the OTP will be shown in the UI instead of sent via SMS
 - Make sure to set all required secrets before testing in production
 

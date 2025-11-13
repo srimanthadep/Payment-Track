@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { email, password, full_name, phone_number, make_admin } = await req.json();
+    const { email, password, full_name, make_admin } = await req.json();
 
     if (!email || !password) {
       return new Response(JSON.stringify({ error: "email and password are required" }), {
@@ -37,7 +37,7 @@ serve(async (req) => {
       email,
       password,
       email_confirm: true,
-      user_metadata: { full_name, phone_number },
+      user_metadata: { full_name },
     });
     if (createErr) throw createErr;
 
@@ -54,7 +54,7 @@ serve(async (req) => {
     }
 
     // Update profile with provided fields if not covered by trigger
-    await admin.from("profiles").update({ full_name, phone_number: phone_number || null, email }).eq("id", newUserId);
+    await admin.from("profiles").update({ full_name, email }).eq("id", newUserId);
 
     return new Response(JSON.stringify({ id: newUserId }), {
       status: 200,

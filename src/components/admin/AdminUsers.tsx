@@ -14,7 +14,6 @@ interface UserWithRole {
   id: string;
   email: string;
   full_name: string;
-  phone_number: string;
   created_at: string;
   is_admin: boolean;
 }
@@ -26,7 +25,7 @@ export const AdminUsers = () => {
 
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<any | null>(null);
-  const [editForm, setEditForm] = useState({ full_name: "", phone_number: "", business_name: "", email: "" });
+  const [editForm, setEditForm] = useState({ full_name: "", business_name: "", email: "" });
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [addOpen, setAddOpen] = useState(false);
@@ -110,7 +109,6 @@ export const AdminUsers = () => {
     setEditing(u);
     setEditForm({
       full_name: u.full_name || "",
-      phone_number: u.phone_number || "",
       business_name: u.business_name || "",
       email: u.email || "",
     });
@@ -123,7 +121,6 @@ export const AdminUsers = () => {
         .from("profiles")
         .update({
           full_name: editForm.full_name,
-          phone_number: editForm.phone_number,
           business_name: editForm.business_name,
           email: editForm.email,
         })
@@ -155,7 +152,7 @@ export const AdminUsers = () => {
   }
 
   const filtered = users.filter((u) =>
-    [u.email, (u as any).full_name, (u as any).phone_number].some((x) =>
+    [u.email, (u as any).full_name].some((x) =>
       (x || "").toLowerCase().includes(search.toLowerCase())
     )
   );
@@ -181,7 +178,6 @@ export const AdminUsers = () => {
               <TableRow>
                 <TableHead className="text-xs sm:text-sm">Email</TableHead>
                 <TableHead className="text-xs sm:text-sm hidden sm:table-cell">Name</TableHead>
-                <TableHead className="text-xs sm:text-sm hidden md:table-cell">Phone</TableHead>
                 <TableHead className="text-xs sm:text-sm">Role</TableHead>
                 <TableHead className="text-xs sm:text-sm hidden lg:table-cell">Joined</TableHead>
                 <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
@@ -195,7 +191,6 @@ export const AdminUsers = () => {
                     <div className="text-[10px] text-muted-foreground sm:hidden mt-0.5">{user.full_name || "-"}</div>
                   </TableCell>
                   <TableCell className="text-xs sm:text-sm hidden sm:table-cell">{user.full_name || "-"}</TableCell>
-                  <TableCell className="text-xs sm:text-sm hidden md:table-cell">{user.phone_number || "-"}</TableCell>
                   <TableCell>
                     {user.is_admin ? (
                       <Badge className="text-[10px] sm:text-xs">Admin</Badge>
@@ -235,11 +230,10 @@ export const AdminUsers = () => {
           <DialogHeader>
             <DialogTitle>Edit user</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             <div className="space-y-1"><Label>Full name</Label><Input value={editForm.full_name} onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })} /></div>
-            <div className="space-y-1"><Label>Phone</Label><Input value={editForm.phone_number} onChange={(e) => setEditForm({ ...editForm, phone_number: e.target.value })} /></div>
-            <div className="space-y-1 col-span-2"><Label>Business name</Label><Input value={editForm.business_name} onChange={(e) => setEditForm({ ...editForm, business_name: e.target.value })} /></div>
-            <div className="space-y-1 col-span-2"><Label>Email (profile)</Label><Input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Business name</Label><Input value={editForm.business_name} onChange={(e) => setEditForm({ ...editForm, business_name: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Email (profile)</Label><Input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} /></div>
           </div>
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
