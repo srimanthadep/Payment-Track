@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CreditCard } from "lucide-react";
-import { PhoneAuth } from "@/components/auth/PhoneAuth";
+
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -97,10 +97,9 @@ const Auth = () => {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="signin" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
-              <TabsTrigger value="phone">Phone</TabsTrigger>
             </TabsList>
             
             <TabsContent value="signin">
@@ -185,10 +184,6 @@ const Auth = () => {
                   )}
                 </Button>
               </form>
-            </TabsContent>
-
-            <TabsContent value="phone">
-              <PhoneAuth />
             </TabsContent>
           </Tabs>
         </CardContent>
