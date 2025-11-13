@@ -25,16 +25,14 @@ Your backend is powered by **Supabase**. Here's how to access all parts of it:
 - `profiles` - User profiles
 - `portals` - Payment portals (PayMama, PaysWith, etc.)
 - `user_roles` - Admin/user roles
-- `otp_verifications` - OTP codes for phone auth
 - `scraping_configs` - Web scraping configurations
 
 ### 2. **Edge Functions (Serverless Functions)**
 **Access**: https://supabase.com/dashboard/project/lxlhszovqelgpqtvnpvx/functions
 
 **Functions:**
-- `send-otp` - Sends OTP via SMS/WhatsApp
-- `verify-otp` - Verifies OTP codes
 - `scrape-website` - Scrapes websites for transaction data
+- `admin-create-user` - Admin function to create new users
 
 **What you can do:**
 - View/edit function code
@@ -91,9 +89,6 @@ Your backend is powered by **Supabase**. Here's how to access all parts of it:
 **Set these secrets:**
 - `SUPABASE_URL` - Your project URL
 - `SUPABASE_SERVICE_ROLE_KEY` - Service role key
-- `TWILIO_ACCOUNT_SID` - For SMS (optional)
-- `TWILIO_AUTH_TOKEN` - For SMS (optional)
-- `TWILIO_PHONE_NUMBER` - For SMS (optional)
 
 ## 🔑 Getting Your Credentials
 
@@ -134,9 +129,8 @@ Authorization: Bearer your_anon_key
 **Base URL**: `https://lxlhszovqelgpqtvnpvx.supabase.co/functions/v1/`
 
 **Endpoints:**
-- `POST /functions/v1/send-otp` - Send OTP
-- `POST /functions/v1/verify-otp` - Verify OTP
 - `POST /functions/v1/scrape-website` - Scrape website
+- `POST /functions/v1/admin-create-user` - Create a new user (admin only)
 
 ## 🔧 Local Development
 
