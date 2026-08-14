@@ -93,20 +93,11 @@ const Index = () => {
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <Button
-              variant="ghost"
               size="sm"
               onClick={() => navigate("/auth")}
-              className="h-9 px-3 sm:px-4 text-xs sm:text-sm touch-manipulation"
+              className="gap-1.5 sm:gap-2 h-9 px-4 text-xs sm:text-sm font-medium touch-manipulation shadow-sm"
             >
-              Sign In
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => navigate("/auth")}
-              className="gap-1.5 sm:gap-2 h-9 px-3 sm:px-4 text-xs sm:text-sm touch-manipulation"
-            >
-              <span className="hidden sm:inline">Get Started</span>
-              <span className="sm:hidden">Start</span>
+              <span>Sign In</span>
               <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
           </div>
@@ -141,23 +132,14 @@ const Index = () => {
                     </p>
                   </div>
                   
-                  <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 w-full sm:w-auto">
+                  <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                     <Button
                       size="lg"
                       onClick={() => navigate("/auth")}
-                      className="bg-white text-primary hover:bg-white/90 shadow-xl h-12 sm:h-12 px-6 sm:px-8 text-base sm:text-base group w-full sm:w-auto touch-manipulation active:scale-95 transition-transform"
+                      className="bg-white text-primary hover:bg-white/95 shadow-xl font-semibold h-12 px-8 text-base group w-full sm:w-auto touch-manipulation active:scale-95 transition-transform"
                     >
-                      <span className="hidden sm:inline">Start Free Trial</span>
-                      <span className="sm:hidden">Get Started</span>
+                      <span>Sign In to Dashboard</span>
                       <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                    </Button>
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      onClick={() => navigate("/auth")}
-                      className="border-2 border-white/30 text-white hover:bg-white/10 backdrop-blur-sm h-12 sm:h-12 px-6 sm:px-8 text-base sm:text-base w-full sm:w-auto touch-manipulation active:scale-95 transition-transform"
-                    >
-                      Sign In
                     </Button>
                   </div>
 
