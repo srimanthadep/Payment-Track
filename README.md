@@ -83,7 +83,7 @@ Payment-Track is a comprehensive payment transaction tracking system built with 
 
 ## 🎬 Demo
 
-**Live Demo**: [View on Lovable](https://lovable.dev/projects/857f8112-b332-414d-8896-66d5b7ebedb4)
+**Live Demo**: [View Payment Tracker](https://payment-track.vercel.app)
 
 ## 📸 Screenshots
 
@@ -213,10 +213,6 @@ See [DEPLOY_INSTRUCTIONS.md](./DEPLOY_INSTRUCTIONS.md) for detailed deployment i
 
 ## 🌐 Deployment
 
-### Deploy with Lovable
-
-Simply open [Lovable](https://lovable.dev/projects/857f8112-b332-414d-8896-66d5b7ebedb4) and click on Share → Publish.
-
 ### Deploy with Vercel
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/srimanthadep/Payment-Track)
@@ -335,7 +331,6 @@ See [IMPROVEMENTS_SUMMARY.md](./IMPROVEMENTS_SUMMARY.md) for planned features an
 
 ## 🙏 Acknowledgments
 
-- Built with [Lovable](https://lovable.dev)
 - UI Components from [shadcn/ui](https://ui.shadcn.com)
 - Backend powered by [Supabase](https://supabase.com)
 - Icons from [Lucide](https://lucide.dev)
