@@ -32,12 +32,14 @@ interface AddTransactionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   portalsRefreshKey?: number;
+  onSuccess?: (addedDate?: Date) => void;
 }
 
 export const AddTransactionDialog = ({
   userId,
   open,
   onOpenChange,
+  onSuccess,
 }: AddTransactionDialogProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -192,12 +194,14 @@ export const AddTransactionDialog = ({
         variant: "destructive",
       });
     } else {
+      const addedDate = formData.transaction_date;
       toast({
         title: "Success",
         description: "Transaction added successfully",
       });
       resetForm();
       onOpenChange(false);
+      onSuccess?.(addedDate);
     }
   };
 
@@ -247,7 +251,16 @@ export const AddTransactionDialog = ({
                       selected={formData.transaction_date}
                       onSelect={(date) => {
                         if (date) {
-                          setFormData({ ...formData, transaction_date: date });
+                          const now = new Date();
+                          const adjustedDate = new Date(
+                            date.getFullYear(),
+                            date.getMonth(),
+                            date.getDate(),
+                            now.getHours(),
+                            now.getMinutes(),
+                            now.getSeconds()
+                          );
+                          setFormData({ ...formData, transaction_date: adjustedDate });
                           setCalendarOpen(false);
                         }
                       }}

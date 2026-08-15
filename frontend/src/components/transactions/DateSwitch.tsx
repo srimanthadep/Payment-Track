@@ -21,6 +21,7 @@ export const DateSwitch = ({
   className = "",
 }: DateSwitchProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const isAllTransactions = selectedDate === null;
   const activeDate = selectedDate || new Date();
 
   const handlePrevDay = (e: React.MouseEvent) => {
@@ -46,8 +47,8 @@ export const DateSwitch = ({
     }
   };
 
-  const isCurrentDayToday = selectedDate ? isToday(selectedDate) : true;
-  const formattedDate = format(activeDate, "EEE, dd MMM yyyy");
+  const isCurrentDayToday = selectedDate ? isToday(selectedDate) : false;
+  const formattedDate = isAllTransactions ? "All Transactions" : format(activeDate, "EEE, dd MMM yyyy");
 
   return (
     <div
@@ -79,8 +80,12 @@ export const DateSwitch = ({
               {formattedDate}
             </span>
 
-            {/* TODAY / GO TO TODAY indicator */}
-            {isCurrentDayToday ? (
+            {/* Indicator Badge */}
+            {isAllTransactions ? (
+              <span className="bg-primary/10 text-primary font-bold text-[10px] tracking-wider px-2 py-0.5 rounded-md uppercase border border-primary/20">
+                ALL
+              </span>
+            ) : isCurrentDayToday ? (
               <span className="bg-primary/10 text-primary font-bold text-[10px] tracking-wider px-2 py-0.5 rounded-md uppercase border border-primary/20">
                 TODAY
               </span>
@@ -113,22 +118,22 @@ export const DateSwitch = ({
           </div>
 
           {/* Quick Action Footer in Popover */}
-          <div className="flex items-center justify-between border-t border-border/60 bg-muted/30 px-3 py-2">
+          <div className="flex items-center justify-between border-t border-border/60 bg-muted/30 px-3 py-2 gap-2">
             <Button
               type="button"
-              variant="ghost"
+              variant={isAllTransactions ? "default" : "outline"}
               size="sm"
               onClick={() => {
                 onDateChange(null);
                 setIsOpen(false);
               }}
-              className="h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+              className="h-7 px-2.5 text-xs font-semibold"
             >
-              All Dates
+              All Transactions
             </Button>
             <Button
               type="button"
-              variant="default"
+              variant={!isAllTransactions && isCurrentDayToday ? "default" : "outline"}
               size="sm"
               onClick={handleTodayClick}
               className="h-7 px-3 text-xs font-semibold"
@@ -150,6 +155,19 @@ export const DateSwitch = ({
       >
         <ChevronRight className="h-4 w-4" />
       </Button>
+
+      {!isAllTransactions && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => onDateChange(null)}
+          className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground font-medium rounded-lg"
+          title="Clear date filter and view all transactions"
+        >
+          View All
+        </Button>
+      )}
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Table,
@@ -35,6 +35,7 @@ import {
 interface TransactionsTableProps {
   userId: string;
   selectedDate?: Date | null;
+  onPortalFilterSummaryChange?: (summary: { portalNames: string[]; totalAmount: number; count: number } | null) => void;
 }
 
 interface Transaction {
@@ -54,7 +55,11 @@ interface Transaction {
   };
 }
 
-export const TransactionsTable = ({ userId, selectedDate }: TransactionsTableProps) => {
+export const TransactionsTable = ({
+  userId,
+  selectedDate,
+  onPortalFilterSummaryChange,
+}: TransactionsTableProps) => {
   const { toast } = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
@@ -121,9 +126,14 @@ export const TransactionsTable = ({ userId, selectedDate }: TransactionsTablePro
           variant: "destructive",
         });
       } else {
-        setTransactions(data as Transaction[]);
-        setFilteredTransactions(data as Transaction[]);
-        setHasMore((data?.length || 0) > itemsPerPage);
+        const sortedData = [...((data as Transaction[]) || [])].sort(
+          (a, b) =>
+            new Date(b.transaction_date).getTime() -
+            new Date(a.transaction_date).getTime()
+        );
+        setTransactions(sortedData);
+        setFilteredTransactions(sortedData);
+        setHasMore(sortedData.length > itemsPerPage);
       }
 
       setIsLoading(false);
@@ -225,12 +235,46 @@ export const TransactionsTable = ({ userId, selectedDate }: TransactionsTablePro
     if (filters.amountRange.max !== null) {
       filtered = filtered.filter((t) => t.amount <= filters.amountRange.max!);
     }
+    // Always sort by transaction_date descending (most recent date and time first)
+    filtered.sort(
+      (a, b) =>
+        new Date(b.transaction_date).getTime() -
+        new Date(a.transaction_date).getTime()
+    );
 
     setFilteredTransactions(filtered);
     setDisplayedTransactions(filtered.slice(0, itemsPerPage));
     setPage(1);
     setHasMore(filtered.length > itemsPerPage);
   }, [searchQuery, transactions, filters, selectedDate]);
+
+  const portalFilterSummary = useMemo(() => {
+    if (filters.portals.length === 0) return null;
+    const matchedPortals = portals.filter((p) => filters.portals.includes(p.id));
+    const portalNames = matchedPortals.map((p) => p.name);
+    const totalAmount = filteredTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    const totalProfit = filteredTransactions.reduce((sum, t) => sum + Number(t.profit || t.commission || 0), 0);
+    return {
+      portalNames,
+      totalAmount,
+      totalProfit,
+      count: filteredTransactions.length,
+    };
+  }, [filters.portals, portals, filteredTransactions]);
+
+  useEffect(() => {
+    if (onPortalFilterSummaryChange) {
+      onPortalFilterSummaryChange(
+        portalFilterSummary
+          ? {
+              portalNames: portalFilterSummary.portalNames,
+              totalAmount: portalFilterSummary.totalAmount,
+              count: portalFilterSummary.count,
+            }
+          : null
+      );
+    }
+  }, [portalFilterSummary, onPortalFilterSummaryChange]);
 
   const { ref: loadMoreRef, inView } = useInView({
     threshold: 0,
@@ -508,6 +552,48 @@ export const TransactionsTable = ({ userId, selectedDate }: TransactionsTablePro
           </div>
         )}
         <TransactionFilters portals={portals} onFiltersChange={setFilters} />
+
+        {portalFilterSummary && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-3 bg-gradient-to-r from-primary/10 via-card to-accent/10 border border-primary/20 rounded-xl p-3 sm:p-4 shadow-xs flex items-center justify-between gap-3"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/15 text-primary rounded-lg font-bold text-xs sm:text-sm tracking-wide">
+                🏢 {portalFilterSummary.portalNames.join(", ")}
+              </div>
+              <div>
+                <div className="text-[11px] sm:text-xs text-muted-foreground font-medium">
+                  Sum of Total Amount ({portalFilterSummary.count} txns)
+                </div>
+                <div className="text-base sm:text-lg lg:text-xl font-bold tracking-tight text-foreground">
+                  ₹{portalFilterSummary.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:flex flex-col text-right">
+                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                  Net Profit
+                </span>
+                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                  ₹{portalFilterSummary.totalProfit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setFilters({ ...filters, portals: [] })}
+                className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground font-medium"
+              >
+                Clear Filter
+              </Button>
+            </div>
+          </motion.div>
+        )}
       </div>
 
       {/* Mobile cards */}

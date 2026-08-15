@@ -22,7 +22,13 @@ const Transactions = () => {
   const [portalsRefreshKey, setPortalsRefreshKey] = useState(0);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+  const [portalSummary, setPortalSummary] = useState<{
+    portalNames: string[];
+    totalAmount: number;
+    count: number;
+  } | null>(null);
 
   const handleRefresh = async () => {
     setRefreshKey((k) => k + 1);
@@ -60,15 +66,35 @@ const Transactions = () => {
           transition={{ duration: 0.3 }}
           className="space-y-4 sm:space-y-6"
         >
-          {/* Header Row: Title on Left, DateSwitch on Right */}
+          {/* Header Row: Title on Left with Portal Status Card, DateSwitch on Right */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
-                Transactions
-              </h1>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                Manage all your payment transactions
-              </p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div>
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
+                  Transactions
+                </h1>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                  Manage all your payment transactions
+                </p>
+              </div>
+
+              {/* Status Card beside transaction header when portal is selected */}
+              {portalSummary && portalSummary.portalNames.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex items-center gap-2 bg-gradient-to-r from-primary/15 via-primary/10 to-emerald-500/10 border border-primary/25 rounded-xl px-3.5 py-1.5 shadow-sm"
+                >
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase font-extrabold tracking-wider text-primary">
+                      🏢 {portalSummary.portalNames.join(", ")} Total ({portalSummary.count})
+                    </span>
+                    <span className="text-sm sm:text-base font-bold text-foreground">
+                      ₹{portalSummary.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </motion.div>
+              )}
             </div>
 
             <div className="flex items-center">
@@ -108,6 +134,7 @@ const Transactions = () => {
           <TransactionsTable
             userId={user.id}
             selectedDate={selectedDate}
+            onPortalFilterSummaryChange={setPortalSummary}
             key={`tx-table-${refreshKey}`}
           />
 
@@ -116,6 +143,12 @@ const Transactions = () => {
             open={isDialogOpen}
             onOpenChange={setIsDialogOpen}
             portalsRefreshKey={portalsRefreshKey}
+            onSuccess={(addedDate) => {
+              setRefreshKey((k) => k + 1);
+              if (addedDate) {
+                setSelectedDate(addedDate);
+              }
+            }}
           />
 
           <ManagePortalsDialog
@@ -129,7 +162,10 @@ const Transactions = () => {
           <UploadPayoutDialog
             userId={user.id}
             open={uploadOpen}
-            onOpenChange={setUploadOpen}
+            onOpenChange={(open) => {
+              setUploadOpen(open);
+              if (!open) setRefreshKey((k) => k + 1);
+            }}
           />
         </motion.div>
       </PullToRefresh>
