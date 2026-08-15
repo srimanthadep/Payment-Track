@@ -557,28 +557,28 @@ export const TransactionsTable = ({
           <motion.div
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-3 bg-gradient-to-r from-primary/10 via-card to-accent/10 border border-primary/20 rounded-xl p-3 sm:p-4 shadow-xs flex items-center justify-between gap-3"
+            className="mt-3 bg-gradient-to-r from-primary/10 via-card to-accent/10 border border-primary/20 rounded-xl p-2.5 sm:p-4 shadow-xs flex flex-wrap items-center justify-between gap-2.5"
           >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/15 text-primary rounded-lg font-bold text-xs sm:text-sm tracking-wide">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 sm:p-2 bg-primary/15 text-primary rounded-lg font-bold text-xs sm:text-sm tracking-wide">
                 🏢 {portalFilterSummary.portalNames.join(", ")}
               </div>
               <div>
-                <div className="text-[11px] sm:text-xs text-muted-foreground font-medium">
+                <div className="text-[10px] sm:text-xs text-muted-foreground font-medium">
                   Sum of Total Amount ({portalFilterSummary.count} txns)
                 </div>
-                <div className="text-base sm:text-lg lg:text-xl font-bold tracking-tight text-foreground">
+                <div className="text-sm sm:text-lg lg:text-xl font-bold tracking-tight text-foreground">
                   ₹{portalFilterSummary.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="hidden sm:flex flex-col text-right">
-                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+            <div className="flex items-center gap-2.5">
+              <div className="flex flex-col text-right bg-background/80 px-2.5 py-1 rounded-lg border border-border/50">
+                <span className="text-[9px] sm:text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
                   Net Profit
                 </span>
-                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                <span className="text-xs sm:text-sm font-bold text-emerald-600 dark:text-emerald-400">
                   ₹{portalFilterSummary.totalProfit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                 </span>
               </div>
@@ -587,9 +587,9 @@ export const TransactionsTable = ({
                 variant="ghost"
                 size="sm"
                 onClick={() => setFilters({ ...filters, portals: [] })}
-                className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground font-medium"
+                className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground font-medium"
               >
-                Clear Filter
+                Clear
               </Button>
             </div>
           </motion.div>

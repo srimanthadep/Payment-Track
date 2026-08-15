@@ -68,7 +68,7 @@ const Transactions = () => {
         >
           {/* Header Row: Title on Left with Portal Status Card, DateSwitch on Right */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <div>
                 <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
                   Transactions
@@ -81,17 +81,22 @@ const Transactions = () => {
               {/* Status Card beside transaction header when portal is selected */}
               {portalSummary && portalSummary.portalNames.length > 0 && (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="flex items-center gap-2 bg-gradient-to-r from-primary/15 via-primary/10 to-emerald-500/10 border border-primary/25 rounded-xl px-3.5 py-1.5 shadow-sm"
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="w-full sm:w-auto inline-flex items-center justify-between gap-3 bg-gradient-to-r from-primary/15 via-primary/10 to-emerald-500/10 border border-primary/25 rounded-xl px-3.5 py-2 shadow-xs"
                 >
-                  <div className="flex flex-col">
-                    <span className="text-[10px] uppercase font-extrabold tracking-wider text-primary">
-                      🏢 {portalSummary.portalNames.join(", ")} Total ({portalSummary.count})
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold text-primary bg-primary/15 px-2 py-0.5 rounded-md">
+                      🏢 {portalSummary.portalNames.join(", ")}
                     </span>
-                    <span className="text-sm sm:text-base font-bold text-foreground">
-                      ₹{portalSummary.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
+                        Total ({portalSummary.count} txns)
+                      </span>
+                      <span className="text-sm sm:text-base font-extrabold text-foreground">
+                        ₹{portalSummary.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
                   </div>
                 </motion.div>
               )}
