@@ -7,6 +7,7 @@ import { TransactionsTable } from "@/components/transactions/TransactionsTable";
 import { AddTransactionDialog } from "@/components/transactions/AddTransactionDialog";
 import { ManagePortalsDialog } from "@/components/portals/ManagePortalsDialog";
 import { UploadPayoutDialog } from "@/components/transactions/UploadPayoutDialog";
+import { DateSwitch } from "@/components/transactions/DateSwitch";
 import { FloatingActionButton } from "@/components/ui/FloatingActionButton";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ const Transactions = () => {
   const [portalsRefreshKey, setPortalsRefreshKey] = useState(0);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
 
   const handleRefresh = async () => {
     setRefreshKey((k) => k + 1);
@@ -35,14 +37,14 @@ const Transactions = () => {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user ?? null);
-        if (!session) {
-          navigate("/auth");
-        }
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      if (!session) {
+        navigate("/auth");
       }
-    );
+    });
 
     return () => subscription.unsubscribe();
   }, [navigate]);
@@ -58,33 +60,61 @@ const Transactions = () => {
           transition={{ duration: 0.3 }}
           className="space-y-4 sm:space-y-6"
         >
-          <div className="space-y-3">
-          <div>
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">Transactions</h1>
+          {/* Header Row: Title on Left, DateSwitch on Right */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
+                Transactions
+              </h1>
               <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              Manage all your payment transactions
-            </p>
-          </div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Button className="w-full sm:w-auto text-sm h-9 hidden sm:flex" onClick={() => setIsDialogOpen(true)}>
-                <Plus className="mr-2 h-3.5 w-3.5" />
-            Add Transaction
-          </Button>
-              <Button className="w-full sm:w-auto text-sm h-9" variant="secondary" onClick={() => setUploadOpen(true)}>
-                Import Payouts
-              </Button>
-              <Button className="w-full sm:w-auto text-sm h-9" variant="outline" onClick={() => setManagePortalsOpen(true)}>
-                Manage Portals
-              </Button>
+                Manage all your payment transactions
+              </p>
             </div>
-        </div>
 
-          <TransactionsTable userId={user.id} key={refreshKey} />
-        
-        <AddTransactionDialog 
-          userId={user.id}
-          open={isDialogOpen}
-          onOpenChange={setIsDialogOpen}
+            <div className="flex items-center">
+              <DateSwitch
+                selectedDate={selectedDate}
+                onDateChange={setSelectedDate}
+              />
+            </div>
+          </div>
+
+          {/* Action Buttons Row */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              className="w-full sm:w-auto text-sm h-9 hidden sm:flex"
+              onClick={() => setIsDialogOpen(true)}
+            >
+              <Plus className="mr-2 h-3.5 w-3.5" />
+              Add Transaction
+            </Button>
+            <Button
+              className="w-full sm:w-auto text-sm h-9"
+              variant="secondary"
+              onClick={() => setUploadOpen(true)}
+            >
+              Import Payouts
+            </Button>
+            <Button
+              className="w-full sm:w-auto text-sm h-9"
+              variant="outline"
+              onClick={() => setManagePortalsOpen(true)}
+            >
+              Manage Portals
+            </Button>
+          </div>
+
+          {/* Transactions Table with Date Filter applied */}
+          <TransactionsTable
+            userId={user.id}
+            selectedDate={selectedDate}
+            key={`tx-table-${refreshKey}`}
+          />
+
+          <AddTransactionDialog
+            userId={user.id}
+            open={isDialogOpen}
+            onOpenChange={setIsDialogOpen}
             portalsRefreshKey={portalsRefreshKey}
           />
 
@@ -100,7 +130,7 @@ const Transactions = () => {
             userId={user.id}
             open={uploadOpen}
             onOpenChange={setUploadOpen}
-        />
+          />
         </motion.div>
       </PullToRefresh>
       <FloatingActionButton onClick={() => setIsDialogOpen(true)} />

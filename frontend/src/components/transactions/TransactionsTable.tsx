@@ -34,6 +34,7 @@ import {
 
 interface TransactionsTableProps {
   userId: string;
+  selectedDate?: Date | null;
 }
 
 interface Transaction {
@@ -53,7 +54,7 @@ interface Transaction {
   };
 }
 
-export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
+export const TransactionsTable = ({ userId, selectedDate }: TransactionsTableProps) => {
   const { toast } = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
@@ -100,8 +101,7 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
           )
         `)
         .eq("user_id", userId)
-        .order("transaction_date", { ascending: false })
-        .range(0, itemsPerPage - 1);
+        .order("transaction_date", { ascending: false });
 
       // Fetch portals for filters
       const { data: portalsData } = await supabase
@@ -123,7 +123,7 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
       } else {
         setTransactions(data as Transaction[]);
         setFilteredTransactions(data as Transaction[]);
-        setHasMore((data?.length || 0) === itemsPerPage);
+        setHasMore((data?.length || 0) > itemsPerPage);
       }
 
       setIsLoading(false);
@@ -162,6 +162,21 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
 
   useEffect(() => {
     let filtered = [...transactions];
+
+    // Date Switch single date filter
+    if (selectedDate) {
+      const targetYear = selectedDate.getFullYear();
+      const targetMonth = selectedDate.getMonth();
+      const targetDay = selectedDate.getDate();
+      filtered = filtered.filter((t) => {
+        const txDate = new Date(t.transaction_date);
+        return (
+          txDate.getFullYear() === targetYear &&
+          txDate.getMonth() === targetMonth &&
+          txDate.getDate() === targetDay
+        );
+      });
+    }
 
     // Text search
     if (searchQuery) {
@@ -211,11 +226,11 @@ export const TransactionsTable = ({ userId }: TransactionsTableProps) => {
       filtered = filtered.filter((t) => t.amount <= filters.amountRange.max!);
     }
 
-      setFilteredTransactions(filtered);
+    setFilteredTransactions(filtered);
     setDisplayedTransactions(filtered.slice(0, itemsPerPage));
     setPage(1);
     setHasMore(filtered.length > itemsPerPage);
-  }, [searchQuery, transactions, filters]);
+  }, [searchQuery, transactions, filters, selectedDate]);
 
   const { ref: loadMoreRef, inView } = useInView({
     threshold: 0,
