@@ -5,10 +5,14 @@ import { ArrowDownCircle, ArrowUpCircle, TrendingUp } from "lucide-react";
 import { RupeeIcon } from "@/components/icons/RupeeIcon";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
+import { format, isToday } from "date-fns";
+
+export type Period = "daily" | "weekly" | "monthly" | "all";
 
 interface StatsCardsProps {
   userId: string;
   period?: Period;
+  selectedDate?: Date | null;
   onPeriodChange?: (period: Period) => void;
   showTabs?: boolean;
 }
@@ -20,9 +24,13 @@ interface Stats {
   totalProfit: number;
 }
 
-export type Period = "daily" | "weekly" | "monthly" | "all";
-
-export const StatsCards = ({ userId, period: controlledPeriod, onPeriodChange, showTabs = false }: StatsCardsProps) => {
+export const StatsCards = ({
+  userId,
+  period: controlledPeriod,
+  selectedDate,
+  onPeriodChange,
+  showTabs = false,
+}: StatsCardsProps) => {
   const [stats, setStats] = useState<Stats>({
     totalWithdrawals: 0,
     totalRepayments: 0,
@@ -41,29 +49,46 @@ export const StatsCards = ({ userId, period: controlledPeriod, onPeriodChange, s
   useEffect(() => {
     const fetchStats = async () => {
       setIsLoading(true);
-      
+
       let query = supabase
         .from("transactions")
         .select("transaction_type, amount, commission, site_fee, transaction_date")
         .eq("user_id", userId);
 
-      // Apply date filter based on period
       const now = new Date();
-      let startDate: Date;
+      const activeDate = selectedDate || now;
 
       if (period === "daily") {
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const startOfDay = new Date(
+          activeDate.getFullYear(),
+          activeDate.getMonth(),
+          activeDate.getDate(),
+          0,
+          0,
+          0,
+          0
+        );
+        const endOfDay = new Date(
+          activeDate.getFullYear(),
+          activeDate.getMonth(),
+          activeDate.getDate(),
+          23,
+          59,
+          59,
+          999
+        );
+        query = query
+          .gte("transaction_date", startOfDay.toISOString())
+          .lte("transaction_date", endOfDay.toISOString());
       } else if (period === "weekly") {
         const dayOfWeek = now.getDay();
-        startDate = new Date(now);
-        startDate.setDate(now.getDate() - dayOfWeek);
-        startDate.setHours(0, 0, 0, 0);
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - dayOfWeek);
+        startOfWeek.setHours(0, 0, 0, 0);
+        query = query.gte("transaction_date", startOfWeek.toISOString());
       } else if (period === "monthly") {
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-      }
-
-      if (period !== "all" && startDate!) {
-        query = query.gte("transaction_date", startDate.toISOString());
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        query = query.gte("transaction_date", startOfMonth.toISOString());
       }
 
       const { data: transactions, error } = await query;
@@ -74,19 +99,27 @@ export const StatsCards = ({ userId, period: controlledPeriod, onPeriodChange, s
         return;
       }
 
-      const withdrawals = transactions
-        ?.filter((t) => t.transaction_type?.toLowerCase() === "withdrawal")
-        .reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+      const withdrawals =
+        transactions
+          ?.filter((t) => t.transaction_type?.toLowerCase() === "withdrawal")
+          .reduce((sum, t) => sum + Number(t.amount || 0), 0) || 0;
 
-      const repayments = transactions
-        ?.filter((t) => t.transaction_type?.toLowerCase() === "repayment")
-        .reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+      const repayments =
+        transactions
+          ?.filter((t) => t.transaction_type?.toLowerCase() === "repayment")
+          .reduce((sum, t) => sum + Number(t.amount || 0), 0) || 0;
 
-      const commissions = transactions
-        ?.reduce((sum, t) => sum + Number(t.commission || 0), 0) || 0;
+      const commissions =
+        transactions?.reduce(
+          (sum, t) => sum + Number(t.commission || 0),
+          0
+        ) || 0;
 
-      const profit = transactions
-        ?.reduce((sum, t) => sum + Number(t.commission || 0), 0) || 0;
+      const profit =
+        transactions?.reduce(
+          (sum, t) => sum + (Number(t.commission || 0) - Number(t.site_fee || 0)),
+          0
+        ) || 0;
 
       setStats({
         totalWithdrawals: withdrawals,
@@ -100,9 +133,9 @@ export const StatsCards = ({ userId, period: controlledPeriod, onPeriodChange, s
 
     fetchStats();
 
-    // Set up realtime subscription
+    // Realtime subscription
     const channel = supabase
-      .channel("transactions-changes")
+      .channel("transactions-stats-changes")
       .on(
         "postgres_changes",
         {
@@ -120,7 +153,7 @@ export const StatsCards = ({ userId, period: controlledPeriod, onPeriodChange, s
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, period]);
+  }, [userId, period, selectedDate]);
 
   const formatCurrency = (amount: number) => {
     return `₹${amount.toLocaleString("en-IN", {
@@ -131,8 +164,10 @@ export const StatsCards = ({ userId, period: controlledPeriod, onPeriodChange, s
 
   const getPeriodLabel = () => {
     switch (period) {
-      case "daily":
-        return "Today";
+      case "daily": {
+        const activeDate = selectedDate || new Date();
+        return isToday(activeDate) ? "Today" : format(activeDate, "dd MMM");
+      }
       case "weekly":
         return "This Week";
       case "monthly":
@@ -144,19 +179,19 @@ export const StatsCards = ({ userId, period: controlledPeriod, onPeriodChange, s
 
   const cards = [
     {
-      title: "Total Withdrawals",
+      title: `Total Withdrawals (${getPeriodLabel()})`,
       value: stats.totalWithdrawals,
       icon: ArrowDownCircle,
       gradient: "from-primary to-primary/70",
     },
     {
-      title: "Total Repayments",
+      title: `Total Repayments (${getPeriodLabel()})`,
       value: stats.totalRepayments,
       icon: ArrowUpCircle,
       gradient: "from-blue-500 to-blue-600",
     },
     {
-      title: "Total Commissions",
+      title: `Total Commissions (${getPeriodLabel()})`,
       value: stats.totalCommissions,
       icon: RupeeIcon,
       gradient: "from-purple-500 to-purple-600",
@@ -175,49 +210,59 @@ export const StatsCards = ({ userId, period: controlledPeriod, onPeriodChange, s
         <div className="flex justify-center sm:justify-end">
           <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
             <TabsList className="grid grid-cols-4 w-full sm:w-auto">
-              <TabsTrigger value="daily" className="text-xs sm:text-sm">Daily</TabsTrigger>
-              <TabsTrigger value="weekly" className="text-xs sm:text-sm">Weekly</TabsTrigger>
-              <TabsTrigger value="monthly" className="text-xs sm:text-sm">Monthly</TabsTrigger>
-              <TabsTrigger value="all" className="text-xs sm:text-sm">All Time</TabsTrigger>
+              <TabsTrigger value="daily" className="text-xs sm:text-sm">
+                Daily
+              </TabsTrigger>
+              <TabsTrigger value="weekly" className="text-xs sm:text-sm">
+                Weekly
+              </TabsTrigger>
+              <TabsTrigger value="monthly" className="text-xs sm:text-sm">
+                Monthly
+              </TabsTrigger>
+              <TabsTrigger value="all" className="text-xs sm:text-sm">
+                All Time
+              </TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
       )}
       <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         {cards.map((card, index) => {
-        const Icon = card.icon;
-        return (
+          const Icon = card.icon;
+          return (
             <motion.div
               key={card.title}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
+              transition={{ delay: index * 0.05 }}
             >
-              <Card className="overflow-hidden relative">
+              <Card className="overflow-hidden relative shadow-sm border-border/80">
                 <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                   <CardTitle className="text-xs sm:text-sm font-medium leading-tight pr-2">
-                {card.title}
-              </CardTitle>
-                  <div className={`p-1.5 sm:p-2 rounded-lg bg-gradient-to-br ${card.gradient} flex-shrink-0`}>
+                    {card.title}
+                  </CardTitle>
+                  <div
+                    className={`p-1.5 sm:p-2 rounded-lg bg-gradient-to-br ${card.gradient} flex-shrink-0`}
+                  >
                     <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
-              </div>
-            </CardHeader>
+                  </div>
+                </CardHeader>
                 <CardContent className="pt-0">
                   <div className="text-lg sm:text-2xl font-bold">
-                {isLoading ? (
+                    {isLoading ? (
                       <div className="h-6 sm:h-8 w-20 sm:w-24 bg-muted animate-pulse rounded" />
-                ) : (
-                  formatCurrency(card.value)
-                )}
-              </div>
+                    ) : (
+                      formatCurrency(card.value)
+                    )}
+                  </div>
                   <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
-                Updated in real-time
-              </p>
-            </CardContent>
-          </Card>
+                    Updated in real-time
+                  </p>
+                </CardContent>
+              </Card>
             </motion.div>
-        );
-      })}
+          );
+        })}
       </div>
     </div>
   );

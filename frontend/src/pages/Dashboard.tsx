@@ -7,6 +7,7 @@ import { StatsCards, Period } from "@/components/dashboard/StatsCards";
 import { ProfitChart } from "@/components/dashboard/ProfitChart";
 import { RecentTransactions } from "@/components/dashboard/RecentTransactions";
 import { PortalComparisonChart } from "@/components/dashboard/PortalComparisonChart";
+import { DateSwitch } from "@/components/transactions/DateSwitch";
 import { DashboardSkeleton } from "@/components/ui/skeletons";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,6 +22,7 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [period, setPeriod] = useState<Period>("daily");
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
 
   const handleRefresh = async () => {
     setRefreshKey((k) => k + 1);
@@ -28,23 +30,23 @@ const Dashboard = () => {
 
   useEffect(() => {
     // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (!session) {
-          navigate("/auth");
-        }
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+
+      if (!session) {
+        navigate("/auth");
       }
-    );
+    });
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
-      
+
       if (!session) {
         navigate("/auth");
       }
@@ -104,23 +106,48 @@ const Dashboard = () => {
           transition={{ duration: 0.3 }}
           className="space-y-4 sm:space-y-6"
         >
-          {/* Header with Title and Period Tabs placed right beside it */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          {/* Header with Title, DateSwitch, and Period Tabs */}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
             <div className="space-y-1">
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                Dashboard
+              </h1>
               <p className="text-sm text-muted-foreground">
                 Overview of your payment transactions and profits
               </p>
             </div>
 
-            <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
-              <TabsList className="grid grid-cols-4 w-full sm:w-auto">
-                <TabsTrigger value="daily" className="text-xs sm:text-sm">Daily</TabsTrigger>
-                <TabsTrigger value="weekly" className="text-xs sm:text-sm">Weekly</TabsTrigger>
-                <TabsTrigger value="monthly" className="text-xs sm:text-sm">Monthly</TabsTrigger>
-                <TabsTrigger value="all" className="text-xs sm:text-sm">All Time</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <DateSwitch
+                selectedDate={selectedDate}
+                onDateChange={(newDate) => {
+                  setSelectedDate(newDate);
+                  if (newDate) {
+                    setPeriod("daily");
+                  }
+                }}
+              />
+
+              <Tabs
+                value={period}
+                onValueChange={(v) => setPeriod(v as Period)}
+              >
+                <TabsList className="grid grid-cols-4 w-full sm:w-auto">
+                  <TabsTrigger value="daily" className="text-xs sm:text-sm">
+                    Daily
+                  </TabsTrigger>
+                  <TabsTrigger value="weekly" className="text-xs sm:text-sm">
+                    Weekly
+                  </TabsTrigger>
+                  <TabsTrigger value="monthly" className="text-xs sm:text-sm">
+                    Monthly
+                  </TabsTrigger>
+                  <TabsTrigger value="all" className="text-xs sm:text-sm">
+                    All Time
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
           </div>
 
           <motion.div
@@ -128,9 +155,17 @@ const Dashboard = () => {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1 }}
           >
-            <StatsCards userId={user.id} period={period} onPeriodChange={setPeriod} key={`stats-${refreshKey}-${period}`} />
+            <StatsCards
+              userId={user.id}
+              period={period}
+              selectedDate={selectedDate}
+              onPeriodChange={setPeriod}
+              key={`stats-${refreshKey}-${period}-${
+                selectedDate ? selectedDate.toISOString() : "all"
+              }`}
+            />
           </motion.div>
-          
+
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -138,7 +173,10 @@ const Dashboard = () => {
             className="grid gap-6 lg:grid-cols-2"
           >
             <ProfitChart userId={user.id} key={`profit-${refreshKey}`} />
-            <RecentTransactions userId={user.id} key={`recent-${refreshKey}`} />
+            <RecentTransactions
+              userId={user.id}
+              key={`recent-${refreshKey}`}
+            />
           </motion.div>
 
           <motion.div
@@ -146,7 +184,11 @@ const Dashboard = () => {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
           >
-            <PortalComparisonChart userId={user.id} period={period} key={`portal-${refreshKey}-${period}`} />
+            <PortalComparisonChart
+              userId={user.id}
+              period={period}
+              key={`portal-${refreshKey}-${period}`}
+            />
           </motion.div>
         </motion.div>
       </PullToRefresh>
