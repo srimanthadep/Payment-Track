@@ -1,6 +1,12 @@
-import { useRef } from "react";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
+import { useState } from "react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { format, isToday, addDays, subDays } from "date-fns";
 
 interface DateSwitchProps {
@@ -14,102 +20,132 @@ export const DateSwitch = ({
   onDateChange,
   className = "",
 }: DateSwitchProps) => {
-  const dateInputRef = useRef<HTMLInputElement>(null);
+  const [isOpen, setIsOpen] = useState(false);
   const activeDate = selectedDate || new Date();
 
-  const handlePrevDay = () => {
+  const handlePrevDay = (e: React.MouseEvent) => {
+    e.stopPropagation();
     onDateChange(subDays(activeDate, 1));
   };
 
-  const handleNextDay = () => {
+  const handleNextDay = (e: React.MouseEvent) => {
+    e.stopPropagation();
     onDateChange(addDays(activeDate, 1));
   };
 
   const handleTodayClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onDateChange(new Date());
+    setIsOpen(false);
   };
 
-  const handleNativeDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.value) {
-      const [year, month, day] = e.target.value.split("-").map(Number);
-      const newDate = new Date(year, month - 1, day);
-      onDateChange(newDate);
+  const handleSelectDate = (date: Date | undefined) => {
+    if (date) {
+      onDateChange(date);
+      setIsOpen(false);
     }
   };
 
   const isCurrentDayToday = selectedDate ? isToday(selectedDate) : true;
   const formattedDate = format(activeDate, "EEE, dd MMM yyyy");
-  const isoDateForInput = format(activeDate, "yyyy-MM-dd");
 
   return (
     <div
-      className={`inline-flex items-center gap-1 sm:gap-1.5 bg-background border border-border/80 rounded-xl p-1 shadow-sm hover:border-border transition-colors select-none ${className}`}
+      className={`inline-flex items-center gap-1 sm:gap-1.5 bg-card border border-border/80 rounded-xl p-1 shadow-sm select-none ${className}`}
     >
-      {/* Previous Day Chevron Button */}
+      {/* Previous Day Button */}
       <Button
         type="button"
         variant="ghost"
         size="icon"
         onClick={handlePrevDay}
-        className="h-8 w-8 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground active:scale-95 transition-transform"
+        className="h-8 w-8 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground active:scale-95 transition-all"
         title="Previous Day"
       >
         <ChevronLeft className="h-4 w-4" />
       </Button>
 
-      {/* Date Trigger with hidden native calendar picker */}
-      <div
-        onClick={() => {
-          try {
-            dateInputRef.current?.showPicker();
-          } catch {
-            dateInputRef.current?.focus();
-          }
-        }}
-        className="relative flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-muted/60 cursor-pointer group transition-colors"
-        title="Click to choose a date from calendar"
-      >
-        <CalendarIcon className="h-4 w-4 text-primary group-hover:scale-105 transition-transform flex-shrink-0" />
-
-        <span className="text-xs sm:text-sm font-semibold tracking-tight whitespace-nowrap text-foreground">
-          {formattedDate}
-        </span>
-
-        {/* TODAY / GO TO TODAY indicator */}
-        {isCurrentDayToday ? (
-          <span className="bg-primary/10 text-primary font-bold text-[10px] tracking-wider px-2 py-0.5 rounded-md uppercase border border-primary/20">
-            TODAY
-          </span>
-        ) : (
+      {/* Styled Popover Calendar Trigger */}
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <PopoverTrigger asChild>
           <button
             type="button"
-            onClick={handleTodayClick}
-            className="bg-accent hover:bg-primary/15 text-accent-foreground hover:text-primary font-bold text-[10px] tracking-wider px-2 py-0.5 rounded-md uppercase border border-border transition-colors"
-            title="Jump to today"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-muted/70 cursor-pointer group transition-all text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            title="Click to open calendar"
           >
-            GO TO TODAY
+            <CalendarIcon className="h-4 w-4 text-primary group-hover:scale-110 transition-transform flex-shrink-0" />
+
+            <span className="text-xs sm:text-sm font-semibold tracking-tight whitespace-nowrap text-foreground">
+              {formattedDate}
+            </span>
+
+            {/* TODAY / GO TO TODAY indicator */}
+            {isCurrentDayToday ? (
+              <span className="bg-primary/10 text-primary font-bold text-[10px] tracking-wider px-2 py-0.5 rounded-md uppercase border border-primary/20">
+                TODAY
+              </span>
+            ) : (
+              <span
+                onClick={handleTodayClick}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-[10px] tracking-wider px-2 py-0.5 rounded-md uppercase transition-colors shadow-xs"
+                title="Jump to today"
+              >
+                GO TO TODAY
+              </span>
+            )}
           </button>
-        )}
+        </PopoverTrigger>
 
-        {/* Hidden Date Input */}
-        <input
-          ref={dateInputRef}
-          type="date"
-          value={isoDateForInput}
-          onChange={handleNativeDateChange}
-          className="absolute inset-0 opacity-0 pointer-events-none w-full h-full"
-          tabIndex={-1}
-        />
-      </div>
+        <PopoverContent
+          className="w-auto p-0 bg-popover/95 backdrop-blur-md border border-border/80 shadow-xl rounded-2xl overflow-hidden"
+          align="center"
+          sideOffset={8}
+        >
+          {/* Calendar Picker Component */}
+          <div className="p-1">
+            <Calendar
+              mode="single"
+              selected={activeDate}
+              onSelect={handleSelectDate}
+              initialFocus
+              className="rounded-xl"
+            />
+          </div>
 
-      {/* Next Day Chevron Button */}
+          {/* Quick Action Footer in Popover */}
+          <div className="flex items-center justify-between border-t border-border/60 bg-muted/30 px-3 py-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                onDateChange(null);
+                setIsOpen(false);
+              }}
+              className="h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+            >
+              All Dates
+            </Button>
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              onClick={handleTodayClick}
+              className="h-7 px-3 text-xs font-semibold"
+            >
+              Today
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      {/* Next Day Button */}
       <Button
         type="button"
         variant="ghost"
         size="icon"
         onClick={handleNextDay}
-        className="h-8 w-8 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground active:scale-95 transition-transform"
+        className="h-8 w-8 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground active:scale-95 transition-all"
         title="Next Day"
       >
         <ChevronRight className="h-4 w-4" />
