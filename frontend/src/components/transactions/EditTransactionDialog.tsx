@@ -17,8 +17,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Calendar as CalendarIcon } from "lucide-react";
+import { format, isToday } from "date-fns";
 import {
   calculateCommission,
   getCardTypesForTransaction,
@@ -59,8 +66,9 @@ export const EditTransactionDialog = ({
 }: EditTransactionDialogProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [portals, setPortals] = useState<Portal[]>([]);
-  
+
   const [formData, setFormData] = useState({
     portal_id: "",
     card_type: "" as CardType | "",
@@ -70,7 +78,7 @@ export const EditTransactionDialog = ({
     site_fee: "",
     reference_number: "",
     status: "completed",
-    transaction_date: "",
+    transaction_date: new Date(),
   });
 
   useEffect(() => {
@@ -92,21 +100,25 @@ export const EditTransactionDialog = ({
 
   useEffect(() => {
     if (transaction) {
-      // Map old repayment card types to new grouped types
       let cardType = (transaction.card_type as CardType) || ("" as CardType | "");
       if (transaction.transaction_type === "repayment" && cardType) {
-        // Map old individual card types to grouped types
         if (cardType === "normal_visa" || cardType === "normal_rupay") {
           cardType = "all_visa_rupay";
         } else if (cardType === "hdfc_visa" || cardType === "hdfc_rupay") {
           cardType = "hdfc_visa_rupay";
-        } else if (cardType === "normal_master" || cardType === "hdfc_master" || cardType === "au_card" || cardType === "amex_diners" || cardType === "machine_swiping") {
+        } else if (
+          cardType === "normal_master" ||
+          cardType === "hdfc_master" ||
+          cardType === "au_card" ||
+          cardType === "amex_diners" ||
+          cardType === "machine_swiping"
+        ) {
           cardType = "all_master_cards";
         } else if (cardType === "hdfc_business") {
           cardType = "all_business_cards";
         }
       }
-      
+
       setFormData({
         portal_id: transaction.portal_id,
         card_type: cardType,
@@ -116,7 +128,9 @@ export const EditTransactionDialog = ({
         site_fee: transaction.site_fee.toString(),
         reference_number: transaction.reference_number || "",
         status: transaction.status,
-        transaction_date: transaction.transaction_date.split("T")[0],
+        transaction_date: transaction.transaction_date
+          ? new Date(transaction.transaction_date)
+          : new Date(),
       });
     }
   }, [transaction]);
@@ -127,10 +141,8 @@ export const EditTransactionDialog = ({
       const next = {
         ...formData,
         portal_id: portalId,
-        // Only set site_fee if it's empty, otherwise keep user's value
         site_fee: formData.site_fee || portal.default_site_fee.toString(),
       };
-      // Recalculate commission if amount and card type are set
       if (next.amount && next.card_type) {
         const commissionAmount = calculateCommission(
           parseFloat(next.amount),
@@ -148,7 +160,6 @@ export const EditTransactionDialog = ({
       ...formData,
       card_type: cardType,
     };
-    // Recalculate commission if amount is set
     if (next.amount && cardType) {
       const commissionAmount = calculateCommission(
         parseFloat(next.amount),
@@ -164,9 +175,8 @@ export const EditTransactionDialog = ({
     const next = {
       ...formData,
       transaction_type: transactionType,
-      card_type: "" as CardType | "", // Reset card type when transaction type changes
+      card_type: "" as CardType | "",
     };
-    // Recalculate commission if amount and card type are set
     if (next.amount && next.card_type) {
       const commissionAmount = calculateCommission(
         parseFloat(next.amount),
@@ -183,7 +193,6 @@ export const EditTransactionDialog = ({
       ...formData,
       amount,
     };
-    // Recalculate commission if card type is set
     if (amount && next.card_type) {
       const commissionAmount = calculateCommission(
         parseFloat(amount),
@@ -212,19 +221,7 @@ export const EditTransactionDialog = ({
 
     setIsLoading(true);
 
-    interface UpdatePayload {
-      portal_id: string;
-      card_type: string;
-      transaction_type: string;
-      amount: number;
-      commission: number;
-      site_fee: number;
-      reference_number: string | null;
-      status: string;
-      transaction_date?: string;
-    }
-
-    const updatePayload: UpdatePayload = {
+    const updatePayload = {
       portal_id: formData.portal_id,
       card_type: formData.card_type,
       transaction_type: formData.transaction_type,
@@ -233,11 +230,8 @@ export const EditTransactionDialog = ({
       site_fee: formData.site_fee ? parseFloat(formData.site_fee) : 0,
       reference_number: formData.reference_number || null,
       status: formData.status,
+      transaction_date: formData.transaction_date.toISOString(),
     };
-
-    if (formData.transaction_date) {
-      updatePayload.transaction_date = new Date(formData.transaction_date).toISOString();
-    }
 
     const { error } = await supabase
       .from("transactions")
@@ -273,7 +267,7 @@ export const EditTransactionDialog = ({
             Update transaction details below.
           </DialogDescription>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="portal">Portal</Label>
@@ -324,11 +318,16 @@ export const EditTransactionDialog = ({
                   <SelectValue placeholder="Select card type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {getCardTypesForTransaction(formData.transaction_type).map((cardType) => (
-                    <SelectItem key={cardType} value={cardType}>
-                      {getCardTypeDisplayNameWithRate(cardType, formData.transaction_type)}
-                    </SelectItem>
-                  ))}
+                  {getCardTypesForTransaction(formData.transaction_type).map(
+                    (cardType) => (
+                      <SelectItem key={cardType} value={cardType}>
+                        {getCardTypeDisplayNameWithRate(
+                          cardType,
+                          formData.transaction_type
+                        )}
+                      </SelectItem>
+                    )
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -352,19 +351,58 @@ export const EditTransactionDialog = ({
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="date">Transaction Date</Label>
-            <Input
-              id="date"
-              type="date"
-              value={formData.transaction_date}
-              onChange={(e) =>
-                setFormData({ ...formData, transaction_date: e.target.value })
-              }
-              required
-            />
+            {/* Transaction Date Popover Calendar */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-tx-date">Transaction Date</Label>
+              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="edit-tx-date"
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start text-left font-medium h-10 px-3 border-input bg-background hover:bg-accent/50"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
+                    <span className="truncate">
+                      {isToday(formData.transaction_date)
+                        ? `Today (${format(formData.transaction_date, "dd MMM")})`
+                        : format(formData.transaction_date, "dd MMM yyyy")}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 rounded-2xl shadow-xl border-border/80" align="start">
+                  <div className="p-1">
+                    <Calendar
+                      mode="single"
+                      selected={formData.transaction_date}
+                      onSelect={(date) => {
+                        if (date) {
+                          setFormData({ ...formData, transaction_date: date });
+                          setCalendarOpen(false);
+                        }
+                      }}
+                      initialFocus
+                      className="rounded-xl"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between border-t border-border/60 bg-muted/30 px-3 py-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setFormData({ ...formData, transaction_date: new Date() });
+                        setCalendarOpen(false);
+                      }}
+                      className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Set Today
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -444,4 +482,3 @@ export const EditTransactionDialog = ({
     </Dialog>
   );
 };
-

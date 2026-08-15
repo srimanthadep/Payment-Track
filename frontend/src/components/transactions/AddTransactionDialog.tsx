@@ -17,8 +17,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Calendar as CalendarIcon } from "lucide-react";
+import { format, isToday } from "date-fns";
 
 interface AddTransactionDialogProps {
   userId: string;
@@ -34,8 +41,7 @@ export const AddTransactionDialog = ({
 }: AddTransactionDialogProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-
-  const getTodayString = () => new Date().toISOString().split("T")[0];
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     amount: "",
@@ -45,7 +51,7 @@ export const AddTransactionDialog = ({
     site_fee_percent: "",
     sent_to: "",
     reference_number: "",
-    transaction_date: getTodayString(),
+    transaction_date: new Date(),
   });
 
   // Calculate commission amount
@@ -82,7 +88,7 @@ export const AddTransactionDialog = ({
       site_fee_percent: "",
       sent_to: "",
       reference_number: "",
-      transaction_date: getTodayString(),
+      transaction_date: new Date(),
     });
   };
 
@@ -159,10 +165,6 @@ export const AddTransactionDialog = ({
       }
     }
 
-    const txDate = formData.transaction_date
-      ? new Date(formData.transaction_date).toISOString()
-      : new Date().toISOString();
-
     const payload = {
       user_id: userId,
       portal_id: portalId,
@@ -171,7 +173,7 @@ export const AddTransactionDialog = ({
       amount: parseFloat(formData.amount),
       commission: commissionAmount,
       site_fee: siteFeeAmount,
-      transaction_date: txDate,
+      transaction_date: formData.transaction_date.toISOString(),
       reference_number: formData.reference_number || null,
       status: "completed",
       notes: `Sent to: ${formData.sent_to} | Commission: ${formData.commission_percent}%${
@@ -222,16 +224,55 @@ export const AddTransactionDialog = ({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="tx-date">Date</Label>
-              <Input
-                id="tx-date"
-                type="date"
-                value={formData.transaction_date}
-                onChange={(e) =>
-                  setFormData({ ...formData, transaction_date: e.target.value })
-                }
-                required
-              />
+              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="tx-date"
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start text-left font-medium h-10 px-3 border-input bg-background hover:bg-accent/50"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
+                    <span className="truncate">
+                      {isToday(formData.transaction_date)
+                        ? `Today (${format(formData.transaction_date, "dd MMM")})`
+                        : format(formData.transaction_date, "dd MMM yyyy")}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 rounded-2xl shadow-xl border-border/80" align="start">
+                  <div className="p-1">
+                    <Calendar
+                      mode="single"
+                      selected={formData.transaction_date}
+                      onSelect={(date) => {
+                        if (date) {
+                          setFormData({ ...formData, transaction_date: date });
+                          setCalendarOpen(false);
+                        }
+                      }}
+                      initialFocus
+                      className="rounded-xl"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between border-t border-border/60 bg-muted/30 px-3 py-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setFormData({ ...formData, transaction_date: new Date() });
+                        setCalendarOpen(false);
+                      }}
+                      className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Set Today
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="amount">Amount (₹)</Label>
               <Input
