@@ -35,6 +35,8 @@ export const AddTransactionDialog = ({
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
+  const getTodayString = () => new Date().toISOString().split("T")[0];
+
   const [formData, setFormData] = useState({
     amount: "",
     transaction_type: "" as "" | "withdrawal" | "repayment",
@@ -43,6 +45,7 @@ export const AddTransactionDialog = ({
     site_fee_percent: "",
     sent_to: "",
     reference_number: "",
+    transaction_date: getTodayString(),
   });
 
   // Calculate commission amount
@@ -79,6 +82,7 @@ export const AddTransactionDialog = ({
       site_fee_percent: "",
       sent_to: "",
       reference_number: "",
+      transaction_date: getTodayString(),
     });
   };
 
@@ -155,15 +159,19 @@ export const AddTransactionDialog = ({
       }
     }
 
+    const txDate = formData.transaction_date
+      ? new Date(formData.transaction_date).toISOString()
+      : new Date().toISOString();
+
     const payload = {
       user_id: userId,
       portal_id: portalId,
       card_type: formData.card_type,
-      transaction_type: formData.transaction_type,
+      transaction_type: formData.transaction_type.toLowerCase(),
       amount: parseFloat(formData.amount),
       commission: commissionAmount,
       site_fee: siteFeeAmount,
-      transaction_date: new Date().toISOString(),
+      transaction_date: txDate,
       reference_number: formData.reference_number || null,
       status: "completed",
       notes: `Sent to: ${formData.sent_to} | Commission: ${formData.commission_percent}%${
@@ -210,20 +218,34 @@ export const AddTransactionDialog = ({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* 1. Amount */}
-          <div className="space-y-2">
-            <Label htmlFor="amount">Amount (₹)</Label>
-            <Input
-              id="amount"
-              type="number"
-              step="0.01"
-              placeholder="Enter amount"
-              value={formData.amount}
-              onChange={(e) =>
-                setFormData({ ...formData, amount: e.target.value })
-              }
-              required
-            />
+          {/* 1. Date & Amount */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="tx-date">Date</Label>
+              <Input
+                id="tx-date"
+                type="date"
+                value={formData.transaction_date}
+                onChange={(e) =>
+                  setFormData({ ...formData, transaction_date: e.target.value })
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="amount">Amount (₹)</Label>
+              <Input
+                id="amount"
+                type="number"
+                step="0.01"
+                placeholder="Enter amount"
+                value={formData.amount}
+                onChange={(e) =>
+                  setFormData({ ...formData, amount: e.target.value })
+                }
+                required
+              />
+            </div>
           </div>
 
           {/* 2. Repayment or Withdrawals & 3. Card Type */}
@@ -235,7 +257,7 @@ export const AddTransactionDialog = ({
                 onValueChange={(val) =>
                   setFormData({
                     ...formData,
-                    transaction_type: val as "Withdrawal" | "Repayment",
+                    transaction_type: val as "withdrawal" | "repayment",
                   })
                 }
                 required
@@ -244,8 +266,8 @@ export const AddTransactionDialog = ({
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Withdrawal">Withdrawal</SelectItem>
-                  <SelectItem value="Repayment">Repayment</SelectItem>
+                  <SelectItem value="withdrawal">Withdrawal</SelectItem>
+                  <SelectItem value="repayment">Repayment</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -266,6 +288,10 @@ export const AddTransactionDialog = ({
                   <SelectItem value="RuPay">RuPay</SelectItem>
                   <SelectItem value="Visa">Visa</SelectItem>
                   <SelectItem value="Mastercard">Mastercard</SelectItem>
+                  <SelectItem value="Business Card">Business Card</SelectItem>
+                  <SelectItem value="AU Cards">AU Cards</SelectItem>
+                  <SelectItem value="Amex & Diners">Amex & Diners</SelectItem>
+                  <SelectItem value="Machine Swiping">Machine Swiping</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -281,7 +307,7 @@ export const AddTransactionDialog = ({
                 step="0.01"
                 min="0"
                 max="100"
-                placeholder="e.g. 2.5"
+                placeholder="e.g. 2.0"
                 value={formData.commission_percent}
                 onChange={(e) =>
                   setFormData({

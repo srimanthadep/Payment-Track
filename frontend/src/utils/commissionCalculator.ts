@@ -124,23 +124,29 @@ export function calculateCommission(
 /**
  * Get card type display name
  */
-export function getCardTypeDisplayName(cardType: CardType): string {
-  const names: Record<CardType, string> = {
-    normal_visa: "Normal VISA",
-    normal_rupay: "Normal RUPAY",
-    normal_master: "Normal Master Card",
-    hdfc_visa: "HDFC (VISA)",
-    hdfc_rupay: "HDFC (RUPAY)",
-    hdfc_master: "HDFC Master Card",
-    hdfc_business: "HDFC Business Card",
+export function getCardTypeDisplayName(cardType: CardType | string): string {
+  const names: Record<string, string> = {
+    normal_visa: "Visa",
+    normal_rupay: "RuPay",
+    normal_master: "Mastercard",
+    hdfc_visa: "Visa",
+    hdfc_rupay: "RuPay",
+    hdfc_master: "Mastercard",
+    hdfc_business: "Business Card",
+    rupay: "RuPay",
+    RuPay: "RuPay",
+    visa: "Visa",
+    Visa: "Visa",
+    mastercard: "Mastercard",
+    Mastercard: "Mastercard",
     au_card: "AU Cards",
-    amex_diners: "Amex And Diners",
+    amex_diners: "Amex & Diners",
     machine_swiping: "Machine Swiping",
     // Repayment grouped types
-    all_visa_rupay: "ALL VISA & RUPAY",
-    hdfc_visa_rupay: "HDFC VISA & RUPAY",
-    all_master_cards: "ALL MASTER CARDS",
-    all_business_cards: "ALL BUSINESS CARDS",
+    all_visa_rupay: "Visa & RuPay",
+    hdfc_visa_rupay: "Visa & RuPay",
+    all_master_cards: "Mastercard",
+    all_business_cards: "Business Cards",
   };
   return names[cardType] || cardType;
 }
