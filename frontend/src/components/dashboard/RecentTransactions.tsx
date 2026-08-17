@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { motion } from "framer-motion";
+import { format } from "date-fns";
 
 interface RecentTransactionsProps {
   userId: string;
@@ -83,11 +84,13 @@ export const RecentTransactions = ({ userId }: RecentTransactionsProps) => {
   };
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("en-IN", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return date;
+      return format(d, "dd MMM yyyy, hh:mm a");
+    } catch {
+      return date;
+    }
   };
 
   return (
