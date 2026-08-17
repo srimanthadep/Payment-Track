@@ -15,7 +15,7 @@ export const FloatingActionButton = ({ onClick, className }: FloatingActionButto
       animate={{ scale: 1, opacity: 1 }}
       transition={{ type: "spring", stiffness: 260, damping: 20 }}
       className={cn(
-        "fixed bottom-6 right-6 z-50 sm:hidden",
+        "fixed bottom-20 right-4 z-40 sm:hidden",
         className
       )}
     >

@@ -7,6 +7,8 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
+import Expenses from "./pages/Expenses";
+import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
 import Scraping from "./pages/Scraping";
 import NotFound from "./pages/NotFound";
@@ -15,7 +17,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes
-      cacheTime: 1000 * 60 * 10, // 10 minutes
+      gcTime: 1000 * 60 * 10, // 10 minutes
       refetchOnWindowFocus: false,
       retry: 1,
     },
@@ -33,6 +35,8 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/transactions" element={<Transactions />} />
+          <Route path="/expenses" element={<Expenses />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/scraping" element={<Scraping />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

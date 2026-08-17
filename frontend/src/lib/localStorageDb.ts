@@ -243,8 +243,12 @@ class LocalQueryBuilder {
     });
 
     if (this.tableName === "user_roles" && filtered.length === 0) {
-      const userFilter = this.filters.find((f) => f.field === "user_id" && f.type === "eq");
-      const roleFilter = this.filters.find((f) => f.field === "role" && f.type === "eq");
+      const userFilter = this.filters.find(
+        (f): f is { type: "eq"; field: string; value: any } => f.field === "user_id" && f.type === "eq"
+      );
+      const roleFilter = this.filters.find(
+        (f): f is { type: "eq"; field: string; value: any } => f.field === "role" && f.type === "eq"
+      );
       if (roleFilter?.value === "admin") {
         const userId = userFilter ? userFilter.value : "local-admin-id";
         filtered = [{ id: `role-${userId}`, user_id: userId, role: "admin", created_at: new Date().toISOString() }];

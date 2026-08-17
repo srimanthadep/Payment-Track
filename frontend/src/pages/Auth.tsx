@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, User } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import SpecularButton from "@/components/ui/SpecularButton";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -55,7 +56,7 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
-      <Card className="w-full max-w-md shadow-lg">
+      <Card className="w-full max-w-md shadow-lg border border-border/80">
         <CardHeader className="space-y-2 text-center">
           <div className="flex justify-center mb-3">
             <img
@@ -95,16 +96,33 @@ const Auth = () => {
                 required
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                "Sign In"
-              )}
-            </Button>
+            <div className="pt-2">
+              <SpecularButton
+                type="submit"
+                size="md"
+                radius={12}
+                tint="#1d4ed8"
+                tintOpacity={0.95}
+                textColor="#ffffff"
+                lineColor="#93c5fd"
+                baseColor="#1e3a8a"
+                intensity={1.2}
+                thickness={1.5}
+                speed={0.4}
+                followMouse
+                disabled={isLoading}
+                className="w-full font-semibold shadow-md py-3 text-sm"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  "Sign In"
+                )}
+              </SpecularButton>
+            </div>
           </form>
         </CardContent>
       </Card>

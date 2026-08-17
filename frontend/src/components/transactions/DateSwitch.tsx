@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -24,15 +24,48 @@ export const DateSwitch = ({
   const isAllTransactions = selectedDate === null;
   const activeDate = selectedDate || new Date();
 
-  const handlePrevDay = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handlePrevDay = useCallback(() => {
     onDateChange(subDays(activeDate, 1));
-  };
+  }, [activeDate, onDateChange]);
 
-  const handleNextDay = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleNextDay = useCallback(() => {
     onDateChange(addDays(activeDate, 1));
-  };
+  }, [activeDate, onDateChange]);
+
+  // Keyboard shortcut listener for Left Arrow & Right Arrow
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing inside an input, textarea, select, or editable element
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      const isEditable = target?.isContentEditable;
+      const isInput =
+        tag === "input" ||
+        tag === "textarea" ||
+        tag === "select" ||
+        isEditable ||
+        target?.getAttribute("role") === "textbox";
+
+      if (isInput) return;
+
+      // Don't interfere if a modal dialog is currently focused/open with active form
+      const openDialog = document.querySelector('[role="dialog"]');
+      if (openDialog && openDialog.contains(target)) return;
+
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        handlePrevDay();
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        handleNextDay();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [handlePrevDay, handleNextDay]);
 
   const handleTodayClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -61,7 +94,7 @@ export const DateSwitch = ({
         size="icon"
         onClick={handlePrevDay}
         className="h-8 w-8 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground active:scale-95 transition-all"
-        title="Previous Day"
+        title="Previous Day (← Left Arrow)"
       >
         <ChevronLeft className="h-4 w-4" />
       </Button>
@@ -151,7 +184,7 @@ export const DateSwitch = ({
         size="icon"
         onClick={handleNextDay}
         className="h-8 w-8 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground active:scale-95 transition-all"
-        title="Next Day"
+        title="Next Day (→ Right Arrow)"
       >
         <ChevronRight className="h-4 w-4" />
       </Button>

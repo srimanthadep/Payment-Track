@@ -191,7 +191,7 @@ export function getCardTypeDisplayNameWithRate(
 ): string {
   const name = getCardTypeDisplayName(cardType);
   const rate = getCardTypeRate(cardType, transactionType);
-  return `${name} (${rate}%)`;
+  return rate && rate > 0 ? `${name} (${rate}%)` : name;
 }
 
 /**

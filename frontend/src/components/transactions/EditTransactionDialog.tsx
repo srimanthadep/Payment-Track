@@ -32,6 +32,7 @@ import {
   getCardTypeDisplayNameWithRate,
   type CardType,
 } from "@/utils/commissionCalculator";
+import { settingsService, CardTypeOption } from "@/services/settingsService";
 
 interface EditTransactionDialogProps {
   transaction: {
@@ -68,6 +69,15 @@ export const EditTransactionDialog = ({
   const [isLoading, setIsLoading] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [portals, setPortals] = useState<Portal[]>([]);
+  const [customCards, setCustomCards] = useState<CardTypeOption[]>([]);
+
+  useEffect(() => {
+    const updateCards = () => {
+      setCustomCards(settingsService.getCardTypes());
+    };
+    updateCards();
+    return settingsService.subscribe(updateCards);
+  }, []);
 
   const [formData, setFormData] = useState({
     portal_id: "",
@@ -410,6 +420,32 @@ export const EditTransactionDialog = ({
                   <SelectItem value="AU Cards">AU Cards</SelectItem>
                   <SelectItem value="Amex & Diners">Amex & Diners</SelectItem>
                   <SelectItem value="Machine Swiping">Machine Swiping</SelectItem>
+                  {customCards
+                    .filter(
+                      (c) =>
+                        ![
+                          "rupay",
+                          "visa",
+                          "mastercard",
+                          "business card",
+                          "au cards",
+                          "amex & diners",
+                          "machine swiping",
+                        ].includes(c.name.toLowerCase())
+                    )
+                    .map((c) => {
+                      const rate =
+                        formData.transaction_type === "repayment"
+                          ? c.repayRate
+                          : c.withdrawRate;
+                      const label =
+                        rate && rate > 0 ? `${c.name} (${rate}%)` : c.name;
+                      return (
+                        <SelectItem key={c.id} value={c.name}>
+                          {label}
+                        </SelectItem>
+                      );
+                    })}
                   {getCardTypesForTransaction(formData.transaction_type).map(
                     (cardType) => (
                       <SelectItem key={cardType} value={cardType}>

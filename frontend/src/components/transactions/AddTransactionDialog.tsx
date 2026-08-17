@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -26,6 +26,12 @@ import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Calendar as CalendarIcon } from "lucide-react";
 import { format, isToday } from "date-fns";
+import {
+  settingsService,
+  CardTypeOption,
+  RecipientOption,
+  TransactionTypeOption,
+} from "@/services/settingsService";
 
 interface AddTransactionDialogProps {
   userId: string;
@@ -44,6 +50,20 @@ export const AddTransactionDialog = ({
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
+
+  const [cardTypes, setCardTypes] = useState<CardTypeOption[]>([]);
+  const [recipients, setRecipients] = useState<RecipientOption[]>([]);
+  const [txTypes, setTxTypes] = useState<TransactionTypeOption[]>([]);
+
+  useEffect(() => {
+    const updateDropdowns = () => {
+      setCardTypes(settingsService.getCardTypes());
+      setRecipients(settingsService.getRecipients());
+      setTxTypes(settingsService.getTransactionTypes());
+    };
+    updateDropdowns();
+    return settingsService.subscribe(updateDropdowns);
+  }, []);
 
   const [formData, setFormData] = useState({
     amount: "",
@@ -308,20 +328,31 @@ export const AddTransactionDialog = ({
               <Label htmlFor="type">Transaction Type</Label>
               <Select
                 value={formData.transaction_type}
-                onValueChange={(val) =>
+                onValueChange={(val) => {
+                  const newType = val as "withdrawal" | "repayment";
+                  // Check if selected card has default rate for this type
+                  const selectedCard = cardTypes.find((c) => c.name === formData.card_type);
+                  let rate = formData.commission_percent;
+                  if (selectedCard) {
+                    rate = (newType === "withdrawal" ? selectedCard.withdrawRate : selectedCard.repayRate).toString();
+                  }
                   setFormData({
                     ...formData,
-                    transaction_type: val as "withdrawal" | "repayment",
-                  })
-                }
+                    transaction_type: newType,
+                    commission_percent: rate || formData.commission_percent,
+                  });
+                }}
                 required
               >
                 <SelectTrigger id="type">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="withdrawal">Withdrawal</SelectItem>
-                  <SelectItem value="repayment">Repayment</SelectItem>
+                  {txTypes.map((t) => (
+                    <SelectItem key={t.id} value={t.name}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -330,22 +361,40 @@ export const AddTransactionDialog = ({
               <Label htmlFor="card_type">Card Type</Label>
               <Select
                 value={formData.card_type}
-                onValueChange={(val) =>
-                  setFormData({ ...formData, card_type: val })
-                }
+                onValueChange={(val) => {
+                  const selectedCard = cardTypes.find((c) => c.name === val);
+                  let rate = formData.commission_percent;
+                  if (selectedCard && formData.transaction_type) {
+                    rate = (formData.transaction_type === "withdrawal"
+                      ? selectedCard.withdrawRate
+                      : selectedCard.repayRate
+                    ).toString();
+                  }
+                  setFormData({
+                    ...formData,
+                    card_type: val,
+                    commission_percent: rate || formData.commission_percent,
+                  });
+                }}
                 required
               >
                 <SelectTrigger id="card_type">
                   <SelectValue placeholder="Select card type" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="RuPay">RuPay</SelectItem>
-                  <SelectItem value="Visa">Visa</SelectItem>
-                  <SelectItem value="Mastercard">Mastercard</SelectItem>
-                  <SelectItem value="Business Card">Business Card</SelectItem>
-                  <SelectItem value="AU Cards">AU Cards</SelectItem>
-                  <SelectItem value="Amex & Diners">Amex & Diners</SelectItem>
-                  <SelectItem value="Machine Swiping">Machine Swiping</SelectItem>
+                <SelectContent className="max-h-60">
+                  {cardTypes.map((card) => {
+                    const rate =
+                      formData.transaction_type === "repayment"
+                        ? card.repayRate
+                        : card.withdrawRate;
+                    const label =
+                      rate && rate > 0 ? `${card.name} (${rate}%)` : card.name;
+                    return (
+                      <SelectItem key={card.id} value={card.name}>
+                        {label}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -417,7 +466,7 @@ export const AddTransactionDialog = ({
             </div>
           )}
 
-          {/* 7. Sent to (Upender or Chummi) */}
+          {/* 7. Sent to (Portals / Recipients) */}
           <div className="space-y-2">
             <Label htmlFor="sent_to">Sent To</Label>
             <Select
@@ -431,8 +480,11 @@ export const AddTransactionDialog = ({
                 <SelectValue placeholder="Select person" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Upender">Upender</SelectItem>
-                <SelectItem value="Chummi">Chummi</SelectItem>
+                {recipients.map((rec) => (
+                  <SelectItem key={rec.id} value={rec.name}>
+                    {rec.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
