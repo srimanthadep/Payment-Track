@@ -1,9 +1,25 @@
 import jsPDF from "jspdf";
 import "jspdf-autotable";
-import { Transaction } from "./TransactionsTable";
+
+export interface PDFTransaction {
+  id: string;
+  portal_id?: string;
+  transaction_type: string;
+  amount: number;
+  commission: number;
+  site_fee: number;
+  profit?: number;
+  transaction_date: string;
+  reference_number?: string | null;
+  status: string;
+  card_type?: string | null;
+  portals: {
+    name: string;
+  };
+}
 
 interface PDFExportProps {
-  transactions: Transaction[];
+  transactions: PDFTransaction[];
   dateRange?: { from: Date | null; to: Date | null };
 }
 
@@ -29,9 +45,12 @@ export const exportToPDF = ({ transactions, dateRange }: PDFExportProps) => {
   }
 
   // Summary stats
-  const totalAmount = transactions.reduce((sum, t) => sum + t.amount, 0);
-  const totalCommission = transactions.reduce((sum, t) => sum + t.commission, 0);
-  const totalProfit = transactions.reduce((sum, t) => sum + t.commission, 0);
+  const totalAmount = transactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+  const totalCommission = transactions.reduce((sum, t) => sum + Number(t.commission || 0), 0);
+  const totalProfit = transactions.reduce(
+    (sum, t) => sum + (t.profit !== undefined ? Number(t.profit) : Number(t.commission || 0) - Number(t.site_fee || 0)),
+    0
+  );
 
   doc.setFontSize(12);
   doc.text(`Total Transactions: ${transactions.length}`, 14, 45);
@@ -40,16 +59,19 @@ export const exportToPDF = ({ transactions, dateRange }: PDFExportProps) => {
   doc.text(`Total Profit: ₹${totalProfit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, 14, 66);
 
   // Table data
-  const tableData = transactions.map((t) => [
-    new Date(t.transaction_date).toLocaleDateString("en-IN"),
-    t.portals.name,
-    t.transaction_type,
-    `₹${t.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
-    `₹${t.commission.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
-    `₹${t.site_fee.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
-    `₹${t.commission.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
-    t.status,
-  ]);
+  const tableData = transactions.map((t) => {
+    const profitVal = t.profit !== undefined ? Number(t.profit) : Number(t.commission || 0) - Number(t.site_fee || 0);
+    return [
+      new Date(t.transaction_date).toLocaleDateString("en-IN"),
+      t.portals?.name || "N/A",
+      t.transaction_type || "N/A",
+      `₹${Number(t.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+      `₹${Number(t.commission || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+      `₹${Number(t.site_fee || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+      `₹${profitVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+      t.status || "Completed",
+    ];
+  });
 
   // Add table
   (doc as any).autoTable({
@@ -62,7 +84,6 @@ export const exportToPDF = ({ transactions, dateRange }: PDFExportProps) => {
   });
 
   // Footer
-  const finalY = (doc as any).lastAutoTable.finalY || 75;
   doc.setFontSize(8);
   doc.text(
     `Generated on: ${new Date().toLocaleString("en-IN")}`,
@@ -74,4 +95,3 @@ export const exportToPDF = ({ transactions, dateRange }: PDFExportProps) => {
   // Save PDF
   doc.save(`transactions-report-${new Date().toISOString().split("T")[0]}.pdf`);
 };
-

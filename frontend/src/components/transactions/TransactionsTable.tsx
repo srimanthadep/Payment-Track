@@ -372,6 +372,7 @@ export const TransactionsTable = ({
         .from("transactions")
         .select(`
           id,
+          portal_id,
           transaction_type,
           amount,
           commission,
@@ -380,6 +381,7 @@ export const TransactionsTable = ({
           transaction_date,
           reference_number,
           status,
+          card_type,
           portals (
             name
           )

@@ -13,6 +13,7 @@ import {
   Menu,
   ChevronRight,
   Sparkles,
+  BarChart3,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -50,6 +51,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "Transactions", href: "/transactions", icon: Receipt },
     { name: "Expenses", href: "/expenses", icon: Wallet },
+    { name: "Analytics", href: "/analytics", icon: BarChart3 },
     { name: "Settings", href: "/settings", icon: SettingsIcon },
     { name: "Web Scraping", href: "/scraping", icon: Globe },
     { name: "Admin", href: "/admin", icon: Shield },
@@ -59,8 +61,8 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "Transactions", href: "/transactions", icon: Receipt },
     { name: "Expenses", href: "/expenses", icon: Wallet },
+    { name: "Analytics", href: "/analytics", icon: BarChart3 },
     { name: "Settings", href: "/settings", icon: SettingsIcon },
-    { name: "Admin", href: "/admin", icon: Shield },
   ];
 
   return (
