@@ -4,6 +4,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -83,6 +84,21 @@ export const TransactionsTable = ({
   const [hasMore, setHasMore] = useState(true);
   const [displayedTransactions, setDisplayedTransactions] = useState<Transaction[]>([]);
   const itemsPerPage = 20;
+
+  const totals = useMemo(() => {
+    const amount = filteredTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    const commission = filteredTransactions.reduce((sum, t) => sum + Number(t.commission || 0), 0);
+    const siteFee = filteredTransactions.reduce((sum, t) => sum + Number(t.site_fee || 0), 0);
+    const profit = filteredTransactions.reduce(
+      (sum, t) =>
+        sum +
+        (t.profit !== undefined
+          ? Number(t.profit)
+          : Number(t.commission || 0) - Number(t.site_fee || 0)),
+      0
+    );
+    return { amount, commission, siteFee, profit, count: filteredTransactions.length };
+  }, [filteredTransactions]);
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -677,12 +693,42 @@ export const TransactionsTable = ({
                     </div>
                     <div className="flex items-center justify-between gap-2 col-span-2">
                       <span className="text-[10px] text-muted-foreground whitespace-nowrap">Profit</span>
-                      <span className="text-success font-semibold text-right">{formatCurrency(transaction.commission)}</span>
+                      <span className="text-success font-semibold text-right">
+                        {formatCurrency(
+                          transaction.profit !== undefined
+                            ? transaction.profit
+                            : transaction.commission - transaction.site_fee
+                        )}
+                      </span>
                     </div>
                   </div>
                 </motion.div>
               ))}
             </AnimatePresence>
+
+            {/* Mobile Total Bar at the end */}
+            {filteredTransactions.length > 0 && (
+              <div className="rounded-xl border bg-muted/40 p-3.5 space-y-2 mt-2">
+                <div className="flex items-center justify-between text-xs font-semibold">
+                  <span className="text-muted-foreground">Total ({totals.count} {totals.count === 1 ? "txn" : "txns"})</span>
+                  <span className="text-sm font-bold text-foreground">{formatCurrency(totals.amount)}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs pt-2 border-t border-border/50">
+                  <div>
+                    <div className="text-[10px] text-muted-foreground">Commission</div>
+                    <div className="font-semibold text-success">{formatCurrency(totals.commission)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-muted-foreground">Site Fee</div>
+                    <div className="font-semibold text-destructive">{formatCurrency(totals.siteFee)}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[10px] text-muted-foreground">Net Profit</div>
+                    <div className="font-bold text-success">{formatCurrency(totals.profit)}</div>
+                  </div>
+                </div>
+              </div>
+            )}
             {hasMore && (
               <div ref={loadMoreRef} className="py-4 text-center">
                 {isLoading && <div className="text-sm text-muted-foreground">Loading more...</div>}
@@ -748,9 +794,13 @@ export const TransactionsTable = ({
                       <TableCell className="text-right text-destructive hidden sm:table-cell">
                     {formatCurrency(transaction.site_fee)}
                   </TableCell>
-                      <TableCell className="text-right font-semibold hidden sm:table-cell">
-                        {formatCurrency(transaction.commission)}
-                  </TableCell>
+                      <TableCell className="text-right font-semibold text-success hidden sm:table-cell">
+                        {formatCurrency(
+                          transaction.profit !== undefined
+                            ? transaction.profit
+                            : transaction.commission - transaction.site_fee
+                        )}
+                      </TableCell>
                       <TableCell className="hidden md:table-cell">
                     <Badge
                       variant={
@@ -795,6 +845,36 @@ export const TransactionsTable = ({
                 </>
             )}
           </TableBody>
+          {filteredTransactions.length > 0 && (
+            <TableFooter className="bg-muted/50 font-semibold border-t-2 border-border/80">
+              <TableRow className="hover:bg-transparent">
+                <TableCell><div className="w-[40px]" /></TableCell>
+                <TableCell colSpan={3} className="font-bold text-foreground">
+                  <div className="flex items-center gap-2">
+                    <span>Total</span>
+                    <Badge variant="outline" className="text-[11px] font-normal px-2 py-0">
+                      {totals.count} {totals.count === 1 ? "transaction" : "transactions"}
+                    </Badge>
+                  </div>
+                </TableCell>
+                <TableCell className="hidden md:table-cell" />
+                <TableCell className="text-right font-bold text-foreground text-sm">
+                  {formatCurrency(totals.amount)}
+                </TableCell>
+                <TableCell className="text-right font-bold text-success text-sm">
+                  {formatCurrency(totals.commission)}
+                </TableCell>
+                <TableCell className="text-right font-bold text-destructive hidden sm:table-cell text-sm">
+                  {formatCurrency(totals.siteFee)}
+                </TableCell>
+                <TableCell className="text-right font-bold text-success hidden sm:table-cell text-sm">
+                  {formatCurrency(totals.profit)}
+                </TableCell>
+                <TableCell className="hidden md:table-cell" />
+                <TableCell className="text-right" />
+              </TableRow>
+            </TableFooter>
+          )}
         </Table>
         )}
       </div>
