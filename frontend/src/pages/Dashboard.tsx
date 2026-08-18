@@ -187,7 +187,10 @@ const Dashboard = () => {
             <PortalComparisonChart
               userId={user.id}
               period={period}
-              key={`portal-${refreshKey}-${period}`}
+              selectedDate={selectedDate}
+              key={`portal-${refreshKey}-${period}-${
+                selectedDate ? selectedDate.toISOString() : "all"
+              }`}
             />
           </motion.div>
         </motion.div>
