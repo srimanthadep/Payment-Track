@@ -109,7 +109,7 @@ class ExpensesService {
       if (data && Array.isArray(data)) {
         this.isRemoteTableAvailable = true;
         // Sync to local cache
-        const remoteExpenses = data as Expense[];
+        const remoteExpenses = data as unknown as Expense[];
         const localAll = this.getLocalExpenses().filter((e) => e.user_id !== userId);
         this.saveLocalExpenses([...localAll, ...remoteExpenses]);
         return { data: remoteExpenses, error: null };
@@ -173,7 +173,7 @@ class ExpensesService {
           this.isRemoteTableAvailable = false;
         }
       } else if (data) {
-        return { data: data as Expense, error: null };
+        return { data: data as unknown as Expense, error: null };
       }
     } catch {
       this.isRemoteTableAvailable = false;
@@ -218,7 +218,7 @@ class ExpensesService {
         .single();
 
       if (!error && data) {
-        return { data: data as Expense, error: null };
+        return { data: data as unknown as Expense, error: null };
       }
     } catch {
       // Handled gracefully via local update

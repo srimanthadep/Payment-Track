@@ -14,6 +14,72 @@ export type Database = {
   }
   public: {
     Tables: {
+      expenses: {
+        Row: {
+          id: string
+          user_id: string
+          category: string
+          amount: number
+          expense_date: string
+          paid_to: string | null
+          payment_method: string | null
+          reference_number: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          category: string
+          amount: number
+          expense_date?: string
+          paid_to?: string | null
+          payment_method?: string | null
+          reference_number?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          category?: string
+          amount?: number
+          expense_date?: string
+          paid_to?: string | null
+          payment_method?: string | null
+          reference_number?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      app_settings: {
+        Row: {
+          id: string
+          user_id: string
+          settings: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          settings?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          settings?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       card_types: {
         Row: {
           created_at: string
