@@ -7,7 +7,7 @@ export interface Expense {
   amount: number;
   expense_date: string;
   paid_to: string | null;
-  payment_method: string;
+  payment_method: string | null;
   reference_number: string | null;
   notes: string | null;
   created_at: string;
@@ -20,7 +20,7 @@ export interface CreateExpenseInput {
   amount: number;
   expense_date: string;
   paid_to?: string | null;
-  payment_method?: string;
+  payment_method?: string | null;
   reference_number?: string | null;
   notes?: string | null;
 }
@@ -30,7 +30,7 @@ export interface UpdateExpenseInput {
   amount?: number;
   expense_date?: string;
   paid_to?: string | null;
-  payment_method?: string;
+  payment_method?: string | null;
   reference_number?: string | null;
   notes?: string | null;
 }
@@ -49,29 +49,12 @@ export interface ExpenseStats {
   thisMonthAmount: number;
 }
 
-const EXPENSES_LOCAL_STORAGE_KEY = "payment_track_expenses_cache_v1";
-const EXPENSES_REMOTE_SYNC_KEY = "payment_track_expenses_remote_sync_v1";
+const EXPENSES_CACHE_KEY = "payment_track_expenses_cache_v1";
 
 class ExpensesService {
-  private isRemoteTableAvailable: boolean;
-
-  constructor() {
-    // Default to false unless explicitly enabled, avoiding 404s when Supabase table isn't created
-    this.isRemoteTableAvailable = localStorage.getItem(EXPENSES_REMOTE_SYNC_KEY) === "true";
-  }
-
-  public setRemoteSyncEnabled(enabled: boolean): void {
-    this.isRemoteTableAvailable = enabled;
-    localStorage.setItem(EXPENSES_REMOTE_SYNC_KEY, enabled ? "true" : "false");
-  }
-
-  public isRemoteSyncEnabled(): boolean {
-    return this.isRemoteTableAvailable;
-  }
-
-  private getLocalExpenses(userId?: string): Expense[] {
+  private getCachedExpenses(userId?: string): Expense[] {
     try {
-      const stored = localStorage.getItem(EXPENSES_LOCAL_STORAGE_KEY);
+      const stored = localStorage.getItem(EXPENSES_CACHE_KEY);
       if (stored) {
         const list: Expense[] = JSON.parse(stored);
         if (userId) {
@@ -80,64 +63,51 @@ class ExpensesService {
         return list;
       }
     } catch (e) {
-      console.warn("Failed to read local expenses", e);
+      console.warn("Failed to read cached expenses", e);
     }
     return [];
   }
 
-  private saveLocalExpenses(expenses: Expense[]): void {
+  private setCachedExpenses(expenses: Expense[]): void {
     try {
-      localStorage.setItem(EXPENSES_LOCAL_STORAGE_KEY, JSON.stringify(expenses));
+      localStorage.setItem(EXPENSES_CACHE_KEY, JSON.stringify(expenses));
     } catch (e) {
-      console.error("Failed to save local expenses", e);
+      console.error("Failed to save cached expenses", e);
     }
   }
 
   public async getExpenses(userId: string): Promise<{ data: Expense[]; error: string | null }> {
-    // If remote sync is not enabled, return local data instantly without network calls
-    if (!this.isRemoteTableAvailable) {
-      return { data: this.getLocalExpenses(userId), error: null };
-    }
-
     try {
       const { data, error } = await supabase
-        .from("expenses" as any)
+        .from("expenses")
         .select("*")
         .eq("user_id", userId)
         .order("expense_date", { ascending: false });
 
       if (error) {
-        // If table doesn't exist, disable remote sync and use local
-        if (
-          error.message?.includes("schema cache") ||
-          error.message?.includes("does not exist") ||
-          (error as any).code === "42P01" ||
-          (error as any).code === "PGRST204" ||
-          (error as any).code === "404"
-        ) {
-          this.setRemoteSyncEnabled(false);
-        }
-        return { data: this.getLocalExpenses(userId), error: null };
+        console.error("Supabase getExpenses error:", error);
+        // Return local cache as fallback if network fails
+        return { data: this.getCachedExpenses(userId), error: error.message };
       }
 
-      if (data && Array.isArray(data)) {
+      if (data) {
         const remoteExpenses = data as unknown as Expense[];
-        const localAll = this.getLocalExpenses().filter((e) => e.user_id !== userId);
-        this.saveLocalExpenses([...localAll, ...remoteExpenses]);
+        const localOther = this.getCachedExpenses().filter((e) => e.user_id !== userId);
+        this.setCachedExpenses([...localOther, ...remoteExpenses]);
         return { data: remoteExpenses, error: null };
       }
 
-      return { data: this.getLocalExpenses(userId), error: null };
-    } catch {
-      this.setRemoteSyncEnabled(false);
-      return { data: this.getLocalExpenses(userId), error: null };
+      return { data: [], error: null };
+    } catch (err: any) {
+      console.error("Failed to fetch expenses from database:", err);
+      return { data: this.getCachedExpenses(userId), error: err.message || "Failed to fetch expenses" };
     }
   }
 
   public async createExpense(input: CreateExpenseInput): Promise<{ data: Expense | null; error: string | null }> {
     const id = "exp_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
     const now = new Date().toISOString();
-    const newExpense: Expense = {
+    const newExpenseRecord = {
       id,
       user_id: input.user_id,
       category: input.category,
@@ -151,47 +121,30 @@ class ExpensesService {
       updated_at: now,
     };
 
-    // Always update local cache immediately for instant UI response
-    const all = this.getLocalExpenses();
-    this.saveLocalExpenses([newExpense, ...all]);
-
-    if (!this.isRemoteTableAvailable) {
-      return { data: newExpense, error: null };
-    }
-
     try {
       const { data, error } = await supabase
-        .from("expenses" as any)
-        .insert({
-          id: newExpense.id,
-          user_id: newExpense.user_id,
-          category: newExpense.category,
-          amount: newExpense.amount,
-          expense_date: newExpense.expense_date,
-          paid_to: newExpense.paid_to,
-          payment_method: newExpense.payment_method,
-          reference_number: newExpense.reference_number,
-          notes: newExpense.notes,
-        })
+        .from("expenses")
+        .insert(newExpenseRecord)
         .select()
         .single();
 
       if (error) {
-        if (
-          error.message?.includes("schema cache") ||
-          error.message?.includes("does not exist") ||
-          (error as any).code === "42P01"
-        ) {
-          this.setRemoteSyncEnabled(false);
-        }
-      } else if (data) {
-        return { data: data as unknown as Expense, error: null };
+        console.error("Supabase createExpense error:", error);
+        return { data: null, error: error.message };
       }
-    } catch {
-      this.setRemoteSyncEnabled(false);
-    }
 
-    return { data: newExpense, error: null };
+      if (data) {
+        const created = data as unknown as Expense;
+        const all = this.getCachedExpenses();
+        this.setCachedExpenses([created, ...all]);
+        return { data: created, error: null };
+      }
+
+      return { data: newExpenseRecord, error: null };
+    } catch (err: any) {
+      console.error("Failed to insert expense into database:", err);
+      return { data: null, error: err.message || "Database insert failed" };
+    }
   }
 
   public async updateExpense(
@@ -199,79 +152,82 @@ class ExpensesService {
     updates: UpdateExpenseInput,
     userId: string
   ): Promise<{ data: Expense | null; error: string | null }> {
-    const all = this.getLocalExpenses();
-    const idx = all.findIndex((e) => e.id === id);
-    let updatedItem: Expense | null = null;
-
-    if (idx !== -1) {
-      updatedItem = {
-        ...all[idx],
-        ...updates,
-        amount: updates.amount !== undefined ? Number(updates.amount) : all[idx].amount,
-        updated_at: new Date().toISOString(),
-      };
-      all[idx] = updatedItem;
-      this.saveLocalExpenses(all);
-    }
-
-    if (!this.isRemoteTableAvailable) {
-      return { data: updatedItem, error: null };
-    }
-
     try {
       const { data, error } = await supabase
-        .from("expenses" as any)
+        .from("expenses")
         .update({
           ...updates,
           updated_at: new Date().toISOString(),
         })
         .eq("id", id)
+        .eq("user_id", userId)
         .select()
         .single();
 
-      if (!error && data) {
-        return { data: data as unknown as Expense, error: null };
+      if (error) {
+        console.error("Supabase updateExpense error:", error);
+        return { data: null, error: error.message };
       }
-    } catch {
-      // Local is already updated
-    }
 
-    return { data: updatedItem, error: null };
+      if (data) {
+        const updated = data as unknown as Expense;
+        const all = this.getCachedExpenses();
+        const idx = all.findIndex((e) => e.id === id);
+        if (idx !== -1) {
+          all[idx] = updated;
+          this.setCachedExpenses(all);
+        }
+        return { data: updated, error: null };
+      }
+
+      return { data: null, error: null };
+    } catch (err: any) {
+      console.error("Failed to update expense in database:", err);
+      return { data: null, error: err.message || "Database update failed" };
+    }
   }
 
   public async deleteExpense(id: string): Promise<{ success: boolean; error: string | null }> {
-    const all = this.getLocalExpenses();
-    this.saveLocalExpenses(all.filter((e) => e.id !== id));
-
-    if (!this.isRemoteTableAvailable) {
-      return { success: true, error: null };
-    }
-
     try {
-      await supabase.from("expenses" as any).delete().eq("id", id);
-    } catch {
-      // Handled via local delete
-    }
+      const { error } = await supabase
+        .from("expenses")
+        .delete()
+        .eq("id", id);
 
-    return { success: true, error: null };
+      if (error) {
+        console.error("Supabase deleteExpense error:", error);
+        return { success: false, error: error.message };
+      }
+
+      const all = this.getCachedExpenses();
+      this.setCachedExpenses(all.filter((e) => e.id !== id));
+      return { success: true, error: null };
+    } catch (err: any) {
+      console.error("Failed to delete expense from database:", err);
+      return { success: false, error: err.message || "Database delete failed" };
+    }
   }
 
   public async bulkDeleteExpenses(ids: string[]): Promise<{ success: boolean; error: string | null }> {
-    const idSet = new Set(ids);
-    const all = this.getLocalExpenses();
-    this.saveLocalExpenses(all.filter((e) => !idSet.has(e.id)));
-
-    if (!this.isRemoteTableAvailable) {
-      return { success: true, error: null };
-    }
-
     try {
-      await supabase.from("expenses" as any).delete().in("id", ids);
-    } catch {
-      // Handled via local delete
-    }
+      const { error } = await supabase
+        .from("expenses")
+        .delete()
+        .in("id", ids);
 
-    return { success: true, error: null };
+      if (error) {
+        console.error("Supabase bulkDeleteExpenses error:", error);
+        return { success: false, error: error.message };
+      }
+
+      const idSet = new Set(ids);
+      const all = this.getCachedExpenses();
+      this.setCachedExpenses(all.filter((e) => !idSet.has(e.id)));
+      return { success: true, error: null };
+    } catch (err: any) {
+      console.error("Failed to bulk delete expenses from database:", err);
+      return { success: false, error: err.message || "Database bulk delete failed" };
+    }
   }
 
   public calculateStats(expenses: Expense[]): ExpenseStats {
@@ -340,7 +296,7 @@ class ExpensesService {
     const rows = expenses.map((exp) => [
       exp.expense_date.slice(0, 10),
       `"${(exp.category || "").replace(/"/g, '""')}"`,
-      exp.amount.toFixed(2),
+      Number(exp.amount || 0).toFixed(2),
       `"${(exp.paid_to || "").replace(/"/g, '""')}"`,
       `"${(exp.payment_method || "").replace(/"/g, '""')}"`,
       `"${(exp.reference_number || "").replace(/"/g, '""')}"`,
