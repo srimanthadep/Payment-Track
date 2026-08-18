@@ -52,6 +52,8 @@ export interface ExpenseStats {
 const EXPENSES_LOCAL_STORAGE_KEY = "payment_track_expenses_cache_v1";
 
 class ExpensesService {
+  private isRemoteTableAvailable: boolean = true;
+
   private getLocalExpenses(userId?: string): Expense[] {
     try {
       const stored = localStorage.getItem(EXPENSES_LOCAL_STORAGE_KEY);
@@ -77,6 +79,11 @@ class ExpensesService {
   }
 
   public async getExpenses(userId: string): Promise<{ data: Expense[]; error: string | null }> {
+    // If remote table was previously found to be not yet created, return local data instantly
+    if (!this.isRemoteTableAvailable) {
+      return { data: this.getLocalExpenses(userId), error: null };
+    }
+
     try {
       // Try fetching from Supabase table if available
       const { data, error } = await supabase
@@ -86,13 +93,21 @@ class ExpensesService {
         .order("expense_date", { ascending: false });
 
       if (error) {
-        // If table doesn't exist or RLS issue, return local storage data seamlessly
-        console.warn("Supabase expenses query returned:", error.message);
-        const localData = this.getLocalExpenses(userId);
-        return { data: localData, error: null };
+        // If table doesn't exist in schema cache, remember to avoid spamming network
+        if (
+          error.message?.includes("schema cache") ||
+          error.message?.includes("does not exist") ||
+          (error as any).code === "42P01" ||
+          (error as any).code === "PGRST204" ||
+          (error as any).code === "404"
+        ) {
+          this.isRemoteTableAvailable = false;
+        }
+        return { data: this.getLocalExpenses(userId), error: null };
       }
 
       if (data && Array.isArray(data)) {
+        this.isRemoteTableAvailable = true;
         // Sync to local cache
         const remoteExpenses = data as Expense[];
         const localAll = this.getLocalExpenses().filter((e) => e.user_id !== userId);
@@ -101,8 +116,8 @@ class ExpensesService {
       }
 
       return { data: this.getLocalExpenses(userId), error: null };
-    } catch (err: any) {
-      console.warn("Failed to query Supabase expenses, fallback to local:", err);
+    } catch {
+      this.isRemoteTableAvailable = false;
       return { data: this.getLocalExpenses(userId), error: null };
     }
   }
@@ -128,6 +143,10 @@ class ExpensesService {
     const all = this.getLocalExpenses();
     this.saveLocalExpenses([newExpense, ...all]);
 
+    if (!this.isRemoteTableAvailable) {
+      return { data: newExpense, error: null };
+    }
+
     try {
       const { data, error } = await supabase
         .from("expenses" as any)
@@ -146,12 +165,18 @@ class ExpensesService {
         .single();
 
       if (error) {
-        console.warn("Could not insert expense to Supabase (using local persistence):", error.message);
+        if (
+          error.message?.includes("schema cache") ||
+          error.message?.includes("does not exist") ||
+          (error as any).code === "42P01"
+        ) {
+          this.isRemoteTableAvailable = false;
+        }
       } else if (data) {
         return { data: data as Expense, error: null };
       }
-    } catch (err: any) {
-      console.warn("Supabase insert exception (using local storage):", err);
+    } catch {
+      this.isRemoteTableAvailable = false;
     }
 
     return { data: newExpense, error: null };
@@ -177,6 +202,10 @@ class ExpensesService {
       this.saveLocalExpenses(all);
     }
 
+    if (!this.isRemoteTableAvailable) {
+      return { data: updatedItem, error: null };
+    }
+
     try {
       const { data, error } = await supabase
         .from("expenses" as any)
@@ -188,13 +217,11 @@ class ExpensesService {
         .select()
         .single();
 
-      if (error) {
-        console.warn("Supabase expense update error:", error.message);
-      } else if (data) {
+      if (!error && data) {
         return { data: data as Expense, error: null };
       }
-    } catch (err) {
-      console.warn("Supabase expense update error (local updated):", err);
+    } catch {
+      // Handled gracefully via local update
     }
 
     return { data: updatedItem, error: null };
@@ -204,13 +231,14 @@ class ExpensesService {
     const all = this.getLocalExpenses();
     this.saveLocalExpenses(all.filter((e) => e.id !== id));
 
+    if (!this.isRemoteTableAvailable) {
+      return { success: true, error: null };
+    }
+
     try {
-      const { error } = await supabase.from("expenses" as any).delete().eq("id", id);
-      if (error) {
-        console.warn("Supabase expense delete error:", error.message);
-      }
-    } catch (err) {
-      console.warn("Supabase expense delete exception:", err);
+      await supabase.from("expenses" as any).delete().eq("id", id);
+    } catch {
+      // Handled gracefully via local delete
     }
 
     return { success: true, error: null };
@@ -221,13 +249,14 @@ class ExpensesService {
     const all = this.getLocalExpenses();
     this.saveLocalExpenses(all.filter((e) => !idSet.has(e.id)));
 
+    if (!this.isRemoteTableAvailable) {
+      return { success: true, error: null };
+    }
+
     try {
-      const { error } = await supabase.from("expenses" as any).delete().in("id", ids);
-      if (error) {
-        console.warn("Supabase bulk delete error:", error.message);
-      }
-    } catch (err) {
-      console.warn("Supabase bulk delete exception:", err);
+      await supabase.from("expenses" as any).delete().in("id", ids);
+    } catch {
+      // Handled gracefully via local delete
     }
 
     return { success: true, error: null };
