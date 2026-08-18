@@ -1,4 +1,4 @@
-// Central reactive settings store for dropdown options across Expenses and Transactions
+// Central reactive settings store for dropdown options across Expenses and Transactions with Supabase Database persistence
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ExpenseCategoryOption {
@@ -98,17 +98,18 @@ const listeners: Set<SettingsListener> = new Set();
 
 class SettingsService {
   private settings: AppSettings;
+  private currentUserId: string | null = null;
 
   constructor() {
-    this.settings = this.loadSettings();
+    this.settings = this.loadLocalCache();
+    this.initDatabaseSync();
   }
 
-  private loadSettings(): AppSettings {
+  private loadLocalCache(): AppSettings {
     try {
       const stored = localStorage.getItem(SETTINGS_STORAGE_KEY) || localStorage.getItem("payment_track_custom_settings_v1");
       if (stored) {
         const parsed = JSON.parse(stored);
-        // If v1 had non-zero card types, set card types to 0 if not explicitly modified
         const cards = parsed.transactionCardTypes?.length
           ? parsed.transactionCardTypes.map((c: CardTypeOption) => ({
               ...c,
@@ -127,7 +128,7 @@ class SettingsService {
         };
       }
     } catch (e) {
-      console.warn("Failed to load custom settings from localStorage", e);
+      console.warn("Failed to load custom settings cache", e);
     }
 
     return {
@@ -140,13 +141,94 @@ class SettingsService {
     };
   }
 
-  private saveSettings(): void {
+  private async initDatabaseSync() {
+    // Check for user session
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user?.id) {
+      this.currentUserId = session.user.id;
+      await this.loadFromDatabase(session.user.id);
+    }
+
+    // Subscribe to auth state changes
+    supabase.auth.onAuthStateChange(async (_, newSession) => {
+      const userId = newSession?.user?.id;
+      if (userId && userId !== this.currentUserId) {
+        this.currentUserId = userId;
+        await this.loadFromDatabase(userId);
+      }
+    });
+  }
+
+  public async loadFromDatabase(userId: string): Promise<void> {
+    try {
+      const { data, error } = await supabase
+        .from("app_settings")
+        .select("settings")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (error) {
+        console.warn("Could not fetch app_settings from Supabase:", error.message);
+        return;
+      }
+
+      if (data && data.settings && typeof data.settings === "object") {
+        const parsed = data.settings as any;
+        this.settings = {
+          expenseCategories: parsed.expenseCategories || [...DEFAULT_EXPENSE_CATEGORIES],
+          expensePaymentMethods: parsed.expensePaymentMethods || [...DEFAULT_PAYMENT_METHODS],
+          expensePayees: parsed.expensePayees || [...DEFAULT_PAYEES],
+          transactionCardTypes: parsed.transactionCardTypes || [...DEFAULT_CARD_TYPES],
+          transactionRecipients: parsed.transactionRecipients || [...DEFAULT_RECIPIENTS],
+          transactionTypes: parsed.transactionTypes || [...DEFAULT_TRANSACTION_TYPES],
+        };
+        this.saveLocalCache();
+        this.notifyListeners();
+      } else {
+        // First time user: save current default settings to database
+        await this.persistToDatabase(userId);
+      }
+    } catch (err) {
+      console.warn("Failed to load settings from database:", err);
+    }
+  }
+
+  private saveLocalCache(): void {
     try {
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(this.settings));
       this.notifyListeners();
     } catch (e) {
-      console.error("Failed to save settings to localStorage", e);
+      console.error("Failed to save settings cache", e);
     }
+  }
+
+  private async persistToDatabase(targetUserId?: string): Promise<void> {
+    const userId = targetUserId || this.currentUserId;
+    if (!userId) return;
+
+    try {
+      const { error } = await supabase
+        .from("app_settings")
+        .upsert(
+          {
+            user_id: userId,
+            settings: this.settings as any,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id" }
+        );
+
+      if (error) {
+        console.warn("Supabase app_settings upsert error:", error.message);
+      }
+    } catch (err) {
+      console.warn("Failed to persist app_settings to Supabase:", err);
+    }
+  }
+
+  private saveAndPersist(): void {
+    this.saveLocalCache();
+    this.persistToDatabase();
   }
 
   private notifyListeners(): void {
@@ -185,7 +267,7 @@ class SettingsService {
       isDefault: false,
     };
     this.settings.expenseCategories = [...this.settings.expenseCategories, newCategory];
-    this.saveSettings();
+    this.saveAndPersist();
     return newCategory;
   }
 
@@ -193,12 +275,12 @@ class SettingsService {
     this.settings.expenseCategories = this.settings.expenseCategories.map((cat) =>
       cat.id === id ? { ...cat, ...updates } : cat
     );
-    this.saveSettings();
+    this.saveAndPersist();
   }
 
   public deleteExpenseCategory(id: string): void {
     this.settings.expenseCategories = this.settings.expenseCategories.filter((cat) => cat.id !== id);
-    this.saveSettings();
+    this.saveAndPersist();
   }
 
   // --- Payment Methods ---
@@ -210,7 +292,7 @@ class SettingsService {
     const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "_") + "_" + Date.now();
     const newMethod: PaymentMethodOption = { id, name: name.trim(), isDefault: false };
     this.settings.expensePaymentMethods = [...this.settings.expensePaymentMethods, newMethod];
-    this.saveSettings();
+    this.saveAndPersist();
     return newMethod;
   }
 
@@ -218,12 +300,12 @@ class SettingsService {
     this.settings.expensePaymentMethods = this.settings.expensePaymentMethods.map((m) =>
       m.id === id ? { ...m, name: name.trim() } : m
     );
-    this.saveSettings();
+    this.saveAndPersist();
   }
 
   public deletePaymentMethod(id: string): void {
     this.settings.expensePaymentMethods = this.settings.expensePaymentMethods.filter((m) => m.id !== id);
-    this.saveSettings();
+    this.saveAndPersist();
   }
 
   // --- Payees / Workers ---
@@ -235,13 +317,13 @@ class SettingsService {
     const trimmed = name.trim();
     if (trimmed && !this.settings.expensePayees.includes(trimmed)) {
       this.settings.expensePayees = [...this.settings.expensePayees, trimmed];
-      this.saveSettings();
+      this.saveAndPersist();
     }
   }
 
   public deletePayee(name: string): void {
     this.settings.expensePayees = this.settings.expensePayees.filter((p) => p !== name);
-    this.saveSettings();
+    this.saveAndPersist();
   }
 
   // --- Card Types ---
@@ -259,7 +341,7 @@ class SettingsService {
       isDefault: false,
     };
     this.settings.transactionCardTypes = [...this.settings.transactionCardTypes, newCard];
-    this.saveSettings();
+    this.saveAndPersist();
     return newCard;
   }
 
@@ -267,12 +349,12 @@ class SettingsService {
     this.settings.transactionCardTypes = this.settings.transactionCardTypes.map((c) =>
       c.id === id ? { ...c, ...updates } : c
     );
-    this.saveSettings();
+    this.saveAndPersist();
   }
 
   public deleteCardType(id: string): void {
     this.settings.transactionCardTypes = this.settings.transactionCardTypes.filter((c) => c.id !== id);
-    this.saveSettings();
+    this.saveAndPersist();
   }
 
   // --- Transaction Recipients (Sent To) ---
@@ -284,7 +366,7 @@ class SettingsService {
     const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "_") + "_" + Date.now();
     const newRecipient: RecipientOption = { id, name: name.trim(), isDefault: false };
     this.settings.transactionRecipients = [...this.settings.transactionRecipients, newRecipient];
-    this.saveSettings();
+    this.saveAndPersist();
     return newRecipient;
   }
 
@@ -292,12 +374,12 @@ class SettingsService {
     this.settings.transactionRecipients = this.settings.transactionRecipients.map((r) =>
       r.id === id ? { ...r, name: name.trim() } : r
     );
-    this.saveSettings();
+    this.saveAndPersist();
   }
 
   public deleteRecipient(id: string): void {
     this.settings.transactionRecipients = this.settings.transactionRecipients.filter((r) => r.id !== id);
-    this.saveSettings();
+    this.saveAndPersist();
   }
 
   // --- Transaction Types ---
@@ -309,13 +391,13 @@ class SettingsService {
     const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "_");
     const newType: TransactionTypeOption = { id, name: id, label: label.trim(), isDefault: false };
     this.settings.transactionTypes = [...this.settings.transactionTypes, newType];
-    this.saveSettings();
+    this.saveAndPersist();
     return newType;
   }
 
   public deleteTransactionType(id: string): void {
     this.settings.transactionTypes = this.settings.transactionTypes.filter((t) => t.id !== id);
-    this.saveSettings();
+    this.saveAndPersist();
   }
 
   // --- Reset to Defaults ---
@@ -328,7 +410,7 @@ class SettingsService {
       transactionRecipients: [...DEFAULT_RECIPIENTS],
       transactionTypes: [...DEFAULT_TRANSACTION_TYPES],
     };
-    this.saveSettings();
+    this.saveAndPersist();
   }
 
   public exportSettingsJson(): string {
@@ -347,7 +429,7 @@ class SettingsService {
           transactionRecipients: parsed.transactionRecipients || [...DEFAULT_RECIPIENTS],
           transactionTypes: parsed.transactionTypes || [...DEFAULT_TRANSACTION_TYPES],
         };
-        this.saveSettings();
+        this.saveAndPersist();
         return true;
       }
     } catch (e) {
