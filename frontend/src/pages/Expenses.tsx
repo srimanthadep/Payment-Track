@@ -74,6 +74,31 @@ const Expenses = () => {
     }
   }, [user, refreshKey, fetchExpenses]);
 
+  // Realtime subscription for expenses table
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel("expenses-live-feed")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "expenses",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchExpenses();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, fetchExpenses]);
+
   // Filtered by Date
   const dateFilteredExpenses = useMemo(() => {
     if (!selectedDate) return expenses;
