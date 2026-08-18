@@ -52,6 +52,7 @@ import {
   RecipientOption,
   TransactionTypeOption,
 } from "@/services/settingsService";
+import { ProfileSettings } from "@/components/settings/ProfileSettings";
 
 const COLOR_PRESETS = [
   { name: "Blue", class: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800" },
@@ -254,8 +255,12 @@ const Settings = () => {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="expenses" className="space-y-6">
-          <TabsList className="grid grid-cols-3 w-full sm:w-[450px] p-1 bg-muted/60">
+        <Tabs defaultValue="profile" className="space-y-6">
+          <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full sm:w-[560px] p-1 bg-muted/60">
+            <TabsTrigger value="profile" className="gap-2 text-xs sm:text-sm font-semibold">
+              <User className="h-4 w-4" />
+              Profile
+            </TabsTrigger>
             <TabsTrigger value="expenses" className="gap-2 text-xs sm:text-sm font-semibold">
               <Wallet className="h-4 w-4" />
               Expenses
@@ -269,6 +274,11 @@ const Settings = () => {
               Backup & Reset
             </TabsTrigger>
           </TabsList>
+
+          {/* ===================== TAB 0: PROFILE & ACCOUNT SETTINGS ===================== */}
+          <TabsContent value="profile" className="space-y-6">
+            <ProfileSettings />
+          </TabsContent>
 
           {/* ===================== TAB 1: EXPENSE SETTINGS ===================== */}
           <TabsContent value="expenses" className="space-y-6">

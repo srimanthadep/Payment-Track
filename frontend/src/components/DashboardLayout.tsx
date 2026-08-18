@@ -1,6 +1,7 @@
-import { ReactNode } from "react";
+import { useState, useEffect, ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { profileService, UserProfile } from "@/services/profileService";
 import { Button } from "@/components/ui/button";
 import { 
   LayoutDashboard, 
@@ -32,6 +33,14 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    profileService.getUserProfile().then((p) => setUserProfile(p));
+    return profileService.subscribe(() => {
+      profileService.getUserProfile().then((p) => setUserProfile(p));
+    });
+  }, []);
 
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();
@@ -70,18 +79,27 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       {/* Mobile Top Header */}
       <header className="lg:hidden sticky top-0 z-30 bg-card/90 backdrop-blur-md border-b border-border/80 px-4 py-3 shadow-xs">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <div className="flex items-center space-x-3">
+          <div
+            className="flex items-center space-x-3 cursor-pointer group"
+            onClick={() => navigate("/settings")}
+            title="Settings & Profile"
+          >
             <div className="relative flex items-center justify-center">
               <img
-                src="/logo-circle.png"
-                alt="Logo"
-                className="h-8 w-8 rounded-full object-contain ring-2 ring-primary/20 shadow-xs"
+                src={userProfile?.avatarUrl || "/logo-circle.png"}
+                alt="Profile"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = "/logo-circle.png";
+                }}
+                className="h-8 w-8 rounded-full object-cover ring-2 ring-primary/20 shadow-xs group-hover:ring-primary/50 transition-all"
               />
               <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-card" />
             </div>
             <div>
               <span className="font-bold text-base tracking-tight block leading-tight">Payment Tracker</span>
-              <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider block">Enterprise Hub</span>
+              <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider block">
+                {userProfile?.fullName || "Enterprise Hub"}
+              </span>
             </div>
           </div>
 
@@ -92,16 +110,24 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-72 p-0 flex flex-col">
-              <div className="p-5 border-b border-border/80 bg-muted/20">
+              <div
+                className="p-5 border-b border-border/80 bg-muted/20 cursor-pointer"
+                onClick={() => navigate("/settings")}
+              >
                 <div className="flex items-center space-x-3">
                   <img
-                    src="/logo-circle.png"
-                    alt="Logo"
-                    className="h-10 w-10 rounded-full object-contain ring-2 ring-primary/30 shadow-md"
+                    src={userProfile?.avatarUrl || "/logo-circle.png"}
+                    alt="Profile"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = "/logo-circle.png";
+                    }}
+                    className="h-10 w-10 rounded-full object-cover ring-2 ring-primary/30 shadow-md"
                   />
                   <div>
                     <span className="font-bold text-base tracking-tight block">Payment Tracker</span>
-                    <span className="text-xs text-muted-foreground font-medium">Business Portal</span>
+                    <span className="text-xs text-muted-foreground font-medium">
+                      {userProfile?.fullName || "Business Portal"}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -148,18 +174,27 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         {/* Desktop Sidebar */}
         <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 border-r border-border/80 bg-card/60 backdrop-blur-xl z-20 shadow-xs">
           {/* Brand header */}
-          <div className="flex items-center space-x-3 p-5 border-b border-border/70 bg-gradient-to-b from-card to-card/50">
+          <div
+            className="flex items-center space-x-3 p-5 border-b border-border/70 bg-gradient-to-b from-card to-card/50 cursor-pointer group"
+            onClick={() => navigate("/settings")}
+            title="Click to manage profile & settings"
+          >
             <div className="relative">
               <img
-                src="/logo-circle.png"
-                alt="Logo"
-                className="h-9 w-9 rounded-full object-contain ring-2 ring-primary/25 shadow-sm"
+                src={userProfile?.avatarUrl || "/logo-circle.png"}
+                alt="Profile"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = "/logo-circle.png";
+                }}
+                className="h-9 w-9 rounded-full object-cover ring-2 ring-primary/25 shadow-sm group-hover:ring-primary/50 group-hover:scale-105 transition-all"
               />
               <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-card" />
             </div>
-            <div>
-              <span className="font-bold text-base tracking-tight block leading-tight">Payment Tracker</span>
-              <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider block">Enterprise Hub</span>
+            <div className="min-w-0 flex-1">
+              <span className="font-bold text-base tracking-tight block leading-tight truncate">Payment Tracker</span>
+              <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider block truncate">
+                {userProfile?.fullName || "Enterprise Hub"}
+              </span>
             </div>
           </div>
           
