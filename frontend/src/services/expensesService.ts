@@ -50,9 +50,24 @@ export interface ExpenseStats {
 }
 
 const EXPENSES_LOCAL_STORAGE_KEY = "payment_track_expenses_cache_v1";
+const EXPENSES_REMOTE_SYNC_KEY = "payment_track_expenses_remote_sync_v1";
 
 class ExpensesService {
-  private isRemoteTableAvailable: boolean = true;
+  private isRemoteTableAvailable: boolean;
+
+  constructor() {
+    // Default to false unless explicitly enabled, avoiding 404s when Supabase table isn't created
+    this.isRemoteTableAvailable = localStorage.getItem(EXPENSES_REMOTE_SYNC_KEY) === "true";
+  }
+
+  public setRemoteSyncEnabled(enabled: boolean): void {
+    this.isRemoteTableAvailable = enabled;
+    localStorage.setItem(EXPENSES_REMOTE_SYNC_KEY, enabled ? "true" : "false");
+  }
+
+  public isRemoteSyncEnabled(): boolean {
+    return this.isRemoteTableAvailable;
+  }
 
   private getLocalExpenses(userId?: string): Expense[] {
     try {
@@ -79,13 +94,12 @@ class ExpensesService {
   }
 
   public async getExpenses(userId: string): Promise<{ data: Expense[]; error: string | null }> {
-    // If remote table was previously found to be not yet created, return local data instantly
+    // If remote sync is not enabled, return local data instantly without network calls
     if (!this.isRemoteTableAvailable) {
       return { data: this.getLocalExpenses(userId), error: null };
     }
 
     try {
-      // Try fetching from Supabase table if available
       const { data, error } = await supabase
         .from("expenses" as any)
         .select("*")
@@ -93,7 +107,7 @@ class ExpensesService {
         .order("expense_date", { ascending: false });
 
       if (error) {
-        // If table doesn't exist in schema cache, remember to avoid spamming network
+        // If table doesn't exist, disable remote sync and use local
         if (
           error.message?.includes("schema cache") ||
           error.message?.includes("does not exist") ||
@@ -101,14 +115,12 @@ class ExpensesService {
           (error as any).code === "PGRST204" ||
           (error as any).code === "404"
         ) {
-          this.isRemoteTableAvailable = false;
+          this.setRemoteSyncEnabled(false);
         }
         return { data: this.getLocalExpenses(userId), error: null };
       }
 
       if (data && Array.isArray(data)) {
-        this.isRemoteTableAvailable = true;
-        // Sync to local cache
         const remoteExpenses = data as unknown as Expense[];
         const localAll = this.getLocalExpenses().filter((e) => e.user_id !== userId);
         this.saveLocalExpenses([...localAll, ...remoteExpenses]);
@@ -117,7 +129,7 @@ class ExpensesService {
 
       return { data: this.getLocalExpenses(userId), error: null };
     } catch {
-      this.isRemoteTableAvailable = false;
+      this.setRemoteSyncEnabled(false);
       return { data: this.getLocalExpenses(userId), error: null };
     }
   }
@@ -170,13 +182,13 @@ class ExpensesService {
           error.message?.includes("does not exist") ||
           (error as any).code === "42P01"
         ) {
-          this.isRemoteTableAvailable = false;
+          this.setRemoteSyncEnabled(false);
         }
       } else if (data) {
         return { data: data as unknown as Expense, error: null };
       }
     } catch {
-      this.isRemoteTableAvailable = false;
+      this.setRemoteSyncEnabled(false);
     }
 
     return { data: newExpense, error: null };
@@ -221,7 +233,7 @@ class ExpensesService {
         return { data: data as unknown as Expense, error: null };
       }
     } catch {
-      // Handled gracefully via local update
+      // Local is already updated
     }
 
     return { data: updatedItem, error: null };
@@ -238,7 +250,7 @@ class ExpensesService {
     try {
       await supabase.from("expenses" as any).delete().eq("id", id);
     } catch {
-      // Handled gracefully via local delete
+      // Handled via local delete
     }
 
     return { success: true, error: null };
@@ -256,7 +268,7 @@ class ExpensesService {
     try {
       await supabase.from("expenses" as any).delete().in("id", ids);
     } catch {
-      // Handled gracefully via local delete
+      // Handled via local delete
     }
 
     return { success: true, error: null };
