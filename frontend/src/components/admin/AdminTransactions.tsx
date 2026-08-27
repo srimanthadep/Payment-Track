@@ -115,13 +115,13 @@ export const AdminTransactions = () => {
         (data || []).map(async (tx: any) => {
           const { data: profile } = await supabase
             .from("profiles")
-            .select("email, full_name, username")
+            .select("email, full_name, business_name")
             .eq("id", tx.user_id)
             .single();
 
           const derivedUsername =
             tx.username ||
-            profile?.username ||
+            profile?.full_name ||
             profile?.email?.split("@")[0] ||
             "user";
 
