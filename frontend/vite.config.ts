@@ -50,6 +50,7 @@ export default defineConfig(({ mode }) => ({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MiB
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
@@ -72,6 +73,18 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    chunkSizeWarningLimit: 2000, // Increase limit (in KB) to avoid warnings
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom", "react-router-dom"],
+          charts: ["recharts"],
+          export: ["xlsx", "jspdf", "jspdf-autotable", "html2canvas"],
+          animations: ["framer-motion"],
+          supabase: ["@supabase/supabase-js"],
+          ui: ["@radix-ui/react-dialog", "@radix-ui/react-popover", "@radix-ui/react-tabs", "@radix-ui/react-toast"],
+        },
+      },
+    },
   },
 }));
