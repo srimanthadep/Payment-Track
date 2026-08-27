@@ -256,22 +256,34 @@ const Settings = () => {
 
         {/* Tabs */}
         <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full sm:w-[560px] p-1 bg-muted/60">
-            <TabsTrigger value="profile" className="gap-2 text-xs sm:text-sm font-semibold">
-              <User className="h-4 w-4" />
-              Profile
+          <TabsList className="grid grid-cols-4 w-full sm:w-[580px] p-1 bg-muted/60 h-auto">
+            <TabsTrigger
+              value="profile"
+              className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 text-[11px] sm:text-sm font-semibold h-auto"
+            >
+              <User className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Profile</span>
             </TabsTrigger>
-            <TabsTrigger value="expenses" className="gap-2 text-xs sm:text-sm font-semibold">
-              <Wallet className="h-4 w-4" />
-              Expenses
+            <TabsTrigger
+              value="expenses"
+              className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 text-[11px] sm:text-sm font-semibold h-auto"
+            >
+              <Wallet className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Expenses</span>
             </TabsTrigger>
-            <TabsTrigger value="transactions" className="gap-2 text-xs sm:text-sm font-semibold">
-              <Receipt className="h-4 w-4" />
-              Transactions
+            <TabsTrigger
+              value="transactions"
+              className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 text-[11px] sm:text-sm font-semibold h-auto"
+            >
+              <Receipt className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Tx Config</span>
             </TabsTrigger>
-            <TabsTrigger value="backup" className="gap-2 text-xs sm:text-sm font-semibold">
-              <RotateCcw className="h-4 w-4" />
-              Backup & Reset
+            <TabsTrigger
+              value="backup"
+              className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 text-[11px] sm:text-sm font-semibold h-auto"
+            >
+              <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Backup</span>
             </TabsTrigger>
           </TabsList>
 

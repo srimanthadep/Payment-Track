@@ -182,20 +182,24 @@ const Expenses = () => {
             </div>
 
             {/* Segmented Period Tabs & Daily Navigator */}
-            <div className="flex items-center gap-2 sm:gap-2.5 flex-nowrap shrink-0">
-              <DateSwitch
-                selectedDate={selectedDate}
-                onDateChange={(newDate) => {
-                  setSelectedDate(newDate);
-                  if (newDate) {
-                    setPeriod("daily");
-                  }
-                }}
-              />
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+              {period === "daily" && (
+                <DateSwitch
+                  selectedDate={selectedDate}
+                  onDateChange={(newDate) => {
+                    setSelectedDate(newDate);
+                    if (newDate) {
+                      setPeriod("daily");
+                    }
+                  }}
+                  className="w-full sm:w-auto"
+                />
+              )}
 
               <Tabs
                 value={period}
                 onValueChange={(v) => setPeriod(v as ExpensePeriod)}
+                className="w-full sm:w-auto"
               >
                 <TabsList className="grid grid-cols-4 w-full sm:w-auto">
                   <TabsTrigger value="daily" className="text-xs sm:text-sm">

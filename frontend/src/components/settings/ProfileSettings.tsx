@@ -224,17 +224,17 @@ export const ProfileSettings = () => {
 
       {/* Main Profile & Avatar Card */}
       <Card className="border shadow-sm overflow-hidden">
-        <div className="h-28 sm:h-32 bg-gradient-to-r from-primary/20 via-primary/10 to-accent/20 border-b relative">
-          <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-background/80 backdrop-blur-md border border-border/60 text-xs font-semibold text-foreground/80 shadow-xs">
+        <div className="h-24 sm:h-32 bg-gradient-to-r from-primary/20 via-primary/10 to-accent/20 border-b relative">
+          <div className="hidden sm:flex absolute top-3 right-3 items-center gap-1.5 px-2.5 py-1 rounded-full bg-background/80 backdrop-blur-md border border-border/60 text-xs font-semibold text-foreground/80 shadow-xs">
             <HardDrive className="h-3.5 w-3.5 text-primary" />
             <span>Supabase Bucket: <code className="font-mono text-primary font-bold">profile</code></span>
           </div>
         </div>
 
-        <CardContent className="pt-0 relative px-4 sm:px-6 pb-6">
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 -mt-14 sm:-mt-16 mb-6">
-            {/* Avatar Section */}
-            <div className="flex items-end gap-4">
+        <CardContent className="pt-0 relative px-4 sm:px-6 pb-5">
+          <div className="flex flex-col sm:flex-row items-center sm:items-end sm:justify-between gap-4 -mt-12 sm:-mt-16 mb-5 text-center sm:text-left">
+            {/* Avatar & User Details */}
+            <div className="flex flex-col sm:flex-row items-center sm:items-end gap-3 sm:gap-4">
               <div
                 className={`relative group cursor-pointer rounded-full p-1 bg-background ring-4 ring-card shadow-lg transition-all duration-200 ${
                   isDragOver ? "ring-primary scale-105" : ""
@@ -245,13 +245,13 @@ export const ProfileSettings = () => {
                 onClick={() => !isUploading && fileInputRef.current?.click()}
                 title="Click or drag & drop to change profile picture"
               >
-                <Avatar className="h-24 w-24 sm:h-28 sm:w-28 rounded-full border-2 border-border/80 bg-muted overflow-hidden">
+                <Avatar className="h-20 w-20 sm:h-28 sm:w-28 rounded-full border-2 border-border/80 bg-muted overflow-hidden">
                   <AvatarImage
                     src={profile?.avatarUrl || "/logo-circle.png"}
                     alt={profile?.fullName || "User Profile"}
                     className="object-cover h-full w-full"
                   />
-                  <AvatarFallback className="text-xl font-bold bg-primary/15 text-primary">
+                  <AvatarFallback className="text-lg sm:text-xl font-bold bg-primary/15 text-primary">
                     {getInitials(profile?.fullName, profile?.email)}
                   </AvatarFallback>
                 </Avatar>
@@ -259,11 +259,11 @@ export const ProfileSettings = () => {
                 {/* Upload Hover Overlay */}
                 <div className="absolute inset-1 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center text-white text-xs font-medium">
                   {isUploading ? (
-                    <Loader2 className="h-6 w-6 animate-spin text-white" />
+                    <Loader2 className="h-5 w-5 animate-spin text-white" />
                   ) : (
                     <>
-                      <Camera className="h-6 w-6 mb-1" />
-                      <span>Change</span>
+                      <Camera className="h-5 w-5 mb-0.5" />
+                      <span className="text-[10px]">Change</span>
                     </>
                   )}
                 </div>
@@ -271,8 +271,8 @@ export const ProfileSettings = () => {
                 {/* Active Uploading Spinner */}
                 {isUploading && (
                   <div className="absolute inset-1 rounded-full bg-black/60 flex flex-col items-center justify-center text-white">
-                    <Loader2 className="h-7 w-7 animate-spin text-primary-foreground mb-1" />
-                    <span className="text-[10px] font-semibold">Uploading...</span>
+                    <Loader2 className="h-6 w-6 animate-spin text-primary-foreground mb-0.5" />
+                    <span className="text-[9px] font-semibold">Uploading...</span>
                   </div>
                 )}
 
@@ -284,24 +284,24 @@ export const ProfileSettings = () => {
                     e.stopPropagation();
                     fileInputRef.current?.click();
                   }}
-                  className="absolute bottom-1 right-1 h-7 w-7 rounded-full bg-primary text-primary-foreground shadow-md flex items-center justify-center hover:bg-primary/90 transition-transform active:scale-95 border-2 border-background"
+                  className="absolute bottom-0 right-0 h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-primary text-primary-foreground shadow-md flex items-center justify-center hover:bg-primary/90 transition-transform active:scale-95 border-2 border-background"
                 >
-                  <Camera className="h-3.5 w-3.5" />
+                  <Camera className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 </button>
               </div>
 
               {/* Basic Profile Name Display */}
-              <div className="space-y-1 pb-1">
-                <div className="flex items-center gap-2">
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
                   <h2 className="text-lg sm:text-xl font-bold tracking-tight">
                     {profile?.fullName || "Admin User"}
                   </h2>
-                  <Badge variant="secondary" className="text-[11px] gap-1 py-0.5 px-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
+                  <Badge variant="secondary" className="text-[10px] sm:text-[11px] gap-1 py-0.5 px-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
                     <ShieldCheck className="h-3 w-3" />
                     Active User
                   </Badge>
                 </div>
-                <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5">
+                <p className="text-xs text-muted-foreground flex items-center justify-center sm:justify-start gap-1.5">
                   <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                   {profile?.email || "No email available"}
                 </p>
@@ -309,14 +309,14 @@ export const ProfileSettings = () => {
             </div>
 
             {/* Avatar Action Buttons */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-center">
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
                 disabled={isUploading}
                 onClick={() => fileInputRef.current?.click()}
-                className="h-9 text-xs sm:text-sm gap-1.5 font-medium shadow-xs"
+                className="h-8 sm:h-9 text-xs sm:text-sm gap-1.5 font-medium shadow-xs flex-1 sm:flex-none"
               >
                 {isUploading ? (
                   <>
@@ -338,7 +338,7 @@ export const ProfileSettings = () => {
                   variant="ghost"
                   disabled={isUploading || isRemoving}
                   onClick={() => setRemoveDialogOpen(true)}
-                  className="h-9 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 gap-1.5"
+                  className="h-8 sm:h-9 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 gap-1.5"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   Remove
@@ -347,24 +347,24 @@ export const ProfileSettings = () => {
             </div>
           </div>
 
-          {/* Drag & Drop Upload Zone */}
+          {/* Desktop Drag & Drop Upload Zone */}
           <div
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             onClick={() => !isUploading && fileInputRef.current?.click()}
-            className={`cursor-pointer border-2 border-dashed rounded-xl p-5 text-center transition-all duration-200 ${
+            className={`hidden sm:block cursor-pointer border-2 border-dashed rounded-xl p-4 text-center transition-all duration-200 ${
               isDragOver
                 ? "border-primary bg-primary/5 scale-[1.01]"
                 : "border-border/80 bg-muted/20 hover:bg-muted/40 hover:border-primary/50"
             }`}
           >
-            <div className="flex flex-col items-center justify-center space-y-2">
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                <Upload className="h-5 w-5" />
+            <div className="flex flex-col items-center justify-center space-y-1.5">
+              <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                <Upload className="h-4 w-4" />
               </div>
               <div>
-                <p className="text-xs sm:text-sm font-semibold">
+                <p className="text-xs font-semibold">
                   Click to browse or drag and drop your photo
                 </p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
