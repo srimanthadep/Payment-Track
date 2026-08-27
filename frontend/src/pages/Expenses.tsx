@@ -3,13 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DateSwitch } from "@/components/transactions/DateSwitch";
+import { DateSwitch, DateSwitchRange, PeriodType } from "@/components/transactions/DateSwitch";
 import { FloatingActionButton } from "@/components/ui/FloatingActionButton";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { Button } from "@/components/ui/button";
 import { Plus, Wallet, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
-import { format, isSameDay } from "date-fns";
+import { format, isToday, isYesterday } from "date-fns";
 
 import { expensesService, Expense, ExpenseStats } from "@/services/expensesService";
 import { settingsService, ExpenseCategoryOption } from "@/services/settingsService";
@@ -25,6 +25,15 @@ const Expenses = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<ExpenseCategoryOption[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const [dateRange, setDateRange] = useState<DateSwitchRange>(() => {
+    const today = new Date();
+    const start = new Date(today);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(today);
+    end.setHours(23, 59, 59, 999);
+    return { from: start, to: end };
+  });
+  const [activePeriod, setActivePeriod] = useState<PeriodType>("day");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -99,11 +108,21 @@ const Expenses = () => {
     };
   }, [user, fetchExpenses]);
 
-  // Filtered by Date
+  // Filtered by Date / Period Range
   const dateFilteredExpenses = useMemo(() => {
-    if (!selectedDate) return expenses;
-    return expenses.filter((exp) => isSameDay(new Date(exp.expense_date), selectedDate));
-  }, [expenses, selectedDate]);
+    if (!dateRange.from && !dateRange.to) return expenses;
+    return expenses.filter((exp) => {
+      if (!exp.expense_date) return false;
+      const d = new Date(exp.expense_date);
+      if (dateRange.from && dateRange.to) {
+        return d >= dateRange.from && d <= dateRange.to;
+      }
+      if (dateRange.from) {
+        return d >= dateRange.from;
+      }
+      return true;
+    });
+  }, [expenses, dateRange]);
 
   // Overall & Filtered Stats
   const stats: ExpenseStats = useMemo(() => {
@@ -111,12 +130,30 @@ const Expenses = () => {
   }, [expenses]);
 
   const selectedDateLabel = useMemo(() => {
-    if (!selectedDate) return "All Time";
-    return format(selectedDate, "dd MMM yyyy");
-  }, [selectedDate]);
+    if (!dateRange.from && !dateRange.to) return "All Time";
+    if (activePeriod === "day" && dateRange.from) {
+      if (isToday(dateRange.from)) return `Today, ${format(dateRange.from, "dd MMM yyyy")}`;
+      if (isYesterday(dateRange.from)) return `Yesterday, ${format(dateRange.from, "dd MMM yyyy")}`;
+      return format(dateRange.from, "dd MMM yyyy");
+    }
+    if (activePeriod === "7d") return "Last 7 Days";
+    if (activePeriod === "30d") return "Last 30 Days";
+    if (activePeriod === "month" && dateRange.from) return format(dateRange.from, "MMMM yyyy");
+    if (activePeriod === "90d") return "Last 90 Days";
+    if (dateRange.from && dateRange.to) {
+      return `${format(dateRange.from, "dd MMM")} - ${format(dateRange.to, "dd MMM yyyy")}`;
+    }
+    return "Filtered Period";
+  }, [dateRange, activePeriod]);
 
   const handleRefresh = async () => {
     setRefreshKey((k) => k + 1);
+  };
+
+  const handleRangeChange = (newRange: DateSwitchRange, newPeriod: PeriodType) => {
+    setDateRange(newRange);
+    setActivePeriod(newPeriod);
+    setSelectedDate(newRange.from);
   };
 
   if (!user) return null;
@@ -150,6 +187,9 @@ const Expenses = () => {
               <DateSwitch
                 selectedDate={selectedDate}
                 onDateChange={setSelectedDate}
+                dateRange={dateRange}
+                activePeriod={activePeriod}
+                onRangeChange={handleRangeChange}
               />
             </div>
           </div>

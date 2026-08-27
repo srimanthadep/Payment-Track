@@ -7,7 +7,7 @@ import { TransactionsTable } from "@/components/transactions/TransactionsTable";
 import { AddTransactionDialog } from "@/components/transactions/AddTransactionDialog";
 import { ManagePortalsDialog } from "@/components/portals/ManagePortalsDialog";
 import { UploadPayoutDialog } from "@/components/transactions/UploadPayoutDialog";
-import { DateSwitch } from "@/components/transactions/DateSwitch";
+import { DateSwitch, DateSwitchRange, PeriodType } from "@/components/transactions/DateSwitch";
 import { FloatingActionButton } from "@/components/ui/FloatingActionButton";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,14 @@ const Transactions = () => {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [dateRange, setDateRange] = useState<DateSwitchRange>({ from: null, to: null });
+  const [activePeriod, setActivePeriod] = useState<PeriodType>("all");
+
+  const handleRangeChange = (newRange: DateSwitchRange, newPeriod: PeriodType) => {
+    setDateRange(newRange);
+    setActivePeriod(newPeriod);
+    setSelectedDate(newRange.from);
+  };
 
   const [portalSummary, setPortalSummary] = useState<{
     portalNames: string[];
@@ -82,6 +90,9 @@ const Transactions = () => {
               <DateSwitch
                 selectedDate={selectedDate}
                 onDateChange={setSelectedDate}
+                dateRange={dateRange}
+                activePeriod={activePeriod}
+                onRangeChange={handleRangeChange}
               />
             </div>
           </div>
@@ -91,6 +102,9 @@ const Transactions = () => {
             <DateSwitch
               selectedDate={selectedDate}
               onDateChange={setSelectedDate}
+              dateRange={dateRange}
+              activePeriod={activePeriod}
+              onRangeChange={handleRangeChange}
               className="w-full"
             />
           </div>
@@ -126,6 +140,7 @@ const Transactions = () => {
           <TransactionsTable
             userId={user.id}
             selectedDate={selectedDate}
+            dateRange={dateRange}
             onPortalFilterSummaryChange={setPortalSummary}
             key={`tx-table-${refreshKey}`}
           />

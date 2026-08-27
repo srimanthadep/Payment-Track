@@ -37,6 +37,7 @@ import {
 interface TransactionsTableProps {
   userId: string;
   selectedDate?: Date | null;
+  dateRange?: { from: Date | null; to: Date | null };
   onPortalFilterSummaryChange?: (summary: { portalNames: string[]; totalAmount: number; count: number } | null) => void;
 }
 
@@ -60,6 +61,7 @@ interface Transaction {
 export const TransactionsTable = ({
   userId,
   selectedDate,
+  dateRange,
   onPortalFilterSummaryChange,
 }: TransactionsTableProps) => {
   const { toast } = useToast();
@@ -202,8 +204,18 @@ export const TransactionsTable = ({
   useEffect(() => {
     let filtered = [...transactions];
 
-    // Date Switch single date filter
-    if (selectedDate) {
+    // Date range filter from DateSwitch or parent
+    if (dateRange?.from || dateRange?.to) {
+      if (dateRange.from) {
+        const fromDate = new Date(dateRange.from);
+        filtered = filtered.filter((t) => new Date(t.transaction_date) >= fromDate);
+      }
+      if (dateRange.to) {
+        const toDate = new Date(dateRange.to);
+        toDate.setHours(23, 59, 59, 999);
+        filtered = filtered.filter((t) => new Date(t.transaction_date) <= toDate);
+      }
+    } else if (selectedDate) {
       const targetYear = selectedDate.getFullYear();
       const targetMonth = selectedDate.getMonth();
       const targetDay = selectedDate.getDate();
@@ -227,7 +239,7 @@ export const TransactionsTable = ({
       );
     }
 
-    // Date range filter
+    // Secondary Date range filter from popover filters
     if (filters.dateRange.from) {
       filtered = filtered.filter((t) => {
         const txDate = new Date(t.transaction_date);
@@ -334,7 +346,7 @@ export const TransactionsTable = ({
     setDisplayedTransactions(filtered.slice(0, itemsPerPage));
     setPage(1);
     setHasMore(filtered.length > itemsPerPage);
-  }, [searchQuery, transactions, filters, selectedDate, sortConfig]);
+  }, [searchQuery, transactions, filters, selectedDate, dateRange, sortConfig]);
 
   const portalFilterSummary = useMemo(() => {
     if (filters.portals.length === 0) return null;
