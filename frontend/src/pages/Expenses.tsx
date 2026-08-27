@@ -3,13 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DateSwitch, DateSwitchRange, PeriodType } from "@/components/transactions/DateSwitch";
+import { DateSwitch } from "@/components/transactions/DateSwitch";
 import { FloatingActionButton } from "@/components/ui/FloatingActionButton";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Wallet, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
-import { format, isToday, isYesterday } from "date-fns";
+import { format, isToday, isYesterday, isSameDay, subDays, startOfMonth, endOfMonth } from "date-fns";
 
 import { expensesService, Expense, ExpenseStats } from "@/services/expensesService";
 import { settingsService, ExpenseCategoryOption } from "@/services/settingsService";
@@ -18,22 +19,16 @@ import { ExpenseStatsCards } from "@/components/expenses/ExpenseStatsCards";
 import { ExpenseCategoryChart } from "@/components/expenses/ExpenseCategoryChart";
 import { ExpensesTable } from "@/components/expenses/ExpensesTable";
 
+export type ExpensePeriod = "daily" | "weekly" | "monthly" | "all";
+
 const Expenses = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<ExpenseCategoryOption[]>([]);
+  const [period, setPeriod] = useState<ExpensePeriod>("daily");
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
-  const [dateRange, setDateRange] = useState<DateSwitchRange>(() => {
-    const today = new Date();
-    const start = new Date(today);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(today);
-    end.setHours(23, 59, 59, 999);
-    return { from: start, to: end };
-  });
-  const [activePeriod, setActivePeriod] = useState<PeriodType>("day");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -108,21 +103,35 @@ const Expenses = () => {
     };
   }, [user, fetchExpenses]);
 
-  // Filtered by Date / Period Range
+  // Filtered by Period / Date
   const dateFilteredExpenses = useMemo(() => {
-    if (!dateRange.from && !dateRange.to) return expenses;
-    return expenses.filter((exp) => {
-      if (!exp.expense_date) return false;
-      const d = new Date(exp.expense_date);
-      if (dateRange.from && dateRange.to) {
-        return d >= dateRange.from && d <= dateRange.to;
-      }
-      if (dateRange.from) {
-        return d >= dateRange.from;
-      }
-      return true;
-    });
-  }, [expenses, dateRange]);
+    const now = new Date();
+    if (period === "all") return expenses;
+
+    if (period === "daily") {
+      if (!selectedDate) return expenses;
+      return expenses.filter((exp) => isSameDay(new Date(exp.expense_date), selectedDate));
+    }
+
+    if (period === "weekly") {
+      const weekStart = subDays(now, 7);
+      return expenses.filter((exp) => {
+        const d = new Date(exp.expense_date);
+        return d >= weekStart && d <= now;
+      });
+    }
+
+    if (period === "monthly") {
+      const monthStart = startOfMonth(now);
+      const monthEnd = endOfMonth(now);
+      return expenses.filter((exp) => {
+        const d = new Date(exp.expense_date);
+        return d >= monthStart && d <= monthEnd;
+      });
+    }
+
+    return expenses;
+  }, [expenses, period, selectedDate]);
 
   // Overall & Filtered Stats
   const stats: ExpenseStats = useMemo(() => {
@@ -130,30 +139,19 @@ const Expenses = () => {
   }, [expenses]);
 
   const selectedDateLabel = useMemo(() => {
-    if (!dateRange.from && !dateRange.to) return "All Time";
-    if (activePeriod === "day" && dateRange.from) {
-      if (isToday(dateRange.from)) return `Today, ${format(dateRange.from, "dd MMM yyyy")}`;
-      if (isYesterday(dateRange.from)) return `Yesterday, ${format(dateRange.from, "dd MMM yyyy")}`;
-      return format(dateRange.from, "dd MMM yyyy");
+    if (period === "all") return "All Time";
+    if (period === "weekly") return "Last 7 Days";
+    if (period === "monthly") return format(new Date(), "MMMM yyyy");
+    if (period === "daily" && selectedDate) {
+      if (isToday(selectedDate)) return `Today, ${format(selectedDate, "dd MMM yyyy")}`;
+      if (isYesterday(selectedDate)) return `Yesterday, ${format(selectedDate, "dd MMM yyyy")}`;
+      return format(selectedDate, "dd MMM yyyy");
     }
-    if (activePeriod === "7d") return "Last 7 Days";
-    if (activePeriod === "30d") return "Last 30 Days";
-    if (activePeriod === "month" && dateRange.from) return format(dateRange.from, "MMMM yyyy");
-    if (activePeriod === "90d") return "Last 90 Days";
-    if (dateRange.from && dateRange.to) {
-      return `${format(dateRange.from, "dd MMM")} - ${format(dateRange.to, "dd MMM yyyy")}`;
-    }
-    return "Filtered Period";
-  }, [dateRange, activePeriod]);
+    return "All Time";
+  }, [period, selectedDate]);
 
   const handleRefresh = async () => {
     setRefreshKey((k) => k + 1);
-  };
-
-  const handleRangeChange = (newRange: DateSwitchRange, newPeriod: PeriodType) => {
-    setDateRange(newRange);
-    setActivePeriod(newPeriod);
-    setSelectedDate(newRange.from);
   };
 
   if (!user) return null;
@@ -167,8 +165,8 @@ const Expenses = () => {
           transition={{ duration: 0.3 }}
           className="space-y-4 sm:space-y-6"
         >
-          {/* Header Row */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          {/* Header Row: Title & Switcher */}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pb-1 border-b border-border/60">
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
@@ -183,14 +181,37 @@ const Expenses = () => {
               </p>
             </div>
 
-            <div className="flex items-center">
+            {/* Segmented Period Tabs & Daily Navigator */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <DateSwitch
                 selectedDate={selectedDate}
-                onDateChange={setSelectedDate}
-                dateRange={dateRange}
-                activePeriod={activePeriod}
-                onRangeChange={handleRangeChange}
+                onDateChange={(newDate) => {
+                  setSelectedDate(newDate);
+                  if (newDate) {
+                    setPeriod("daily");
+                  }
+                }}
               />
+
+              <Tabs
+                value={period}
+                onValueChange={(v) => setPeriod(v as ExpensePeriod)}
+              >
+                <TabsList className="grid grid-cols-4 w-full sm:w-auto">
+                  <TabsTrigger value="daily" className="text-xs sm:text-sm">
+                    Daily
+                  </TabsTrigger>
+                  <TabsTrigger value="weekly" className="text-xs sm:text-sm">
+                    Weekly
+                  </TabsTrigger>
+                  <TabsTrigger value="monthly" className="text-xs sm:text-sm">
+                    Monthly
+                  </TabsTrigger>
+                  <TabsTrigger value="all" className="text-xs sm:text-sm">
+                    All Time
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
           </div>
 

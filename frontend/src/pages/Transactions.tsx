@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
@@ -7,12 +7,16 @@ import { TransactionsTable } from "@/components/transactions/TransactionsTable";
 import { AddTransactionDialog } from "@/components/transactions/AddTransactionDialog";
 import { ManagePortalsDialog } from "@/components/portals/ManagePortalsDialog";
 import { UploadPayoutDialog } from "@/components/transactions/UploadPayoutDialog";
-import { DateSwitch, DateSwitchRange, PeriodType } from "@/components/transactions/DateSwitch";
+import { DateSwitch } from "@/components/transactions/DateSwitch";
 import { FloatingActionButton } from "@/components/ui/FloatingActionButton";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Upload, Layers } from "lucide-react";
 import { motion } from "framer-motion";
+import { subDays, startOfMonth, endOfMonth } from "date-fns";
+
+export type TransactionPeriod = "daily" | "weekly" | "monthly" | "all";
 
 const Transactions = () => {
   const navigate = useNavigate();
@@ -22,15 +26,35 @@ const Transactions = () => {
   const [portalsRefreshKey, setPortalsRefreshKey] = useState(0);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [dateRange, setDateRange] = useState<DateSwitchRange>({ from: null, to: null });
-  const [activePeriod, setActivePeriod] = useState<PeriodType>("all");
+  const [period, setPeriod] = useState<TransactionPeriod>("all");
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
 
-  const handleRangeChange = (newRange: DateSwitchRange, newPeriod: PeriodType) => {
-    setDateRange(newRange);
-    setActivePeriod(newPeriod);
-    setSelectedDate(newRange.from);
-  };
+  const dateRange = useMemo<{ from: Date | null; to: Date | null }>(() => {
+    const now = new Date();
+    if (period === "all") return { from: null, to: null };
+    if (period === "daily") {
+      if (!selectedDate) return { from: null, to: null };
+      const start = new Date(selectedDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(selectedDate);
+      end.setHours(23, 59, 59, 999);
+      return { from: start, to: end };
+    }
+    if (period === "weekly") {
+      const start = subDays(now, 7);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(now);
+      end.setHours(23, 59, 59, 999);
+      return { from: start, to: end };
+    }
+    if (period === "monthly") {
+      const start = startOfMonth(now);
+      const end = endOfMonth(now);
+      end.setHours(23, 59, 59, 999);
+      return { from: start, to: end };
+    }
+    return { from: null, to: null };
+  }, [period, selectedDate]);
 
   const [portalSummary, setPortalSummary] = useState<{
     portalNames: string[];
@@ -74,8 +98,8 @@ const Transactions = () => {
           transition={{ duration: 0.3 }}
           className="space-y-4 sm:space-y-6"
         >
-          {/* Header Row: Title on Left, DateSwitch on Right for Desktop */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          {/* Header Row: Title & Switcher */}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pb-1 border-b border-border/60">
             <div>
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
                 Transactions
@@ -85,28 +109,38 @@ const Transactions = () => {
               </p>
             </div>
 
-            {/* Desktop: DateSwitch on the right of header */}
-            <div className="hidden sm:flex items-center">
+            {/* Segmented Period Tabs & Daily Date Navigator */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <DateSwitch
                 selectedDate={selectedDate}
-                onDateChange={setSelectedDate}
-                dateRange={dateRange}
-                activePeriod={activePeriod}
-                onRangeChange={handleRangeChange}
+                onDateChange={(newDate) => {
+                  setSelectedDate(newDate);
+                  if (newDate) {
+                    setPeriod("daily");
+                  }
+                }}
               />
-            </div>
-          </div>
 
-          {/* Mobile Only: Date Switch full-width */}
-          <div className="sm:hidden w-full">
-            <DateSwitch
-              selectedDate={selectedDate}
-              onDateChange={setSelectedDate}
-              dateRange={dateRange}
-              activePeriod={activePeriod}
-              onRangeChange={handleRangeChange}
-              className="w-full"
-            />
+              <Tabs
+                value={period}
+                onValueChange={(v) => setPeriod(v as TransactionPeriod)}
+              >
+                <TabsList className="grid grid-cols-4 w-full sm:w-auto">
+                  <TabsTrigger value="daily" className="text-xs sm:text-sm">
+                    Daily
+                  </TabsTrigger>
+                  <TabsTrigger value="weekly" className="text-xs sm:text-sm">
+                    Weekly
+                  </TabsTrigger>
+                  <TabsTrigger value="monthly" className="text-xs sm:text-sm">
+                    Monthly
+                  </TabsTrigger>
+                  <TabsTrigger value="all" className="text-xs sm:text-sm">
+                    All Time
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
           </div>
 
           {/* Action Buttons Row */}
@@ -136,10 +170,10 @@ const Transactions = () => {
             </Button>
           </div>
 
-          {/* Transactions Table with Date Filter applied */}
+          {/* Transactions Table with Period / Date Filter applied */}
           <TransactionsTable
             userId={user.id}
-            selectedDate={selectedDate}
+            selectedDate={period === "daily" ? selectedDate : null}
             dateRange={dateRange}
             onPortalFilterSummaryChange={setPortalSummary}
             key={`tx-table-${refreshKey}`}
