@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, RotateCcw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, ChevronDown, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -7,7 +7,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { format, isToday, addDays, subDays } from "date-fns";
+import { format, isToday, isYesterday, addDays, subDays } from "date-fns";
 
 interface DateSwitchProps {
   selectedDate: Date | null;
@@ -81,11 +81,19 @@ export const DateSwitch = ({
   };
 
   const isCurrentDayToday = selectedDate ? isToday(selectedDate) : false;
-  const formattedDate = isAllTransactions ? "All Transactions" : format(activeDate, "EEE, dd MMM yyyy");
+  const isCurrentDayYesterday = selectedDate ? isYesterday(selectedDate) : false;
+
+  const dateTitle = isAllTransactions
+    ? "All Transactions"
+    : isCurrentDayToday
+    ? `Today, ${format(activeDate, "dd MMM yyyy")}`
+    : isCurrentDayYesterday
+    ? `Yesterday, ${format(activeDate, "dd MMM yyyy")}`
+    : format(activeDate, "EEE, dd MMM yyyy");
 
   return (
     <div
-      className={`inline-flex items-center gap-1 sm:gap-1.5 bg-card border border-border/80 rounded-xl p-1 shadow-sm select-none ${className}`}
+      className={`flex sm:inline-flex items-center justify-between sm:justify-start gap-1 sm:gap-1.5 bg-card border border-border/80 rounded-2xl sm:rounded-xl p-1.5 sm:p-1 shadow-xs select-none ${className}`}
     >
       {/* Previous Day Button */}
       <Button
@@ -93,7 +101,7 @@ export const DateSwitch = ({
         variant="ghost"
         size="icon"
         onClick={handlePrevDay}
-        className="h-8 w-8 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground active:scale-95 transition-all"
+        className="h-8 w-8 rounded-xl sm:rounded-lg hover:bg-muted/80 text-muted-foreground hover:text-foreground active:scale-95 transition-all flex-shrink-0"
         title="Previous Day (← Left Arrow)"
       >
         <ChevronLeft className="h-4 w-4" />
@@ -104,33 +112,16 @@ export const DateSwitch = ({
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-muted/70 cursor-pointer group transition-all text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-2.5 py-1.5 rounded-xl sm:rounded-lg hover:bg-muted/60 cursor-pointer group transition-all text-center sm:text-left outline-none focus-visible:ring-2 focus-visible:ring-ring min-w-0"
             title="Click to open calendar"
           >
             <CalendarIcon className="h-4 w-4 text-primary group-hover:scale-110 transition-transform flex-shrink-0" />
 
-            <span className="text-xs sm:text-sm font-semibold tracking-tight whitespace-nowrap text-foreground">
-              {formattedDate}
+            <span className="text-xs sm:text-sm font-semibold tracking-tight text-foreground truncate">
+              {dateTitle}
             </span>
 
-            {/* Indicator Badge */}
-            {isAllTransactions ? (
-              <span className="bg-primary/10 text-primary font-bold text-[10px] tracking-wider px-2 py-0.5 rounded-md uppercase border border-primary/20">
-                ALL
-              </span>
-            ) : isCurrentDayToday ? (
-              <span className="bg-primary/10 text-primary font-bold text-[10px] tracking-wider px-2 py-0.5 rounded-md uppercase border border-primary/20">
-                TODAY
-              </span>
-            ) : (
-              <span
-                onClick={handleTodayClick}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-[10px] tracking-wider px-2 py-0.5 rounded-md uppercase transition-colors shadow-xs"
-                title="Jump to today"
-              >
-                GO TO TODAY
-              </span>
-            )}
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
           </button>
         </PopoverTrigger>
 
@@ -183,24 +174,40 @@ export const DateSwitch = ({
         variant="ghost"
         size="icon"
         onClick={handleNextDay}
-        className="h-8 w-8 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground active:scale-95 transition-all"
+        className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl hover:bg-muted/80 text-muted-foreground hover:text-foreground active:scale-95 transition-all flex-shrink-0"
         title="Next Day (→ Right Arrow)"
       >
-        <ChevronRight className="h-4 w-4" />
+        <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
       </Button>
 
-      {!isAllTransactions && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => onDateChange(null)}
-          className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground font-medium rounded-lg"
-          title="Clear date filter and view all transactions"
-        >
-          View All
-        </Button>
-      )}
+      {/* Quick Action Buttons on Right */}
+      <div className="flex items-center gap-1 flex-shrink-0">
+        {!isAllTransactions && !isCurrentDayToday && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleTodayClick}
+            className="h-8 px-2 sm:px-2.5 text-xs font-semibold bg-primary/10 border-primary/25 text-primary hover:bg-primary/20 hover:text-primary rounded-xl transition-all shadow-2xs"
+            title="Jump to today"
+          >
+            <RotateCcw className="mr-1 h-3 w-3" />
+            Today
+          </Button>
+        )}
+        {!isAllTransactions && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => onDateChange(null)}
+            className="h-8 px-2 sm:px-2.5 text-xs text-muted-foreground hover:text-foreground font-medium rounded-xl hover:bg-muted/80 transition-all"
+            title="Clear date filter and view all transactions"
+          >
+            View All
+          </Button>
+        )}
+      </div>
     </div>
   );
 };

@@ -49,18 +49,19 @@ export interface ExpenseStats {
   thisMonthAmount: number;
 }
 
-const EXPENSES_CACHE_KEY = "payment_track_expenses_cache_v1";
+const EXPENSES_CACHE_KEY_PREFIX = "payment_track_expenses_cache_u_";
 
 class ExpensesService {
-  private getCachedExpenses(userId?: string): Expense[] {
+  private getCacheKey(userId: string): string {
+    return `${EXPENSES_CACHE_KEY_PREFIX}${userId}`;
+  }
+
+  private getCachedExpenses(userId: string): Expense[] {
+    if (!userId) return [];
     try {
-      const stored = localStorage.getItem(EXPENSES_CACHE_KEY);
+      const stored = localStorage.getItem(this.getCacheKey(userId));
       if (stored) {
-        const list: Expense[] = JSON.parse(stored);
-        if (userId) {
-          return list.filter((e) => e.user_id === userId);
-        }
-        return list;
+        return JSON.parse(stored);
       }
     } catch (e) {
       console.warn("Failed to read cached expenses", e);
@@ -68,15 +69,17 @@ class ExpensesService {
     return [];
   }
 
-  private setCachedExpenses(expenses: Expense[]): void {
+  private setCachedExpenses(userId: string, expenses: Expense[]): void {
+    if (!userId) return;
     try {
-      localStorage.setItem(EXPENSES_CACHE_KEY, JSON.stringify(expenses));
+      localStorage.setItem(this.getCacheKey(userId), JSON.stringify(expenses));
     } catch (e) {
       console.error("Failed to save cached expenses", e);
     }
   }
 
   public async getExpenses(userId: string): Promise<{ data: Expense[]; error: string | null }> {
+    if (!userId) return { data: [], error: "No user ID provided" };
     try {
       const { data, error } = await supabase
         .from("expenses")
@@ -92,8 +95,7 @@ class ExpensesService {
 
       if (data) {
         const remoteExpenses = data as unknown as Expense[];
-        const localOther = this.getCachedExpenses().filter((e) => e.user_id !== userId);
-        this.setCachedExpenses([...localOther, ...remoteExpenses]);
+        this.setCachedExpenses(userId, remoteExpenses);
         return { data: remoteExpenses, error: null };
       }
 
@@ -135,8 +137,8 @@ class ExpensesService {
 
       if (data) {
         const created = data as unknown as Expense;
-        const all = this.getCachedExpenses();
-        this.setCachedExpenses([created, ...all]);
+        const all = this.getCachedExpenses(input.user_id);
+        this.setCachedExpenses(input.user_id, [created, ...all]);
         return { data: created, error: null };
       }
 
@@ -171,11 +173,11 @@ class ExpensesService {
 
       if (data) {
         const updated = data as unknown as Expense;
-        const all = this.getCachedExpenses();
+        const all = this.getCachedExpenses(userId);
         const idx = all.findIndex((e) => e.id === id);
         if (idx !== -1) {
           all[idx] = updated;
-          this.setCachedExpenses(all);
+          this.setCachedExpenses(userId, all);
         }
         return { data: updated, error: null };
       }
@@ -187,7 +189,7 @@ class ExpensesService {
     }
   }
 
-  public async deleteExpense(id: string): Promise<{ success: boolean; error: string | null }> {
+  public async deleteExpense(id: string, userId?: string): Promise<{ success: boolean; error: string | null }> {
     try {
       const { error } = await supabase
         .from("expenses")
@@ -199,8 +201,10 @@ class ExpensesService {
         return { success: false, error: error.message };
       }
 
-      const all = this.getCachedExpenses();
-      this.setCachedExpenses(all.filter((e) => e.id !== id));
+      if (userId) {
+        const all = this.getCachedExpenses(userId);
+        this.setCachedExpenses(userId, all.filter((e) => e.id !== id));
+      }
       return { success: true, error: null };
     } catch (err: any) {
       console.error("Failed to delete expense from database:", err);
@@ -208,7 +212,7 @@ class ExpensesService {
     }
   }
 
-  public async bulkDeleteExpenses(ids: string[]): Promise<{ success: boolean; error: string | null }> {
+  public async bulkDeleteExpenses(ids: string[], userId?: string): Promise<{ success: boolean; error: string | null }> {
     try {
       const { error } = await supabase
         .from("expenses")
@@ -220,9 +224,11 @@ class ExpensesService {
         return { success: false, error: error.message };
       }
 
-      const idSet = new Set(ids);
-      const all = this.getCachedExpenses();
-      this.setCachedExpenses(all.filter((e) => !idSet.has(e.id)));
+      if (userId) {
+        const idSet = new Set(ids);
+        const all = this.getCachedExpenses(userId);
+        this.setCachedExpenses(userId, all.filter((e) => !idSet.has(e.id)));
+      }
       return { success: true, error: null };
     } catch (err: any) {
       console.error("Failed to bulk delete expenses from database:", err);

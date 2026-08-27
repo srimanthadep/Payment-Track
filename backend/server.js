@@ -56,8 +56,8 @@ app.get("/health", (req, res) => {
   res.status(200).json({ status: "healthy", timestamp: new Date().toISOString() });
 });
 
-// Admin User Creation Endpoint
-async function handleAdminCreateUser(req, res) {
+// User Registration & Creation Endpoint (Used for both public signup and admin creation)
+async function handleRegisterUser(req, res) {
   try {
     if (!supabase) {
       return res.status(500).json({
@@ -65,28 +65,43 @@ async function handleAdminCreateUser(req, res) {
       });
     }
 
-    const { email, password, full_name, make_admin, username } = req.body;
+    const { email, password, full_name, business_name, make_admin, username } = req.body;
 
-    // Support both direct email and username
-    let userEmail = email;
+    // Support both direct email and username (map to @paymenttrack.com)
+    let userEmail = email ? email.trim().toLowerCase() : "";
     if (!userEmail && username) {
-      userEmail = `${username.toLowerCase().trim()}@paymenttrack.local`;
+      const cleanUsername = username.toLowerCase().trim().replace(/[^a-z0-9._-]/g, "");
+      userEmail = `${cleanUsername || "user"}@paymenttrack.com`;
     }
 
     if (!userEmail || !password) {
       return res.status(400).json({ error: "Username/Email and password are required" });
     }
 
-    // 1. Create auth user via Supabase admin API
+    if (password.length < 6) {
+      return res.status(400).json({ error: "Password must be at least 6 characters long" });
+    }
+
+    const displayName = full_name || username || userEmail.split("@")[0];
+
+    // 1. Create auth user via Supabase admin API (bypasses GoTrue disabled signups)
     const { data: createRes, error: createErr } = await supabase.auth.admin.createUser({
       email: userEmail,
       password: password,
       email_confirm: true,
-      user_metadata: { full_name: full_name || username },
+      user_metadata: {
+        full_name: displayName,
+        business_name: business_name || "My Business",
+        username: username || userEmail.split("@")[0],
+      },
     });
 
     if (createErr) {
-      return res.status(400).json({ error: createErr.message });
+      const msg = createErr.message || "Failed to create user";
+      const userFriendlyMsg = msg.includes("already registered") || msg.includes("already exists")
+        ? "This username or email is already registered. Please sign in or choose another."
+        : msg;
+      return res.status(400).json({ error: userFriendlyMsg });
     }
 
     const newUserId = createRes.user?.id;
@@ -95,7 +110,7 @@ async function handleAdminCreateUser(req, res) {
     }
 
     // 2. Assign role
-    const roleToAssign = make_admin ? "admin" : "staff";
+    const roleToAssign = make_admin ? "admin" : "user";
     await supabase
       .from("user_roles")
       .upsert({ user_id: newUserId, role: roleToAssign }, { onConflict: "user_id" });
@@ -104,7 +119,8 @@ async function handleAdminCreateUser(req, res) {
     await supabase.from("profiles").upsert({
       id: newUserId,
       email: userEmail,
-      full_name: full_name || username,
+      full_name: displayName,
+      business_name: business_name || "My Business",
     });
 
     return res.status(200).json({
@@ -112,16 +128,17 @@ async function handleAdminCreateUser(req, res) {
       id: newUserId,
       email: userEmail,
       role: roleToAssign,
-      message: "User created successfully",
+      message: "User registered successfully",
     });
   } catch (error) {
-    console.error("Error creating user:", error);
+    console.error("Error registering user:", error);
     return res.status(500).json({ error: error.message || "Internal server error" });
   }
 }
 
-app.post("/api/admin-create-user", handleAdminCreateUser);
-app.post("/functions/v1/admin-create-user", handleAdminCreateUser);
+app.post("/api/register", handleRegisterUser);
+app.post("/api/admin-create-user", handleRegisterUser);
+app.post("/functions/v1/admin-create-user", handleRegisterUser);
 
 // Web Scraping & Automated Transaction Extraction Endpoint
 async function handleScrapeWebsite(req, res) {

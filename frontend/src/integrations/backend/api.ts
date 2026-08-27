@@ -1,16 +1,20 @@
 import { supabase } from "@/integrations/supabase/client";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+const BACKEND_URL =
+  import.meta.env.VITE_BACKEND_URL ||
+  (typeof window !== "undefined" && window.location.hostname === "localhost"
+    ? "http://localhost:5000"
+    : "");
 
 export async function invokeBackendApi<T = any>(
   endpoint: string,
   payload: any
 ): Promise<{ data: T | null; error: Error | null }> {
-  // If Render backend URL is configured, call the Render Express API
+  // If backend URL is available, call Express API
   if (BACKEND_URL) {
     try {
       const cleanBase = BACKEND_URL.replace(/\/+$/, "");
-      const cleanEndpoint = endpoint.replace(/^\/+/, "");
+      const cleanEndpoint = endpoint.replace(/^\/+/, "").replace(/^api\//, "");
       const res = await fetch(`${cleanBase}/api/${cleanEndpoint}`, {
         method: "POST",
         headers: {
@@ -25,7 +29,7 @@ export async function invokeBackendApi<T = any>(
       }
       return { data, error: null };
     } catch (err: any) {
-      console.warn(`Render backend call failed, falling back to Supabase function:`, err);
+      console.warn(`Backend call failed, trying fallback:`, err);
     }
   }
 

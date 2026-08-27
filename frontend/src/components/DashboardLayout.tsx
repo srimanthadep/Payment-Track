@@ -34,13 +34,39 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const location = useLocation();
   const { toast } = useToast();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    profileService.getUserProfile().then((p) => setUserProfile(p));
+    profileService.getUserProfile().then((p) => {
+      setUserProfile(p);
+      if (p?.id) {
+        checkAdminRole(p.id);
+      }
+    });
     return profileService.subscribe(() => {
-      profileService.getUserProfile().then((p) => setUserProfile(p));
+      profileService.getUserProfile().then((p) => {
+        setUserProfile(p);
+        if (p?.id) {
+          checkAdminRole(p.id);
+        }
+      });
     });
   }, []);
+
+  const checkAdminRole = async (userId: string) => {
+    try {
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId)
+        .eq("role", "admin")
+        .maybeSingle();
+
+      setIsAdmin(!!roles);
+    } catch {
+      setIsAdmin(false);
+    }
+  };
 
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();
@@ -52,19 +78,24 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         variant: "destructive",
       });
     } else {
+      setUserProfile(null);
+      setIsAdmin(false);
       navigate("/auth");
     }
   };
 
-  const navItems = [
+  const baseNavItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "Transactions", href: "/transactions", icon: Receipt },
     { name: "Expenses", href: "/expenses", icon: Wallet },
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
     { name: "Settings", href: "/settings", icon: SettingsIcon },
     { name: "Web Scraping", href: "/scraping", icon: Globe },
-    { name: "Admin", href: "/admin", icon: Shield },
   ];
+
+  const navItems = isAdmin
+    ? [...baseNavItems, { name: "Admin", href: "/admin", icon: Shield }]
+    : baseNavItems;
 
   const mobileBottomNavItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },

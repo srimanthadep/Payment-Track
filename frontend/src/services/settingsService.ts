@@ -91,7 +91,7 @@ export const DEFAULT_TRANSACTION_TYPES: TransactionTypeOption[] = [
   { id: "repayment", name: "repayment", label: "Repayment", isDefault: true },
 ];
 
-const SETTINGS_STORAGE_KEY = "payment_track_custom_settings_v2";
+const SETTINGS_STORAGE_KEY_PREFIX = "payment_track_custom_settings_u_";
 
 type SettingsListener = (settings: AppSettings) => void;
 const listeners: Set<SettingsListener> = new Set();
@@ -101,13 +101,29 @@ class SettingsService {
   private currentUserId: string | null = null;
 
   constructor() {
-    this.settings = this.loadLocalCache();
+    this.settings = this.getDefaultSettings();
     this.initDatabaseSync();
   }
 
-  private loadLocalCache(): AppSettings {
+  private getDefaultSettings(): AppSettings {
+    return {
+      expenseCategories: [...DEFAULT_EXPENSE_CATEGORIES],
+      expensePaymentMethods: [...DEFAULT_PAYMENT_METHODS],
+      expensePayees: [...DEFAULT_PAYEES],
+      transactionCardTypes: [...DEFAULT_CARD_TYPES],
+      transactionRecipients: [...DEFAULT_RECIPIENTS],
+      transactionTypes: [...DEFAULT_TRANSACTION_TYPES],
+    };
+  }
+
+  private getCacheKey(userId?: string | null): string {
+    const id = userId || this.currentUserId || "default";
+    return `${SETTINGS_STORAGE_KEY_PREFIX}${id}`;
+  }
+
+  private loadLocalCache(userId?: string | null): AppSettings {
     try {
-      const stored = localStorage.getItem(SETTINGS_STORAGE_KEY) || localStorage.getItem("payment_track_custom_settings_v1");
+      const stored = localStorage.getItem(this.getCacheKey(userId));
       if (stored) {
         const parsed = JSON.parse(stored);
         const cards = parsed.transactionCardTypes?.length
@@ -131,14 +147,7 @@ class SettingsService {
       console.warn("Failed to load custom settings cache", e);
     }
 
-    return {
-      expenseCategories: [...DEFAULT_EXPENSE_CATEGORIES],
-      expensePaymentMethods: [...DEFAULT_PAYMENT_METHODS],
-      expensePayees: [...DEFAULT_PAYEES],
-      transactionCardTypes: [...DEFAULT_CARD_TYPES],
-      transactionRecipients: [...DEFAULT_RECIPIENTS],
-      transactionTypes: [...DEFAULT_TRANSACTION_TYPES],
-    };
+    return this.getDefaultSettings();
   }
 
   private async initDatabaseSync() {
@@ -146,6 +155,7 @@ class SettingsService {
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user?.id) {
       this.currentUserId = session.user.id;
+      this.settings = this.loadLocalCache(session.user.id);
       await this.loadFromDatabase(session.user.id);
     }
 
@@ -154,7 +164,12 @@ class SettingsService {
       const userId = newSession?.user?.id;
       if (userId && userId !== this.currentUserId) {
         this.currentUserId = userId;
+        this.settings = this.loadLocalCache(userId);
         await this.loadFromDatabase(userId);
+      } else if (!userId) {
+        this.currentUserId = null;
+        this.settings = this.getDefaultSettings();
+        this.notifyListeners();
       }
     });
   }
@@ -185,8 +200,11 @@ class SettingsService {
         this.saveLocalCache();
         this.notifyListeners();
       } else {
-        // First time user: save current default settings to database
+        // First time user: save clean default settings to database
+        this.settings = this.getDefaultSettings();
         await this.persistToDatabase(userId);
+        this.saveLocalCache();
+        this.notifyListeners();
       }
     } catch (err) {
       console.warn("Failed to load settings from database:", err);
@@ -195,7 +213,7 @@ class SettingsService {
 
   private saveLocalCache(): void {
     try {
-      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(this.settings));
+      localStorage.setItem(this.getCacheKey(), JSON.stringify(this.settings));
       this.notifyListeners();
     } catch (e) {
       console.error("Failed to save settings cache", e);

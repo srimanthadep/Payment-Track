@@ -28,9 +28,11 @@ interface TransactionWithUser {
   site_fee: number;
   profit: number;
   user_id: string;
+  username?: string;
   profiles: {
     email: string;
     full_name: string;
+    username?: string;
   };
   portals: {
     name: string;
@@ -79,12 +81,15 @@ export const AdminTransactions = () => {
 
   useEffect(() => {
     if (searchQuery) {
+      const q = searchQuery.toLowerCase();
       const filtered = transactions.filter(
         (tx) =>
-          (tx.profiles?.full_name || tx.profiles?.email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (tx.portals?.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-          tx.transaction_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (tx.reference_number || "").toLowerCase().includes(searchQuery.toLowerCase())
+          (tx.username || "").toLowerCase().includes(q) ||
+          (tx.profiles?.username || "").toLowerCase().includes(q) ||
+          (tx.profiles?.full_name || tx.profiles?.email || "").toLowerCase().includes(q) ||
+          (tx.portals?.name || "").toLowerCase().includes(q) ||
+          tx.transaction_type.toLowerCase().includes(q) ||
+          (tx.reference_number || "").toLowerCase().includes(q)
       );
       setFilteredTransactions(filtered);
     } else {
@@ -107,16 +112,23 @@ export const AdminTransactions = () => {
 
       // Fetch profiles separately
       const txWithProfiles = await Promise.all(
-        (data || []).map(async (tx) => {
+        (data || []).map(async (tx: any) => {
           const { data: profile } = await supabase
             .from("profiles")
-            .select("email, full_name")
+            .select("email, full_name, username")
             .eq("id", tx.user_id)
             .single();
 
+          const derivedUsername =
+            tx.username ||
+            profile?.username ||
+            profile?.email?.split("@")[0] ||
+            "user";
+
           return {
             ...tx,
-            profiles: profile || { email: "", full_name: "" },
+            username: derivedUsername,
+            profiles: profile || { email: "", full_name: "", username: derivedUsername },
           };
         })
       );
@@ -176,6 +188,23 @@ export const AdminTransactions = () => {
       currency: "INR",
       minimumFractionDigits: 2,
     }).format(amount);
+  };
+
+  const formatDateTimeParts = (date: string) => {
+    if (!date) return { date: "-", time: "" };
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return { date: "-", time: "" };
+    const dateStr = d.toLocaleDateString("en-IN", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    const timeStr = d.toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+    return { date: dateStr, time: timeStr };
   };
 
   const exportToCSV = () => {
@@ -250,7 +279,7 @@ export const AdminTransactions = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-xs sm:text-sm">Date</TableHead>
+              <TableHead className="text-xs sm:text-sm whitespace-nowrap">Date</TableHead>
               <TableHead className="text-xs sm:text-sm">User</TableHead>
               <TableHead className="text-xs sm:text-sm hidden sm:table-cell">Portal</TableHead>
               <TableHead className="text-xs sm:text-sm hidden md:table-cell">Type</TableHead>
@@ -273,11 +302,29 @@ export const AdminTransactions = () => {
             ) : (
               filteredTransactions.map((tx) => (
                 <TableRow key={tx.id}>
-                  <TableCell className="text-xs sm:text-sm">
-                    {new Date(tx.transaction_date).toLocaleDateString()}
+                  <TableCell className="text-xs sm:text-sm whitespace-nowrap">
+                    {(() => {
+                      const { date, time } = formatDateTimeParts(tx.transaction_date);
+                      return (
+                        <div className="flex flex-col">
+                          <span className="font-medium text-xs text-foreground">{date}</span>
+                          {time && (
+                            <span className="text-[11px] text-muted-foreground leading-tight">
+                              {time}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="font-medium text-xs sm:text-sm">
-                    <div className="truncate max-w-[120px] sm:max-w-none">{tx.profiles?.full_name || tx.profiles?.email || "-"}</div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-semibold">{tx.profiles?.full_name || tx.profiles?.email?.split('@')[0] || "User"}</span>
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-primary/10 text-primary border-primary/20 font-mono font-medium">
+                        @{tx.username || tx.profiles?.username || tx.profiles?.email?.split('@')[0]}
+                      </Badge>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground truncate max-w-[140px] sm:max-w-none">{tx.profiles?.email}</div>
                     <div className="text-[10px] text-muted-foreground sm:hidden mt-0.5">{tx.portals?.name || "-"}</div>
                   </TableCell>
                   <TableCell className="text-xs sm:text-sm hidden sm:table-cell">{tx.portals?.name || "-"}</TableCell>

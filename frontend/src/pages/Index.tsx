@@ -94,10 +94,18 @@ const Index = () => {
           <div className="flex items-center gap-2 sm:gap-3">
             <Button
               size="sm"
-              onClick={() => navigate("/auth")}
+              variant="ghost"
+              onClick={() => navigate("/auth?mode=signin")}
+              className="h-9 px-3 text-xs sm:text-sm font-medium"
+            >
+              Sign In
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => navigate("/auth?mode=signup")}
               className="gap-1.5 sm:gap-2 h-9 px-4 text-xs sm:text-sm font-medium touch-manipulation shadow-sm"
             >
-              <span>Sign In</span>
+              <span>Get Started</span>
               <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
           </div>
@@ -128,18 +136,26 @@ const Index = () => {
                     </h1>
                     <p className="text-base sm:text-lg lg:text-xl text-primary-foreground/90 max-w-xl lg:max-w-none mx-auto lg:mx-0 leading-relaxed px-2 sm:px-0">
                       The all-in-one platform for managing credit card transactions, commissions, and profits. 
-                      Real-time insights, automated tracking, and powerful analytics.
+                      Every user receives their own isolated private account with custom categories and real-time reports.
                     </p>
                   </div>
                   
                   <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                     <Button
                       size="lg"
-                      onClick={() => navigate("/auth")}
+                      onClick={() => navigate("/auth?mode=signup")}
                       className="bg-white text-primary hover:bg-white/95 shadow-xl font-semibold h-12 px-8 text-base group w-full sm:w-auto touch-manipulation active:scale-95 transition-transform"
                     >
-                      <span>Sign In to Dashboard</span>
+                      <span>Create Free Account</span>
                       <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                    </Button>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      onClick={() => navigate("/auth?mode=signin")}
+                      className="border-white/40 bg-white/10 hover:bg-white/20 text-white shadow-md font-semibold h-12 px-6 text-base w-full sm:w-auto touch-manipulation active:scale-95 transition-transform"
+                    >
+                      <span>Sign In</span>
                     </Button>
                   </div>
 

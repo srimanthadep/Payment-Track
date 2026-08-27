@@ -4,7 +4,15 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, X } from "lucide-react";
+import {
+  CalendarIcon,
+  X,
+  CreditCard,
+  Globe,
+  CheckCircle2,
+  ArrowLeftRight,
+  IndianRupee,
+} from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -18,8 +26,19 @@ export interface FilterState {
   portals: string[];
   status: string[];
   transactionType: string[];
+  cardTypes: string[];
   amountRange: { min: number | null; max: number | null };
 }
+
+export const DEFAULT_CARD_FILTER_OPTIONS = [
+  { id: "rupay", label: "RuPay Cards", desc: "Normal & HDFC RuPay" },
+  { id: "visa", label: "Visa Cards", desc: "Normal & HDFC Visa" },
+  { id: "mastercard", label: "Mastercard", desc: "Normal & HDFC Master" },
+  { id: "business", label: "Business Cards", desc: "HDFC & All Business Cards" },
+  { id: "au_card", label: "AU Cards", desc: "AU Small Finance Cards" },
+  { id: "amex_diners", label: "Amex & Diners", desc: "American Express & Diners" },
+  { id: "machine_swiping", label: "Machine Swiping", desc: "POS Terminal Swipes" },
+];
 
 export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFiltersProps) => {
   const [filters, setFilters] = useState<FilterState>({
@@ -27,6 +46,7 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
     portals: [],
     status: [],
     transactionType: [],
+    cardTypes: [],
     amountRange: { min: null, max: null },
   });
 
@@ -57,6 +77,14 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
       ? filters.transactionType.filter((t) => t !== type)
       : [...filters.transactionType, type];
     updateFilters({ transactionType: updated });
+  };
+
+  const toggleCardType = (cardTypeId: string) => {
+    const current = filters.cardTypes || [];
+    const updated = current.includes(cardTypeId)
+      ? current.filter((c) => c !== cardTypeId)
+      : [...current, cardTypeId];
+    updateFilters({ cardTypes: updated });
   };
 
   const setQuickDateRange = (preset: string) => {
@@ -100,6 +128,7 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
       portals: [],
       status: [],
       transactionType: [],
+      cardTypes: [],
       amountRange: { min: null, max: null },
     };
     setFilters(cleared);
@@ -112,6 +141,7 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
     filters.portals.length > 0 ||
     filters.status.length > 0 ||
     filters.transactionType.length > 0 ||
+    (filters.cardTypes && filters.cardTypes.length > 0) ||
     filters.amountRange.min !== null ||
     filters.amountRange.max !== null;
 
@@ -241,6 +271,7 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
                   : "bg-background hover:bg-accent/50"
               )}
             >
+              <Globe className="mr-1.5 h-3.5 w-3.5 text-primary flex-shrink-0" />
               <span>Portal</span>
               {filters.portals.length > 0 && ` (${filters.portals.length})`}
             </Button>
@@ -277,7 +308,8 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
                   : "bg-background hover:bg-accent/50"
               )}
             >
-              Status {filters.status.length > 0 && `(${filters.status.length})`}
+              <CheckCircle2 className="mr-1.5 h-3.5 w-3.5 text-primary flex-shrink-0" />
+              <span>Status</span> {filters.status.length > 0 && `(${filters.status.length})`}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-48 p-3 rounded-xl shadow-lg border-border/80" align="start">
@@ -312,7 +344,8 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
                   : "bg-background hover:bg-accent/50"
               )}
             >
-              Type {filters.transactionType.length > 0 && `(${filters.transactionType.length})`}
+              <ArrowLeftRight className="mr-1.5 h-3.5 w-3.5 text-primary flex-shrink-0" />
+              <span>Type</span> {filters.transactionType.length > 0 && `(${filters.transactionType.length})`}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-48 p-3 rounded-xl shadow-lg border-border/80" align="start">
@@ -335,18 +368,73 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
           </PopoverContent>
         </Popover>
 
+        {/* Card Type Filter */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn(
+                "h-9 text-xs sm:text-sm w-full sm:w-auto font-medium transition-colors px-2 sm:px-3",
+                (filters.cardTypes?.length ?? 0) > 0
+                  ? "bg-primary/10 border-primary/30 text-primary"
+                  : "bg-background hover:bg-accent/50"
+              )}
+            >
+              <CreditCard className="mr-1.5 h-3.5 w-3.5 text-primary flex-shrink-0" />
+              <span className="hidden sm:inline">Card Type {(filters.cardTypes?.length ?? 0) > 0 && `(${filters.cardTypes.length})`}</span>
+              <span className="sm:hidden">Card {(filters.cardTypes?.length ?? 0) > 0 && `(${filters.cardTypes.length})`}</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-3 rounded-xl shadow-lg border-border/80" align="start">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Select Card Types</Label>
+                {(filters.cardTypes?.length ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => updateFilters({ cardTypes: [] })}
+                    className="text-[11px] text-primary hover:underline font-medium"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="max-h-56 overflow-y-auto space-y-1">
+                {DEFAULT_CARD_FILTER_OPTIONS.map((card) => (
+                  <label
+                    key={card.id}
+                    className="flex items-start space-x-2 cursor-pointer p-1.5 hover:bg-muted/70 rounded-md transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={filters.cardTypes?.includes(card.id) || false}
+                      onChange={() => toggleCardType(card.id)}
+                      className="mt-0.5 rounded accent-primary"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-medium text-foreground">{card.label}</div>
+                      <div className="text-[10px] text-muted-foreground">{card.desc}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+
         {/* Amount Range Filter */}
         <Popover>
           <PopoverTrigger asChild>
             <Button
               variant="outline"
               className={cn(
-                "h-9 text-xs sm:text-sm w-full sm:w-auto col-span-3 sm:col-span-1 font-medium transition-colors",
+                "h-9 text-xs sm:text-sm w-full sm:w-auto font-medium transition-colors",
                 filters.amountRange.min !== null || filters.amountRange.max !== null
                   ? "bg-primary/10 border-primary/30 text-primary"
                   : "bg-background hover:bg-accent/50"
               )}
             >
+              <IndianRupee className="mr-1.5 h-3.5 w-3.5 text-primary flex-shrink-0" />
               <span className="hidden sm:inline">Amount Range</span>
               <span className="sm:hidden">Amount</span>
             </Button>

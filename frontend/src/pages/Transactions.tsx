@@ -11,7 +11,7 @@ import { DateSwitch } from "@/components/transactions/DateSwitch";
 import { FloatingActionButton } from "@/components/ui/FloatingActionButton";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Upload, Layers } from "lucide-react";
 import { motion } from "framer-motion";
 
 const Transactions = () => {
@@ -66,7 +66,7 @@ const Transactions = () => {
           transition={{ duration: 0.3 }}
           className="space-y-4 sm:space-y-6"
         >
-          {/* Header Row: Title on Left, DateSwitch on Right */}
+          {/* Header Row: Title on Left, DateSwitch on Right for Desktop */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
@@ -77,7 +77,8 @@ const Transactions = () => {
               </p>
             </div>
 
-            <div className="flex items-center">
+            {/* Desktop: DateSwitch on the right of header */}
+            <div className="hidden sm:flex items-center">
               <DateSwitch
                 selectedDate={selectedDate}
                 onDateChange={setSelectedDate}
@@ -85,27 +86,38 @@ const Transactions = () => {
             </div>
           </div>
 
+          {/* Mobile Only: Date Switch full-width */}
+          <div className="sm:hidden w-full">
+            <DateSwitch
+              selectedDate={selectedDate}
+              onDateChange={setSelectedDate}
+              className="w-full"
+            />
+          </div>
+
           {/* Action Buttons Row */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
             <Button
-              className="w-full sm:w-auto text-sm h-9 hidden sm:flex"
+              className="w-full sm:w-auto text-sm h-9 hidden sm:flex items-center gap-1.5"
               onClick={() => setIsDialogOpen(true)}
             >
-              <Plus className="mr-2 h-3.5 w-3.5" />
+              <Plus className="h-3.5 w-3.5" />
               Add Transaction
             </Button>
             <Button
-              className="w-full sm:w-auto text-sm h-9"
+              className="w-full sm:w-auto text-xs sm:text-sm h-9 flex items-center justify-center gap-1.5"
               variant="secondary"
               onClick={() => setUploadOpen(true)}
             >
+              <Upload className="h-3.5 w-3.5" />
               Import Payouts
             </Button>
             <Button
-              className="w-full sm:w-auto text-sm h-9"
+              className="w-full sm:w-auto text-xs sm:text-sm h-9 flex items-center justify-center gap-1.5"
               variant="outline"
               onClick={() => setManagePortalsOpen(true)}
             >
+              <Layers className="h-3.5 w-3.5" />
               Manage Portals
             </Button>
           </div>

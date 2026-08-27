@@ -12,7 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Download, Search, Trash2, Edit, FileText } from "lucide-react";
+import { Download, Search, Trash2, Edit, FileText, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { TransactionFilters, FilterState } from "./TransactionFilters";
@@ -75,8 +75,20 @@ export const TransactionsTable = ({
     portals: [],
     status: [],
     transactionType: [],
+    cardTypes: [],
     amountRange: { min: null, max: null },
   });
+  const [sortConfig, setSortConfig] = useState<{
+    key: "date" | "portal" | "type" | "card_type" | "amount" | "commission" | "site_fee" | "profit" | "status";
+    direction: "asc" | "desc";
+  }>({ key: "date", direction: "desc" });
+
+  const handleSort = (key: typeof sortConfig.key) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === "desc" ? "asc" : "desc",
+    }));
+  };
   const [portals, setPortals] = useState<Array<{ id: string; name: string }>>([]);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -251,18 +263,77 @@ export const TransactionsTable = ({
     if (filters.amountRange.max !== null) {
       filtered = filtered.filter((t) => t.amount <= filters.amountRange.max!);
     }
-    // Always sort by transaction_date descending (most recent date and time first)
-    filtered.sort(
-      (a, b) =>
-        new Date(b.transaction_date).getTime() -
-        new Date(a.transaction_date).getTime()
-    );
+
+    // Card type filter (RuPay, Visa, Mastercard, Business, etc.)
+    if (filters.cardTypes && filters.cardTypes.length > 0) {
+      filtered = filtered.filter((t) => {
+        if (!t.card_type) return false;
+        const rawType = t.card_type.toLowerCase();
+        const displayName = (getCardTypeDisplayName(t.card_type) || "").toLowerCase();
+
+        return filters.cardTypes.some((selected) => {
+          const sel = selected.toLowerCase();
+          if (rawType === sel || displayName === sel) return true;
+          if (sel === "rupay" && (rawType.includes("rupay") || displayName.includes("rupay"))) return true;
+          if (sel === "visa" && (rawType.includes("visa") || displayName.includes("visa"))) return true;
+          if (sel === "mastercard" && (rawType.includes("master") || displayName.includes("master"))) return true;
+          if (sel === "business" && (rawType.includes("business") || displayName.includes("business"))) return true;
+          if (sel === "au_card" && (rawType.includes("au") || displayName.includes("au"))) return true;
+          if (sel === "amex_diners" && (rawType.includes("amex") || rawType.includes("diners") || displayName.includes("amex") || displayName.includes("diners"))) return true;
+          if (sel === "machine_swiping" && (rawType.includes("swip") || rawType.includes("machine") || displayName.includes("swip") || displayName.includes("machine"))) return true;
+          return false;
+        });
+      });
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let comparison = 0;
+      switch (sortConfig.key) {
+        case "date":
+          comparison = new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime();
+          break;
+        case "amount":
+          comparison = Number(a.amount || 0) - Number(b.amount || 0);
+          break;
+        case "commission":
+          comparison = Number(a.commission || 0) - Number(b.commission || 0);
+          break;
+        case "site_fee":
+          comparison = Number(a.site_fee || 0) - Number(b.site_fee || 0);
+          break;
+        case "profit": {
+          const profitA = a.profit !== undefined ? Number(a.profit) : Number(a.commission || 0) - Number(a.site_fee || 0);
+          const profitB = b.profit !== undefined ? Number(b.profit) : Number(b.commission || 0) - Number(b.site_fee || 0);
+          comparison = profitA - profitB;
+          break;
+        }
+        case "card_type": {
+          const cardA = getCardTypeDisplayName(a.card_type || "").toLowerCase();
+          const cardB = getCardTypeDisplayName(b.card_type || "").toLowerCase();
+          comparison = cardA.localeCompare(cardB);
+          break;
+        }
+        case "portal":
+          comparison = (a.portals?.name || "").localeCompare(b.portals?.name || "");
+          break;
+        case "type":
+          comparison = (a.transaction_type || "").localeCompare(b.transaction_type || "");
+          break;
+        case "status":
+          comparison = (a.status || "").localeCompare(b.status || "");
+          break;
+        default:
+          comparison = new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime();
+      }
+      return sortConfig.direction === "desc" ? -comparison : comparison;
+    });
 
     setFilteredTransactions(filtered);
     setDisplayedTransactions(filtered.slice(0, itemsPerPage));
     setPage(1);
     setHasMore(filtered.length > itemsPerPage);
-  }, [searchQuery, transactions, filters, selectedDate]);
+  }, [searchQuery, transactions, filters, selectedDate, sortConfig]);
 
   const portalFilterSummary = useMemo(() => {
     if (filters.portals.length === 0) return null;
@@ -327,6 +398,23 @@ export const TransactionsTable = ({
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const formatDateTimeParts = (date: string) => {
+    if (!date) return { date: "-", time: "" };
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return { date: "-", time: "" };
+    const dateStr = d.toLocaleDateString("en-IN", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    const timeStr = d.toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+    return { date: dateStr, time: timeStr };
   };
 
   const handleDeleteClick = (transactionId: string) => {
@@ -501,15 +589,32 @@ export const TransactionsTable = ({
     });
   };
 
-  const handleExportPDF = () => {
-    exportToPDF({
-      transactions: filteredTransactions, // Export all filtered, not just displayed
-      dateRange: filters.dateRange,
-    });
-    toast({
-      title: "Success",
-      description: "PDF report generated",
-    });
+  const handleExportPDF = async () => {
+    try {
+      if (!filteredTransactions || filteredTransactions.length === 0) {
+        toast({
+          title: "No Transactions",
+          description: "There are no transactions to export.",
+          variant: "destructive",
+        });
+        return;
+      }
+      await exportToPDF({
+        transactions: filteredTransactions, // Export all filtered, not just displayed
+        dateRange: filters.dateRange,
+      });
+      toast({
+        title: "Success",
+        description: "PDF report generated and downloaded",
+      });
+    } catch (err: any) {
+      console.error("Failed to export PDF:", err);
+      toast({
+        title: "PDF Export Error",
+        description: err.message || "Failed to generate PDF report",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -552,7 +657,7 @@ export const TransactionsTable = ({
 
       {/* Mobile: Export buttons and filters in integrated grid */}
       <div className="w-full">
-        <div className="grid grid-cols-3 gap-2 sm:hidden mb-2">
+        <div className="grid grid-cols-2 gap-2 sm:hidden mb-2">
           <Button onClick={exportToCSV} variant="outline" className="h-9 text-xs px-2">
             <Download className="mr-1 h-3 w-3" />
             CSV
@@ -636,7 +741,15 @@ export const TransactionsTable = ({
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <Checkbox checked={selectedIds.has(transaction.id)} onCheckedChange={() => toggleSelect(transaction.id)} className="flex-shrink-0" />
                       <div className="min-w-0 flex-1">
-                        <div className="text-xs font-medium truncate">{formatDate(transaction.transaction_date)}</div>
+                        {(() => {
+                          const { date, time } = formatDateTimeParts(transaction.transaction_date);
+                          return (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs font-medium">{date}</span>
+                              {time && <span className="text-[10px] text-muted-foreground">{time}</span>}
+                            </div>
+                          );
+                        })()}
                         <div className="text-[10px] text-muted-foreground truncate">{transaction.portals.name}</div>
                       </div>
                     </div>
@@ -746,16 +859,124 @@ export const TransactionsTable = ({
         <Table>
           <TableHeader>
             <TableRow>
-                <TableHead className="w-[40px]"><Checkbox checked={selectAll} onCheckedChange={toggleSelectAll} /></TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Portal</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead className="hidden md:table-cell">Card Type</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
-              <TableHead className="text-right">Commission</TableHead>
-                <TableHead className="text-right hidden sm:table-cell">Site Fee</TableHead>
-                <TableHead className="text-right hidden sm:table-cell">Profit</TableHead>
-                <TableHead className="hidden md:table-cell">Status</TableHead>
+              <TableHead className="w-[40px]"><Checkbox checked={selectAll} onCheckedChange={toggleSelectAll} /></TableHead>
+              <TableHead
+                className="whitespace-nowrap cursor-pointer select-none hover:text-foreground"
+                onClick={() => handleSort("date")}
+              >
+                <div className="flex items-center gap-1">
+                  <span>Date</span>
+                  {sortConfig.key === "date" ? (
+                    sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                  ) : (
+                    <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
+                  )}
+                </div>
+              </TableHead>
+              <TableHead
+                className="cursor-pointer select-none hover:text-foreground"
+                onClick={() => handleSort("portal")}
+              >
+                <div className="flex items-center gap-1">
+                  <span>Portal</span>
+                  {sortConfig.key === "portal" ? (
+                    sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                  ) : (
+                    <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
+                  )}
+                </div>
+              </TableHead>
+              <TableHead
+                className="cursor-pointer select-none hover:text-foreground"
+                onClick={() => handleSort("type")}
+              >
+                <div className="flex items-center gap-1">
+                  <span>Type</span>
+                  {sortConfig.key === "type" ? (
+                    sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                  ) : (
+                    <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
+                  )}
+                </div>
+              </TableHead>
+              <TableHead
+                className="hidden md:table-cell cursor-pointer select-none hover:text-foreground"
+                onClick={() => handleSort("card_type")}
+              >
+                <div className="flex items-center gap-1">
+                  <span>Card Type</span>
+                  {sortConfig.key === "card_type" ? (
+                    sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                  ) : (
+                    <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
+                  )}
+                </div>
+              </TableHead>
+              <TableHead
+                className="text-right cursor-pointer select-none hover:text-foreground"
+                onClick={() => handleSort("amount")}
+              >
+                <div className="flex items-center justify-end gap-1">
+                  <span>Amount</span>
+                  {sortConfig.key === "amount" ? (
+                    sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                  ) : (
+                    <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
+                  )}
+                </div>
+              </TableHead>
+              <TableHead
+                className="text-right cursor-pointer select-none hover:text-foreground"
+                onClick={() => handleSort("commission")}
+              >
+                <div className="flex items-center justify-end gap-1">
+                  <span>Commission</span>
+                  {sortConfig.key === "commission" ? (
+                    sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                  ) : (
+                    <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
+                  )}
+                </div>
+              </TableHead>
+              <TableHead
+                className="text-right hidden sm:table-cell cursor-pointer select-none hover:text-foreground"
+                onClick={() => handleSort("site_fee")}
+              >
+                <div className="flex items-center justify-end gap-1">
+                  <span>Site Fee</span>
+                  {sortConfig.key === "site_fee" ? (
+                    sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                  ) : (
+                    <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
+                  )}
+                </div>
+              </TableHead>
+              <TableHead
+                className="text-right hidden sm:table-cell cursor-pointer select-none hover:text-foreground"
+                onClick={() => handleSort("profit")}
+              >
+                <div className="flex items-center justify-end gap-1">
+                  <span>Profit</span>
+                  {sortConfig.key === "profit" ? (
+                    sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                  ) : (
+                    <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
+                  )}
+                </div>
+              </TableHead>
+              <TableHead
+                className="hidden md:table-cell cursor-pointer select-none hover:text-foreground"
+                onClick={() => handleSort("status")}
+              >
+                <div className="flex items-center gap-1">
+                  <span>Status</span>
+                  {sortConfig.key === "status" ? (
+                    sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                  ) : (
+                    <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
+                  )}
+                </div>
+              </TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -771,8 +992,20 @@ export const TransactionsTable = ({
                   {displayedTransactions.map((transaction) => (
                 <TableRow key={transaction.id}>
                       <TableCell><Checkbox checked={selectedIds.has(transaction.id)} onCheckedChange={() => toggleSelect(transaction.id)} /></TableCell>
-                  <TableCell className="font-medium">
-                    {formatDate(transaction.transaction_date)}
+                  <TableCell className="whitespace-nowrap">
+                    {(() => {
+                      const { date, time } = formatDateTimeParts(transaction.transaction_date);
+                      return (
+                        <div className="flex flex-col">
+                          <span className="font-medium text-xs text-foreground">{date}</span>
+                          {time && (
+                            <span className="text-[11px] text-muted-foreground leading-tight">
+                              {time}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell>{transaction.portals.name}</TableCell>
                   <TableCell>
