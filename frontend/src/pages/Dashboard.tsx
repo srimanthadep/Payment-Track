@@ -117,7 +117,7 @@ const Dashboard = () => {
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 sm:gap-2.5 flex-nowrap shrink-0">
               <DateSwitch
                 selectedDate={selectedDate}
                 onDateChange={(newDate) => {

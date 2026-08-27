@@ -172,40 +172,25 @@ export const DateSwitch = ({
         variant="ghost"
         size="icon"
         onClick={handleNextDay}
-        className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl hover:bg-muted/80 text-muted-foreground hover:text-foreground active:scale-95 transition-all flex-shrink-0"
+        className="h-8 w-8 rounded-xl sm:rounded-lg hover:bg-muted/80 text-muted-foreground hover:text-foreground active:scale-95 transition-all flex-shrink-0"
         title="Next Day (→ Right Arrow)"
       >
-        <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
+        <ChevronRight className="h-4 w-4" />
       </Button>
 
-      {/* Quick Action Buttons on Right */}
-      <div className="flex items-center gap-1 flex-shrink-0">
-        {!isAllTransactions && !isCurrentDayToday && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleTodayClick}
-            className="h-8 px-2 sm:px-2.5 text-xs font-semibold bg-primary/10 border-primary/25 text-primary hover:bg-primary/20 hover:text-primary rounded-xl transition-all shadow-2xs"
-            title="Jump to today"
-          >
-            <RotateCcw className="mr-1 h-3 w-3" />
-            Today
-          </Button>
-        )}
-        {!isAllTransactions && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => onDateChange(null)}
-            className="h-8 px-2 sm:px-2.5 text-xs text-muted-foreground hover:text-foreground font-medium rounded-xl hover:bg-muted/80 transition-all"
-            title="Clear date filter and view all records"
-          >
-            View All
-          </Button>
-        )}
-      </div>
+      {/* Jump to Today quick icon if not today */}
+      {!isAllTransactions && !isCurrentDayToday && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={handleTodayClick}
+          className="h-8 w-8 rounded-xl sm:rounded-lg hover:bg-primary/10 text-primary active:scale-95 transition-all flex-shrink-0"
+          title="Jump to Today"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+        </Button>
+      )}
     </div>
   );
 };

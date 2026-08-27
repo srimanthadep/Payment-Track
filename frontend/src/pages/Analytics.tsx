@@ -22,7 +22,8 @@ import {
   Banknote, Receipt, Percent, ArrowDown, ArrowUp,
 } from "lucide-react";
 import { expensesService, Expense } from "@/services/expensesService";
-import { format, subDays } from "date-fns";
+import { DateSwitch } from "@/components/transactions/DateSwitch";
+import { format, subDays, isSameDay, startOfMonth, endOfMonth, subMonths, isToday, isYesterday } from "date-fns";
 
 // --- Types ---
 interface Transaction {
@@ -40,7 +41,7 @@ interface Transaction {
   } | null;
 }
 
-type AnalyticsPeriod = "7d" | "30d" | "90d" | "all";
+type AnalyticsPeriod = "daily" | "weekly" | "monthly" | "all";
 
 // --- Helper ---
 const formatINR = (n: number) =>
@@ -67,7 +68,8 @@ const Analytics = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [period, setPeriod] = useState<AnalyticsPeriod>("30d");
+  const [period, setPeriod] = useState<AnalyticsPeriod>("daily");
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
 
   // Auth
   useEffect(() => {
@@ -127,37 +129,72 @@ const Analytics = () => {
   // Computed analytics
   const analytics = useMemo(() => {
     const now = new Date();
-    let cutoff: Date | null = null;
-    if (period === "7d") cutoff = subDays(now, 7);
-    else if (period === "30d") cutoff = subDays(now, 30);
-    else if (period === "90d") cutoff = subDays(now, 90);
-
     const safeTx = Array.isArray(transactions) ? transactions : [];
     const safeExp = Array.isArray(expenses) ? expenses : [];
 
-    const filteredTx = cutoff
-      ? safeTx.filter((t) => t.transaction_date && new Date(t.transaction_date) >= cutoff!)
-      : safeTx;
+    let filteredTx: Transaction[] = safeTx;
+    let filteredExp: Expense[] = safeExp;
+    let prevTx: Transaction[] = [];
+    let prevExp: Expense[] = [];
 
-    const filteredExp = cutoff
-      ? safeExp.filter((e) => e.expense_date && new Date(e.expense_date) >= cutoff!)
-      : safeExp;
+    if (period === "daily") {
+      const targetDate = selectedDate || now;
+      filteredTx = safeTx.filter((t) => t.transaction_date && isSameDay(new Date(t.transaction_date), targetDate));
+      filteredExp = safeExp.filter((e) => e.expense_date && isSameDay(new Date(e.expense_date), targetDate));
+      const prevDate = subDays(targetDate, 1);
+      prevTx = safeTx.filter((t) => t.transaction_date && isSameDay(new Date(t.transaction_date), prevDate));
+      prevExp = safeExp.filter((e) => e.expense_date && isSameDay(new Date(e.expense_date), prevDate));
+    } else if (period === "weekly") {
+      const cutoff = subDays(now, 7);
+      filteredTx = safeTx.filter((t) => t.transaction_date && new Date(t.transaction_date) >= cutoff);
+      filteredExp = safeExp.filter((e) => e.expense_date && new Date(e.expense_date) >= cutoff);
+      const prevStart = subDays(now, 14);
+      const prevEnd = subDays(now, 7);
+      prevTx = safeTx.filter((t) => {
+        if (!t.transaction_date) return false;
+        const d = new Date(t.transaction_date);
+        return d >= prevStart && d < prevEnd;
+      });
+      prevExp = safeExp.filter((e) => {
+        if (!e.expense_date) return false;
+        const d = new Date(e.expense_date);
+        return d >= prevStart && d < prevEnd;
+      });
+    } else if (period === "monthly") {
+      const monthStart = startOfMonth(now);
+      filteredTx = safeTx.filter((t) => t.transaction_date && new Date(t.transaction_date) >= monthStart);
+      filteredExp = safeExp.filter((e) => e.expense_date && new Date(e.expense_date) >= monthStart);
+      const prevStart = startOfMonth(subMonths(now, 1));
+      const prevEnd = monthStart;
+      prevTx = safeTx.filter((t) => {
+        if (!t.transaction_date) return false;
+        const d = new Date(t.transaction_date);
+        return d >= prevStart && d < prevEnd;
+      });
+      prevExp = safeExp.filter((e) => {
+        if (!e.expense_date) return false;
+        const d = new Date(e.expense_date);
+        return d >= prevStart && d < prevEnd;
+      });
+    }
 
     // --- KPI Cards ---
-    const totalRevenue = filteredTx.reduce((s, t) => s + Number(t.commission || 0), 0);
-    const totalExpenses = filteredExp.reduce((s, e) => s + Number(e.amount || 0), 0);
-    const netProfit = totalRevenue - totalExpenses;
-    const totalVolume = filteredTx.reduce((s, t) => s + Number(t.amount || 0), 0);
     const totalSiteFees = filteredTx.reduce((s, t) => s + Number(t.site_fee || 0), 0);
-    const totalTxProfit = filteredTx.reduce((s, t) => {
+    const grossCommission = filteredTx.reduce((s, t) => s + Number(t.commission || 0), 0);
+    // Actual Net Revenue = Gross Commission - Portal Site Fees
+    const totalRevenue = filteredTx.reduce((s, t) => {
       const p = t.profit !== undefined ? Number(t.profit) : Number(t.commission || 0) - Number(t.site_fee || 0);
       return s + p;
     }, 0);
+    const totalExpenses = filteredExp.reduce((s, e) => s + Number(e.amount || 0), 0);
+    const netProfit = totalRevenue - totalExpenses;
+    const totalVolume = filteredTx.reduce((s, t) => s + Number(t.amount || 0), 0);
+    const totalTxProfit = totalRevenue;
     const avgCommission = filteredTx.length > 0 ? totalRevenue / filteredTx.length : 0;
     const profitMargin = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100) : 0;
     const txCount = filteredTx.length;
     const avgTicketSize = txCount > 0 ? totalVolume / txCount : 0;
-    const feeRetentionRate = totalRevenue > 0 ? ((totalRevenue - totalSiteFees) / totalRevenue) * 100 : 0;
+    const feeRetentionRate = grossCommission > 0 ? ((grossCommission - totalSiteFees) / grossCommission) * 100 : 0;
 
     // --- Transaction Types Breakdown ---
     const typeMap: Record<string, { name: string; value: number; count: number }> = {};
@@ -170,35 +207,19 @@ const Analytics = () => {
     const typePie = Object.values(typeMap);
 
     // --- Previous period comparison ---
-    let prevCutoffStart: Date | null = null;
-    let prevCutoffEnd: Date | null = null;
-    if (period === "7d") { prevCutoffStart = subDays(now, 14); prevCutoffEnd = subDays(now, 7); }
-    else if (period === "30d") { prevCutoffStart = subDays(now, 60); prevCutoffEnd = subDays(now, 30); }
-    else if (period === "90d") { prevCutoffStart = subDays(now, 180); prevCutoffEnd = subDays(now, 90); }
-
     let prevRevenue = 0;
     let prevExpenseTotal = 0;
     let prevVolume = 0;
     let prevTxCount = 0;
     let prevTxProfit = 0;
-    if (prevCutoffStart && prevCutoffEnd) {
-      const prevTx = safeTx.filter((t) => {
-        if (!t.transaction_date) return false;
-        const d = new Date(t.transaction_date);
-        return d >= prevCutoffStart! && d < prevCutoffEnd!;
-      });
-      prevRevenue = prevTx.reduce((s, t) => s + Number(t.commission || 0), 0);
-      prevVolume = prevTx.reduce((s, t) => s + Number(t.amount || 0), 0);
-      prevTxCount = prevTx.length;
-      prevTxProfit = prevTx.reduce((s, t) => {
+    if (prevTx.length > 0 || prevExp.length > 0) {
+      prevRevenue = prevTx.reduce((s, t) => {
         const p = t.profit !== undefined ? Number(t.profit) : Number(t.commission || 0) - Number(t.site_fee || 0);
         return s + p;
       }, 0);
-      const prevExp = safeExp.filter((e) => {
-        if (!e.expense_date) return false;
-        const d = new Date(e.expense_date);
-        return d >= prevCutoffStart! && d < prevCutoffEnd!;
-      });
+      prevVolume = prevTx.reduce((s, t) => s + Number(t.amount || 0), 0);
+      prevTxCount = prevTx.length;
+      prevTxProfit = prevRevenue;
       prevExpenseTotal = prevExp.reduce((s, e) => s + Number(e.amount || 0), 0);
     }
 
@@ -209,19 +230,22 @@ const Analytics = () => {
     const txCountGrowth = prevTxCount > 0 ? ((txCount - prevTxCount) / prevTxCount) * 100 : 0;
 
     // --- Daily Revenue vs Expense trend ---
-    const dailyMap: Record<string, { date: string; revenue: number; expenses: number; profit: number; volume: number; count: number }> = {};
+    const dailyMap: Record<string, { date: string; revenue: number; grossCommission: number; siteFee: number; expenses: number; profit: number; volume: number; count: number }> = {};
     filteredTx.forEach((t) => {
       if (!t.transaction_date) return;
       const key = format(new Date(t.transaction_date), "yyyy-MM-dd");
-      if (!dailyMap[key]) dailyMap[key] = { date: key, revenue: 0, expenses: 0, profit: 0, volume: 0, count: 0 };
-      dailyMap[key].revenue += Number(t.commission || 0);
+      if (!dailyMap[key]) dailyMap[key] = { date: key, revenue: 0, grossCommission: 0, siteFee: 0, expenses: 0, profit: 0, volume: 0, count: 0 };
+      const netRev = t.profit !== undefined ? Number(t.profit) : Number(t.commission || 0) - Number(t.site_fee || 0);
+      dailyMap[key].revenue += netRev;
+      dailyMap[key].grossCommission += Number(t.commission || 0);
+      dailyMap[key].siteFee += Number(t.site_fee || 0);
       dailyMap[key].volume += Number(t.amount || 0);
       dailyMap[key].count += 1;
     });
     filteredExp.forEach((e) => {
       if (!e.expense_date) return;
       const key = format(new Date(e.expense_date), "yyyy-MM-dd");
-      if (!dailyMap[key]) dailyMap[key] = { date: key, revenue: 0, expenses: 0, profit: 0, volume: 0, count: 0 };
+      if (!dailyMap[key]) dailyMap[key] = { date: key, revenue: 0, grossCommission: 0, siteFee: 0, expenses: 0, profit: 0, volume: 0, count: 0 };
       dailyMap[key].expenses += Number(e.amount || 0);
     });
     const revenueVsExpenseTrend = Object.values(dailyMap)
@@ -365,7 +389,7 @@ const Analytics = () => {
     const avgDailyProfit = uniqueDays.size > 0 ? totalTxProfit / uniqueDays.size : 0;
 
     return {
-      totalRevenue, totalExpenses, netProfit, totalVolume, totalSiteFees, totalTxProfit,
+      grossCommission, totalRevenue, totalExpenses, netProfit, totalVolume, totalSiteFees, totalTxProfit,
       avgCommission, profitMargin, txCount, avgTicketSize, feeRetentionRate,
       revenueGrowth, expenseGrowth, volumeGrowth, profitGrowth, txCountGrowth,
       revenueVsExpenseTrend, cardBreakdown, expenseBreakdown, portalBreakdown,
@@ -374,7 +398,7 @@ const Analytics = () => {
       withdrawalVolume, repaymentVolume, netCapitalFlow, withdrawals, repayments,
       top5ByAmount, top5ByProfit,
     };
-  }, [transactions, expenses, period]);
+  }, [transactions, expenses, period, selectedDate]);
 
   if (isLoading || !user) {
     return (
@@ -386,7 +410,17 @@ const Analytics = () => {
     );
   }
 
-  const periodLabel = period === "7d" ? "7 Days" : period === "30d" ? "30 Days" : period === "90d" ? "90 Days" : "All Time";
+  const periodLabel = (() => {
+    if (period === "all") return "All Time";
+    if (period === "weekly") return "Last 7 Days";
+    if (period === "monthly") return format(new Date(), "MMMM yyyy");
+    if (period === "daily" && selectedDate) {
+      if (isToday(selectedDate)) return `Today, ${format(selectedDate, "dd MMM yyyy")}`;
+      if (isYesterday(selectedDate)) return `Yesterday, ${format(selectedDate, "dd MMM yyyy")}`;
+      return format(selectedDate, "dd MMM yyyy");
+    }
+    return "Daily";
+  })();
 
   return (
     <DashboardLayout>
@@ -397,7 +431,7 @@ const Analytics = () => {
         className="space-y-6 max-w-7xl mx-auto"
       >
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2 border-b border-border/60">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pb-2 border-b border-border/60">
           <div>
             <div className="flex items-center gap-2.5">
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
@@ -411,26 +445,47 @@ const Analytics = () => {
               Complete business intelligence — revenue, expenses, profitability & trends
             </p>
           </div>
-          <Tabs value={period} onValueChange={(v) => setPeriod(v as AnalyticsPeriod)}>
-            <TabsList className="grid grid-cols-4 w-full sm:w-auto bg-muted/60">
-              <TabsTrigger value="7d" className="text-xs sm:text-sm font-semibold">7D</TabsTrigger>
-              <TabsTrigger value="30d" className="text-xs sm:text-sm font-semibold">30D</TabsTrigger>
-              <TabsTrigger value="90d" className="text-xs sm:text-sm font-semibold">90D</TabsTrigger>
-              <TabsTrigger value="all" className="text-xs sm:text-sm font-semibold">All</TabsTrigger>
-            </TabsList>
-          </Tabs>
+
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-nowrap shrink-0">
+            <DateSwitch
+              selectedDate={selectedDate}
+              onDateChange={(newDate) => {
+                setSelectedDate(newDate);
+                if (newDate) {
+                  setPeriod("daily");
+                }
+              }}
+            />
+
+            <Tabs value={period} onValueChange={(v) => setPeriod(v as AnalyticsPeriod)}>
+              <TabsList className="grid grid-cols-4 w-full sm:w-auto">
+                <TabsTrigger value="daily" className="text-xs sm:text-sm">
+                  Daily
+                </TabsTrigger>
+                <TabsTrigger value="weekly" className="text-xs sm:text-sm">
+                  Weekly
+                </TabsTrigger>
+                <TabsTrigger value="monthly" className="text-xs sm:text-sm">
+                  Monthly
+                </TabsTrigger>
+                <TabsTrigger value="all" className="text-xs sm:text-sm">
+                  All Time
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
         </div>
 
         {/* --- KPI Cards Row (with period-over-period growth on all) --- */}
         <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
           {[
             {
-              title: "Total Revenue",
+              title: "Actual Revenue",
               value: analytics.totalRevenue,
               icon: IndianRupee,
               gradient: "from-emerald-500 to-emerald-600",
               growth: analytics.revenueGrowth,
-              subtitle: `${analytics.txCount} transactions`,
+              subtitle: `Gross ₹${formatINRShort(analytics.grossCommission).replace("₹", "")} • Fees ₹${formatINRShort(analytics.totalSiteFees).replace("₹", "")}`,
             },
             {
               title: "Total Expenses",
@@ -562,7 +617,7 @@ const Analytics = () => {
                   {analytics.feeRetentionRate.toFixed(1)}%
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-0.5">
-                  Fees: {formatINRShort(analytics.totalSiteFees)} / Comm: {formatINRShort(analytics.totalRevenue)}
+                  Fees: {formatINRShort(analytics.totalSiteFees)} / Gross: {formatINRShort(analytics.grossCommission)}
                 </p>
               </CardContent>
             </Card>
