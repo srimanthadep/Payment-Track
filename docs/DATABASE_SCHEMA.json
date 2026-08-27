@@ -1,0 +1,132 @@
+{
+  "database": "Payment-Track",
+  "provider": "Supabase PostgreSQL",
+  "tables": [
+    {
+      "name": "transactions",
+      "description": "Credit card withdrawals, repayments, customer charges, commissions, and portal fees",
+      "columns": [
+        { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
+        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "profiles.id", "nullable": false },
+        { "name": "portal_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "portals.id", "nullable": false },
+        { "name": "amount", "type": "numeric", "nullable": false },
+        { "name": "commission", "type": "numeric", "nullable": true },
+        { "name": "site_fee", "type": "numeric", "nullable": true },
+        { "name": "profit", "type": "numeric", "nullable": true, "description": "Net profit = commission - site_fee" },
+        { "name": "transaction_type", "type": "text", "nullable": false, "examples": ["withdrawal", "repayment"] },
+        { "name": "card_type", "type": "text", "nullable": true, "examples": ["Visa", "Mastercard", "Amex"] },
+        { "name": "transaction_date", "type": "timestamptz", "nullable": false },
+        { "name": "status", "type": "text", "nullable": true, "examples": ["completed", "pending", "cancelled"] },
+        { "name": "reference_number", "type": "text", "nullable": true },
+        { "name": "notes", "type": "text", "nullable": true },
+        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
+        { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
+      ]
+    },
+    {
+      "name": "expenses",
+      "description": "Operating expenses, salaries, rent, utility bills, and overheads",
+      "columns": [
+        { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
+        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "profiles.id", "nullable": false },
+        { "name": "category", "type": "text", "nullable": false },
+        { "name": "amount", "type": "numeric", "nullable": false },
+        { "name": "expense_date", "type": "timestamptz", "nullable": false, "default": "now()" },
+        { "name": "paid_to", "type": "text", "nullable": true },
+        { "name": "payment_method", "type": "text", "nullable": true },
+        { "name": "reference_number", "type": "text", "nullable": true },
+        { "name": "notes", "type": "text", "nullable": true },
+        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
+        { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
+      ]
+    },
+    {
+      "name": "portals",
+      "description": "Portals / gateways used for processing transactions",
+      "columns": [
+        { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
+        { "name": "name", "type": "text", "nullable": false },
+        { "name": "default_commission_rate", "type": "numeric", "nullable": true },
+        { "name": "default_site_fee", "type": "numeric", "nullable": true },
+        { "name": "is_active", "type": "boolean", "nullable": true, "default": true },
+        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
+        { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
+      ]
+    },
+    {
+      "name": "portal_rates",
+      "description": "Card-specific commission rates configured per portal",
+      "columns": [
+        { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
+        { "name": "portal_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "portals.id", "nullable": false },
+        { "name": "card_type", "type": "text", "nullable": false },
+        { "name": "rate_percent", "type": "numeric", "nullable": false },
+        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
+        { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
+      ]
+    },
+    {
+      "name": "profiles",
+      "description": "User profile metadata synced with Supabase Auth",
+      "columns": [
+        { "name": "id", "type": "uuid", "is_primary_key": true, "is_foreign_key": true, "foreign_key_to": "auth.users.id", "nullable": false },
+        { "name": "email", "type": "text", "nullable": true },
+        { "name": "full_name", "type": "text", "nullable": true },
+        { "name": "business_name", "type": "text", "nullable": true },
+        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
+        { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
+      ]
+    },
+    {
+      "name": "user_roles",
+      "description": "User role management (admin / user)",
+      "columns": [
+        { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
+        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "auth.users.id", "nullable": false },
+        { "name": "role", "type": "app_role", "nullable": false, "enum": ["admin", "user"] },
+        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" }
+      ]
+    },
+    {
+      "name": "app_settings",
+      "description": "User-customized dropdown preferences and options stored as JSONB",
+      "columns": [
+        { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
+        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "auth.users.id", "nullable": false },
+        { "name": "settings", "type": "jsonb", "nullable": false },
+        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
+        { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
+      ]
+    },
+    {
+      "name": "card_types",
+      "description": "Global card types registry with standard rates",
+      "columns": [
+        { "name": "id", "type": "integer", "is_primary_key": true, "nullable": false },
+        { "name": "name", "type": "text", "nullable": false },
+        { "name": "percentage", "type": "numeric", "nullable": false },
+        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
+        { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
+      ]
+    },
+    {
+      "name": "scraping_configs",
+      "description": "Automated scraping rules and portal configurations",
+      "columns": [
+        { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
+        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "auth.users.id", "nullable": false },
+        { "name": "portal_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "portals.id", "nullable": true },
+        { "name": "name", "type": "text", "nullable": false },
+        { "name": "url", "type": "text", "nullable": false },
+        { "name": "extraction_rules", "type": "jsonb", "nullable": false },
+        { "name": "is_active", "type": "boolean", "nullable": true, "default": true },
+        { "name": "last_scraped_at", "type": "timestamptz", "nullable": true },
+        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
+        { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
+      ]
+    }
+  ],
+  "enums": {
+    "app_role": ["admin", "user"]
+  }
+}
