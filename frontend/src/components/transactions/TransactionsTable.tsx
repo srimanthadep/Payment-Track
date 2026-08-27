@@ -12,13 +12,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Download, Search, Trash2, Edit, FileText, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Download, Search, Trash2, Edit, FileText, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { TransactionFilters, FilterState } from "./TransactionFilters";
 import { EditTransactionDialog } from "./EditTransactionDialog";
 import { getCardTypeDisplayName, type CardType } from "@/utils/commissionCalculator";
 import { exportToPDF } from "@/utils/pdfExport";
+import { exportTransactionsToCSV, exportTransactionsToExcel } from "@/utils/exportUtils";
 import { TransactionsTableSkeleton } from "@/components/ui/skeletons";
 import { motion, AnimatePresence } from "framer-motion";
 import { useInView } from "react-intersection-observer";
@@ -545,48 +546,53 @@ export const TransactionsTable = ({
   };
 
   const exportToCSV = () => {
-    const csvData = filteredTransactions.map((t) => [
-      formatDate(t.transaction_date),
-      t.portals.name,
-      t.transaction_type,
-      t.card_type ? getCardTypeDisplayName(t.card_type as CardType) : "",
-      t.amount,
-      t.commission,
-      t.site_fee,
-      t.profit,
-      t.reference_number || "",
-      t.status,
-    ]);
+    try {
+      if (!filteredTransactions || filteredTransactions.length === 0) {
+        toast({
+          title: "No Transactions",
+          description: "There are no transactions to export.",
+          variant: "destructive",
+        });
+        return;
+      }
+      exportTransactionsToCSV(filteredTransactions);
+      toast({
+        title: "Success",
+        description: "Transactions exported to CSV",
+      });
+    } catch (err: any) {
+      console.error("Failed to export CSV:", err);
+      toast({
+        title: "CSV Export Error",
+        description: err.message || "Failed to generate CSV",
+        variant: "destructive",
+      });
+    }
+  };
 
-    const headers = [
-      "Date",
-      "Portal",
-      "Type",
-      "Card Type",
-      "Amount",
-      "Commission",
-      "Site Fee",
-      "Profit",
-      "Reference",
-      "Status",
-    ];
-
-    const csvContent = [
-      headers.join(","),
-      ...csvData.map((row) => row.join(",")),
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `transactions-${new Date().toISOString()}.csv`;
-    a.click();
-
-    toast({
-      title: "Success",
-      description: "Transactions exported to CSV",
-    });
+  const exportToExcel = () => {
+    try {
+      if (!filteredTransactions || filteredTransactions.length === 0) {
+        toast({
+          title: "No Transactions",
+          description: "There are no transactions to export.",
+          variant: "destructive",
+        });
+        return;
+      }
+      exportTransactionsToExcel(filteredTransactions);
+      toast({
+        title: "Success",
+        description: "Transactions exported to Excel (.xlsx)",
+      });
+    } catch (err: any) {
+      console.error("Failed to export Excel:", err);
+      toast({
+        title: "Excel Export Error",
+        description: err.message || "Failed to generate Excel file",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleExportPDF = async () => {
@@ -644,26 +650,34 @@ export const TransactionsTable = ({
             <Trash2 className="mr-1.5 h-3.5 w-3.5" />Delete ({selectedIds.size})
           </Button>
         )}
+        <Button onClick={exportToExcel} variant="outline" className="text-xs sm:text-sm h-9 px-3">
+          <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-emerald-600" />
+          Excel
+        </Button>
         <Button onClick={exportToCSV} variant="outline" className="text-xs sm:text-sm h-9 px-3">
-          <Download className="mr-1.5 h-3.5 w-3.5" />
-          Export CSV
+          <Download className="mr-1.5 h-3.5 w-3.5 text-blue-600" />
+          CSV
         </Button>
         <Button onClick={handleExportPDF} variant="outline" className="text-xs sm:text-sm h-9 px-3">
-          <FileText className="mr-1.5 h-3.5 w-3.5" />
-          Export PDF
+          <FileText className="mr-1.5 h-3.5 w-3.5 text-rose-600" />
+          PDF
         </Button>
         </div>
       </div>
 
       {/* Mobile: Export buttons and filters in integrated grid */}
       <div className="w-full">
-        <div className="grid grid-cols-2 gap-2 sm:hidden mb-2">
+        <div className="grid grid-cols-3 gap-2 sm:hidden mb-2">
+          <Button onClick={exportToExcel} variant="outline" className="h-9 text-xs px-2">
+            <FileSpreadsheet className="mr-1 h-3 w-3 text-emerald-600" />
+            Excel
+          </Button>
           <Button onClick={exportToCSV} variant="outline" className="h-9 text-xs px-2">
-            <Download className="mr-1 h-3 w-3" />
+            <Download className="mr-1 h-3 w-3 text-blue-600" />
             CSV
           </Button>
           <Button onClick={handleExportPDF} variant="outline" className="h-9 text-xs px-2">
-            <FileText className="mr-1 h-3 w-3" />
+            <FileText className="mr-1 h-3 w-3 text-rose-600" />
             PDF
           </Button>
         </div>
