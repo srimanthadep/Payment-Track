@@ -89,14 +89,27 @@ const Auth = () => {
 
     setSignInLoading(true);
     const emailIdentifier = formatEmail(signInIdentifier);
+    console.log("[Auth] Attempting sign in for:", signInIdentifier, "->", emailIdentifier);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      // Add a 12-second timeout protection so it never hangs indefinitely
+      const timeoutPromise = new Promise<{ data: any; error: any }>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Sign-in timed out. Please check your network connection and try again.")),
+          12000
+        )
+      );
+
+      const authPromise = supabase.auth.signInWithPassword({
         email: emailIdentifier,
         password: signInPassword,
       });
 
+      const res: any = await Promise.race([authPromise, timeoutPromise]);
+      const error = res?.error;
+
       if (error) {
+        console.error("[Auth] Sign in failed:", error);
         toast({
           title: "Sign In Failed",
           description: error.message.includes("Invalid login credentials")
@@ -105,13 +118,15 @@ const Auth = () => {
           variant: "destructive",
         });
       } else {
+        console.log("[Auth] Sign in success, navigating to dashboard...");
         toast({
           title: "Welcome Back!",
-          description: "Signing into your private workspace...",
+          description: "Signing into your workspace...",
         });
-        navigate("/dashboard");
+        navigate("/dashboard", { replace: true });
       }
     } catch (err: any) {
+      console.error("[Auth] Exception during sign in:", err);
       toast({
         title: "Sign In Error",
         description: err.message || "An unexpected error occurred during sign in.",
