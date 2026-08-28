@@ -1,4 +1,4 @@
-import { useState, useEffect, ReactNode } from "react";
+import { useState, useEffect, ReactNode, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { profileService, UserProfile } from "@/services/profileService";
@@ -15,6 +15,8 @@ import {
   ChevronRight,
   Sparkles,
   BarChart3,
+  Target,
+  Search,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -24,6 +26,8 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { motion, AnimatePresence } from "framer-motion";
+import { CommandPalette } from "@/components/ui/CommandPalette";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -35,6 +39,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const { toast } = useToast();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
     profileService.getUserProfile().then((p) => {
@@ -68,6 +73,18 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     }
   };
 
+  // Global Ctrl+K shortcut for search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();
     
@@ -89,6 +106,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     { name: "Transactions", href: "/transactions", icon: Receipt },
     { name: "Expenses", href: "/expenses", icon: Wallet },
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
+    { name: "Goals", href: "/goals", icon: Target },
     { name: "Settings", href: "/settings", icon: SettingsIcon },
     { name: "Web Scraping", href: "/scraping", icon: Globe },
   ];
@@ -134,12 +152,23 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
             </div>
           </div>
 
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border border-border/60 hover:bg-muted/80">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 rounded-xl border border-border/60 hover:bg-muted/80"
+              onClick={() => setSearchOpen(true)}
+              title="Search (Ctrl+K)"
+            >
+              <Search className="h-4.5 w-4.5" />
+            </Button>
+            <NotificationCenter />
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border border-border/60 hover:bg-muted/80">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
             <SheetContent side="left" className="w-72 p-0 flex flex-col">
               <div
                 className="p-5 border-b border-border/80 bg-muted/20 cursor-pointer"
@@ -197,6 +226,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
               </div>
             </SheetContent>
           </Sheet>
+          </div>
         </div>
       </header>
 
@@ -230,10 +260,26 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           </div>
           
           {/* Sidebar Nav items */}
-          <div className="flex-1 flex flex-col justify-between py-5 px-3.5 overflow-y-auto">
-            <div className="space-y-1">
-              <p className="text-[11px] font-bold text-muted-foreground/80 px-3 uppercase tracking-wider mb-2">Main Menu</p>
-              <nav className="space-y-1.5">
+          <div className="flex-1 flex flex-col justify-between py-4 px-3.5 overflow-y-auto">
+            <div className="space-y-3">
+              {/* Quick Actions Search Bar for Desktop */}
+              <div className="flex items-center gap-1.5 px-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSearchOpen(true)}
+                  className="flex-1 justify-start h-8 text-xs text-muted-foreground gap-2 border-border/70 hover:text-foreground"
+                >
+                  <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>Search...</span>
+                  <kbd className="ml-auto text-[10px] font-mono border rounded px-1 bg-muted/60">Ctrl+K</kbd>
+                </Button>
+                <NotificationCenter />
+              </div>
+
+              <div>
+                <p className="text-[11px] font-bold text-muted-foreground/80 px-3 uppercase tracking-wider mb-2">Main Menu</p>
+                <nav className="space-y-1.5">
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = location.pathname === item.href;
@@ -266,8 +312,9 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                 })}
               </nav>
             </div>
+          </div>
             
-            {/* Bottom Actions */}
+          {/* Bottom Actions */}
             <div className="pt-4 border-t border-border/70 space-y-2">
               <Button 
                 variant="ghost" 
@@ -300,7 +347,14 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
               <button
                 key={item.name}
                 type="button"
-                onClick={() => navigate(item.href)}
+                onClick={() => {
+                  if ("vibrate" in navigator) {
+                    try {
+                      navigator.vibrate(15);
+                    } catch {}
+                  }
+                  navigate(item.href);
+                }}
                 className={cn(
                   "relative flex flex-col items-center justify-center flex-1 py-1.5 px-1 rounded-xl transition-all duration-200 outline-none select-none",
                   isActive ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
@@ -326,6 +380,13 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           })}
         </nav>
       </div>
+
+      {/* Global Search Command Palette */}
+      <CommandPalette
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        userId={userProfile?.id}
+      />
     </div>
   );
 };

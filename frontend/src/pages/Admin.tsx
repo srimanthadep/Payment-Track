@@ -10,6 +10,7 @@ import { AdminTransactions } from "@/components/admin/AdminTransactions";
 import { AdminPortals } from "@/components/admin/AdminPortals";
 import { AdminCardTypes } from "@/components/admin/AdminCardTypes";
 import { AdminStats } from "@/components/admin/AdminStats";
+import { AdminLeaderboard } from "@/components/admin/AdminLeaderboard";
 import { useToast } from "@/hooks/use-toast";
 
 const Admin = () => {
@@ -92,7 +93,9 @@ const Admin = () => {
             <TabsTrigger value="card-types" className="text-xs sm:text-sm">Card Types</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview">
+          <TabsContent value="overview" className="space-y-4">
+            <AdminLeaderboard />
+
             <div className="grid gap-4 md:grid-cols-2">
               <Card>
                 <CardHeader>
@@ -100,7 +103,7 @@ const Admin = () => {
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <p className="text-sm text-muted-foreground">
-                    Manage your platform from the tabs above. Use the Overview tab to see key statistics,
+                    Manage your platform from the tabs above. Use the Overview tab to see key statistics and leaderboard,
                     Users tab to manage user accounts and roles, Transactions tab to view and manage all transactions,
                     and Portals tab to configure payment portals.
                   </p>

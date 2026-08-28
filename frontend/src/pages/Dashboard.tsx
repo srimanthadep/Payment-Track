@@ -7,12 +7,15 @@ import { StatsCards, Period } from "@/components/dashboard/StatsCards";
 import { ProfitChart } from "@/components/dashboard/ProfitChart";
 import { RecentTransactions } from "@/components/dashboard/RecentTransactions";
 import { PortalComparisonChart } from "@/components/dashboard/PortalComparisonChart";
+import { GoalProgressWidget } from "@/components/dashboard/GoalProgressWidget";
+import { ActivityHeatmap } from "@/components/dashboard/ActivityHeatmap";
 import { DateSwitch } from "@/components/transactions/DateSwitch";
 import { DashboardSkeleton } from "@/components/ui/skeletons";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { profileService, UserProfile } from "@/services/profileService";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -23,6 +26,9 @@ const Dashboard = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [period, setPeriod] = useState<Period>("daily");
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [todayStats, setTodayStats] = useState({ count: 0, volume: 0 });
+  const [heatmapTxns, setHeatmapTxns] = useState<any[]>([]);
 
   const handleRefresh = async () => {
     setRefreshKey((k) => k + 1);
@@ -54,6 +60,42 @@ const Dashboard = () => {
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  // Fetch user profile for greeting
+  useEffect(() => {
+    profileService.getUserProfile().then(setUserProfile);
+  }, []);
+
+  // Fetch today's quick stats for greeting subtitle
+  useEffect(() => {
+    if (!user) return;
+    const today = new Date().toISOString().split("T")[0];
+    supabase
+      .from("transactions")
+      .select("amount")
+      .eq("user_id", user.id)
+      .eq("transaction_date", today)
+      .then(({ data }) => {
+        if (data) {
+          setTodayStats({
+            count: data.length,
+            volume: data.reduce((s, t) => s + Number(t.amount || 0), 0),
+          });
+        }
+      });
+
+    // Fetch last 30 days of transactions for heatmap
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    supabase
+      .from("transactions")
+      .select("amount, profit, commission, site_fee, transaction_date")
+      .eq("user_id", user.id)
+      .gte("transaction_date", thirtyDaysAgo.toISOString().split("T")[0])
+      .then(({ data }) => {
+        if (data) setHeatmapTxns(data);
+      });
+  }, [user, refreshKey]);
 
   // Global Realtime WebSocket listener for live dashboard auto-refresh
   useEffect(() => {
@@ -106,14 +148,23 @@ const Dashboard = () => {
           transition={{ duration: 0.3 }}
           className="space-y-4 sm:space-y-6"
         >
-          {/* Header with Title, DateSwitch, and Period Tabs */}
+          {/* Header with Greeting, DateSwitch, and Period Tabs */}
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
             <div className="space-y-1">
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-                Dashboard
+                {(() => {
+                  const hour = new Date().getHours();
+                  const name = userProfile?.fullName?.split(" ")[0] || "";
+                  if (hour >= 6 && hour < 12) return `Good Morning, ${name} ☀️`;
+                  if (hour >= 12 && hour < 17) return `Good Afternoon, ${name} 🌤️`;
+                  if (hour >= 17 && hour < 21) return `Good Evening, ${name} 🌙`;
+                  return `Late Night Hustle, ${name} 🔥`;
+                })()}
               </h1>
               <p className="text-sm text-muted-foreground">
-                Overview of your payment transactions and profits
+                {todayStats.count > 0
+                  ? `You've processed ${todayStats.count} transaction${todayStats.count !== 1 ? "s" : ""} worth ₹${todayStats.volume.toLocaleString("en-IN")} today`
+                  : "No transactions recorded yet today"}
               </p>
             </div>
 
@@ -187,14 +238,37 @@ const Dashboard = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
+            className="grid gap-6 lg:grid-cols-3"
           >
-            <PortalComparisonChart
+            <div className="lg:col-span-2">
+              <PortalComparisonChart
+                userId={user.id}
+                period={period}
+                selectedDate={selectedDate}
+                key={`portal-${refreshKey}-${period}-${
+                  selectedDate ? selectedDate.toISOString() : "all"
+                }`}
+              />
+            </div>
+            <GoalProgressWidget
               userId={user.id}
-              period={period}
-              selectedDate={selectedDate}
-              key={`portal-${refreshKey}-${period}-${
-                selectedDate ? selectedDate.toISOString() : "all"
-              }`}
+              key={`goals-${refreshKey}`}
+            />
+          </motion.div>
+
+          {/* Activity Heatmap Grid */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+          >
+            <ActivityHeatmap
+              transactions={heatmapTxns}
+              selectedDate={period === "daily" ? selectedDate : null}
+              onSelectDate={(date) => {
+                setSelectedDate(date);
+                setPeriod("daily");
+              }}
             />
           </motion.div>
         </motion.div>

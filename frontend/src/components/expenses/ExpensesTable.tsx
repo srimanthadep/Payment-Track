@@ -23,6 +23,7 @@ import {
   User,
   ArrowUpDown,
 } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -283,12 +284,12 @@ export const ExpensesTable = ({
                 ))
               ) : filteredExpenses.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center">
-                    <div className="flex flex-col items-center justify-center text-muted-foreground">
-                      <Receipt className="h-8 w-8 mb-2 opacity-40" />
-                      <p className="font-medium text-sm">No expenses found</p>
-                      <p className="text-xs">Try changing filters or add a new expense</p>
-                    </div>
+                  <TableCell colSpan={7} className="p-0 border-0">
+                    <EmptyState
+                      title="No Expenses Found"
+                      description="No expenses logged for this period or search filter. Try clearing filters or add a new expense."
+                      className="m-4"
+                    />
                   </TableCell>
                 </TableRow>
               ) : (
@@ -371,10 +372,11 @@ export const ExpensesTable = ({
           {isLoading ? (
             <div className="p-4 text-center text-xs text-muted-foreground">Loading expenses...</div>
           ) : filteredExpenses.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground">
-              <Receipt className="h-8 w-8 mx-auto mb-2 opacity-40" />
-              <p className="font-medium text-sm">No expenses found</p>
-            </div>
+            <EmptyState
+              title="No Expenses Found"
+              description="No expenses logged for this period or search filter."
+              className="m-3"
+            />
           ) : (
             filteredExpenses.map((expense) => {
               const badgeColor =

@@ -21,6 +21,7 @@ import { getCardTypeDisplayName, type CardType } from "@/utils/commissionCalcula
 import { exportToPDF } from "@/utils/pdfExport";
 import { exportTransactionsToCSV, exportTransactionsToExcel } from "@/utils/exportUtils";
 import { TransactionsTableSkeleton } from "@/components/ui/skeletons";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { motion, AnimatePresence } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 import {
@@ -750,7 +751,11 @@ export const TransactionsTable = ({
         {isLoading && filteredTransactions.length === 0 ? (
           <TransactionsTableSkeleton />
         ) : filteredTransactions.length === 0 ? (
-          <div className="py-6 text-center text-muted-foreground text-sm">No transactions found</div>
+          <EmptyState
+            title="No Transactions Found"
+            description="No transactions match the selected date or active filters. Adjust your filters or add a new transaction."
+            className="my-4"
+          />
         ) : (
           <>
             <AnimatePresence>
@@ -1009,8 +1014,12 @@ export const TransactionsTable = ({
           <TableBody>
               {filteredTransactions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8">
-                  <p className="text-muted-foreground">No transactions found</p>
+                <TableCell colSpan={10} className="p-0 border-0">
+                  <EmptyState
+                    title="No Transactions Found"
+                    description="No transactions match the selected date or active filters. Try clearing search filters or changing the period tab."
+                    className="m-4"
+                  />
                 </TableCell>
               </TableRow>
             ) : (

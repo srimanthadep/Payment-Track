@@ -29,9 +29,11 @@ import {
   HardDrive,
   Calendar,
   Mail,
+  Palette,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { profileService, UserProfile } from "@/services/profileService";
+import { themeService, THEME_ACCENTS, ThemeAccent } from "@/services/themeService";
 import { motion } from "framer-motion";
 
 export const ProfileSettings = () => {
@@ -48,6 +50,7 @@ export const ProfileSettings = () => {
   const [fullName, setFullName] = useState("");
   const [copiedId, setCopiedId] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [activeAccent, setActiveAccent] = useState<ThemeAccent>(() => themeService.getActiveAccent());
 
   const loadProfile = async () => {
     try {
@@ -512,6 +515,55 @@ export const ProfileSettings = () => {
                   Profile Pic Synced
                 </span>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Theme Accent Customization Card */}
+        <Card className="border shadow-xs md:col-span-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+              <Palette className="h-4 w-4 text-primary" />
+              Theme Accent Color
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Choose your primary highlight palette for buttons, active indicators, and charts
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              {THEME_ACCENTS.map((accent) => {
+                const isSelected = activeAccent.id === accent.id;
+                return (
+                  <button
+                    key={accent.id}
+                    type="button"
+                    onClick={() => {
+                      themeService.setAccent(accent.id);
+                      setActiveAccent(accent);
+                      toast({
+                        title: "🎨 Theme Accent Updated",
+                        description: `Switched to ${accent.name}`,
+                      });
+                    }}
+                    className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all text-center ${
+                      isSelected
+                        ? "border-primary bg-primary/10 shadow-xs ring-2 ring-primary/20"
+                        : "border-border/60 hover:bg-muted/60"
+                    }`}
+                  >
+                    <div
+                      className="w-8 h-8 rounded-full shadow-inner flex items-center justify-center text-white"
+                      style={{ background: accent.colorHex }}
+                    >
+                      {isSelected && <Check className="h-4 w-4" />}
+                    </div>
+                    <span className={`text-xs font-medium ${isSelected ? "text-primary font-bold" : "text-foreground"}`}>
+                      {accent.name}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </CardContent>
         </Card>

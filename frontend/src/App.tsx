@@ -13,7 +13,10 @@ import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
 import Scraping from "./pages/Scraping";
 import Analytics from "./pages/Analytics";
+import Goals from "./pages/Goals";
 import NotFound from "./pages/NotFound";
+import { useEffect } from "react";
+import { themeService } from "@/services/themeService";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,8 +29,13 @@ const queryClient = new QueryClient({
   },
 });
 
-const App = () => (
-  <ErrorBoundary>
+const App = () => {
+  useEffect(() => {
+    themeService.applyAccent();
+  }, []);
+
+  return (
+    <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
@@ -43,6 +51,7 @@ const App = () => (
             <Route path="/admin" element={<Admin />} />
             <Route path="/scraping" element={<Scraping />} />
             <Route path="/analytics" element={<Analytics />} />
+            <Route path="/goals" element={<Goals />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
@@ -50,6 +59,7 @@ const App = () => (
       </TooltipProvider>
     </QueryClientProvider>
   </ErrorBoundary>
-);
+  );
+};
 
 export default App;

@@ -39,6 +39,15 @@ interface AddTransactionDialogProps {
   onOpenChange: (open: boolean) => void;
   portalsRefreshKey?: number;
   onSuccess?: (addedDate?: Date) => void;
+  initialData?: {
+    amount?: string | number;
+    transaction_type?: "withdrawal" | "repayment" | "";
+    card_type?: string;
+    commission_percent?: string | number;
+    site_fee_percent?: string | number;
+    sent_to?: string;
+    portal_id?: string;
+  } | null;
 }
 
 export const AddTransactionDialog = ({
@@ -46,6 +55,7 @@ export const AddTransactionDialog = ({
   open,
   onOpenChange,
   onSuccess,
+  initialData,
 }: AddTransactionDialogProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -75,6 +85,20 @@ export const AddTransactionDialog = ({
     reference_number: "",
     transaction_date: new Date(),
   });
+
+  useEffect(() => {
+    if (initialData && open) {
+      setFormData((prev) => ({
+        ...prev,
+        amount: initialData.amount !== undefined && initialData.amount !== null ? String(initialData.amount) : prev.amount,
+        transaction_type: initialData.transaction_type || prev.transaction_type,
+        card_type: initialData.card_type || prev.card_type,
+        commission_percent: initialData.commission_percent !== undefined ? String(initialData.commission_percent) : prev.commission_percent,
+        site_fee_percent: initialData.site_fee_percent !== undefined ? String(initialData.site_fee_percent) : prev.site_fee_percent,
+        sent_to: initialData.sent_to || prev.sent_to,
+      }));
+    }
+  }, [initialData, open]);
 
   // Calculate commission amount
   const commissionAmount = useMemo(() => {

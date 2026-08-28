@@ -22,6 +22,9 @@ import {
   Banknote, Receipt, Percent, ArrowDown, ArrowUp,
 } from "lucide-react";
 import { expensesService, Expense } from "@/services/expensesService";
+import { PDFReportGenerator } from "@/components/analytics/PDFReportGenerator";
+import { PeriodComparisonCard } from "@/components/analytics/PeriodComparisonCard";
+import { CashFlowForecast } from "@/components/analytics/CashFlowForecast";
 import { DateSwitch } from "@/components/transactions/DateSwitch";
 import { format, subDays, isSameDay, startOfMonth, endOfMonth, subMonths, isToday, isYesterday } from "date-fns";
 
@@ -397,6 +400,7 @@ const Analytics = () => {
       cumulativeProfitData, dailyActivityData, cardYieldData, portalProfitBarData,
       withdrawalVolume, repaymentVolume, netCapitalFlow, withdrawals, repayments,
       top5ByAmount, top5ByProfit,
+      prevVolume, prevRevenue, prevExpenseTotal, prevTxCount, prevTxProfit,
     };
   }, [transactions, expenses, period, selectedDate]);
 
@@ -444,6 +448,7 @@ const Analytics = () => {
             <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
               Complete business intelligence — revenue, expenses, profitability & trends
             </p>
+            {user && <PDFReportGenerator userId={user.id} />}
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
@@ -557,6 +562,47 @@ const Analytics = () => {
             );
           })}
         </div>
+
+        {/* Period-over-Period Comparison Card */}
+        {period !== "all" && (
+          <PeriodComparisonCard
+            currentMetrics={{
+              volume: analytics.totalVolume,
+              commission: analytics.grossCommission,
+              siteFee: analytics.totalSiteFees,
+              netRevenue: analytics.totalRevenue,
+              expenses: analytics.totalExpenses,
+              netProfit: analytics.netProfit,
+              count: analytics.txCount,
+            }}
+            previousMetrics={{
+              volume: analytics.prevVolume,
+              commission: analytics.prevRevenue,
+              siteFee: 0,
+              netRevenue: analytics.prevRevenue,
+              expenses: analytics.prevExpenseTotal,
+              netProfit: analytics.prevTxProfit - analytics.prevExpenseTotal,
+              count: analytics.prevTxCount,
+            }}
+            periodLabel={periodLabel}
+            previousPeriodLabel={
+              period === "daily"
+                ? "Previous Day"
+                : period === "weekly"
+                ? "Preceding 7 Days"
+                : "Previous Month"
+            }
+          />
+        )}
+
+        {/* Monthly Run-Rate & Cash Flow Forecast */}
+        <CashFlowForecast
+          currentMonthRevenue={analytics.totalRevenue}
+          currentMonthExpenses={analytics.totalExpenses}
+          currentMonthProfit={analytics.netProfit}
+          currentMonthVolume={analytics.totalVolume}
+          transactionCount={analytics.txCount}
+        />
 
         {/* --- Cash Flow & Site Fee Efficiency Row --- */}
         <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
