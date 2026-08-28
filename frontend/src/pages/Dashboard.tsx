@@ -81,18 +81,34 @@ const Dashboard = () => {
 
   // Fetch user profile for greeting
   useEffect(() => {
-    profileService.getUserProfile().then(setUserProfile);
-  }, []);
+    if (user) {
+      if (user.user_metadata?.full_name || user.user_metadata?.name) {
+        setUserProfile({
+          id: user.id,
+          email: user.email,
+          fullName: user.user_metadata.full_name || user.user_metadata.name,
+        });
+      }
+    }
+    profileService.getUserProfile().then((p) => {
+      if (p) setUserProfile(p);
+    });
+  }, [user]);
 
   // Fetch today's quick stats for greeting subtitle
   useEffect(() => {
     if (!user) return;
-    const today = new Date().toISOString().split("T")[0];
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
     supabase
       .from("transactions")
       .select("amount")
       .eq("user_id", user.id)
-      .eq("transaction_date", today)
+      .gte("transaction_date", startOfDay.toISOString())
+      .lte("transaction_date", endOfDay.toISOString())
       .then(({ data }) => {
         if (data) {
           setTodayStats({
@@ -105,11 +121,12 @@ const Dashboard = () => {
     // Fetch last 30 days of transactions for heatmap
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    startOfDay.setHours(0, 0, 0, 0);
     supabase
       .from("transactions")
       .select("amount, profit, commission, site_fee, transaction_date")
       .eq("user_id", user.id)
-      .gte("transaction_date", thirtyDaysAgo.toISOString().split("T")[0])
+      .gte("transaction_date", thirtyDaysAgo.toISOString())
       .then(({ data }) => {
         if (data) setHeatmapTxns(data);
       });

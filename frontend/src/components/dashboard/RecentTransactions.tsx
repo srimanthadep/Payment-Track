@@ -25,33 +25,48 @@ export const RecentTransactions = ({ userId }: RecentTransactionsProps) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let isCurrent = true;
+
     const fetchTransactions = async () => {
-      const { data, error } = await supabase
-        .from("transactions")
-        .select(`
-          id,
-          transaction_type,
-          amount,
-          commission,
-          transaction_date,
-          portals (
-            name
-          )
-        `)
-        .eq("user_id", userId)
-        .order("transaction_date", { ascending: false })
-        .limit(5);
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("transactions")
+          .select(`
+            id,
+            transaction_type,
+            amount,
+            commission,
+            transaction_date,
+            portals (
+              name
+            )
+          `)
+          .eq("user_id", userId)
+          .order("transaction_date", { ascending: false })
+          .limit(5);
 
-      if (error) {
-        console.error("Error fetching recent transactions:", error);
-      } else {
-        setTransactions(data as Transaction[]);
+        if (!isCurrent) return;
+
+        if (error) {
+          console.error("Error fetching recent transactions:", error);
+          setTransactions([]);
+        } else {
+          setTransactions((data as Transaction[]) || []);
+        }
+      } catch (err) {
+        console.error("Error in fetchTransactions:", err);
+      } finally {
+        if (isCurrent) setIsLoading(false);
       }
-
-      setIsLoading(false);
     };
 
     fetchTransactions();
+
+    // Fallback timer ensures recent transactions never get stuck loading
+    const timer = setTimeout(() => {
+      if (isCurrent) setIsLoading(false);
+    }, 2000);
 
     // Live WebSocket Subscription
     const channel = supabase

@@ -47,91 +47,100 @@ export const StatsCards = ({
   };
 
   useEffect(() => {
+    let isCurrent = true;
+
     const fetchStats = async () => {
       setIsLoading(true);
+      try {
+        let query = supabase
+          .from("transactions")
+          .select("transaction_type, amount, commission, site_fee, transaction_date")
+          .eq("user_id", userId);
 
-      let query = supabase
-        .from("transactions")
-        .select("transaction_type, amount, commission, site_fee, transaction_date")
-        .eq("user_id", userId);
+        const now = new Date();
+        const activeDate = selectedDate || now;
 
-      const now = new Date();
-      const activeDate = selectedDate || now;
+        if (period === "daily") {
+          const startOfDay = new Date(
+            activeDate.getFullYear(),
+            activeDate.getMonth(),
+            activeDate.getDate(),
+            0,
+            0,
+            0,
+            0
+          );
+          const endOfDay = new Date(
+            activeDate.getFullYear(),
+            activeDate.getMonth(),
+            activeDate.getDate(),
+            23,
+            59,
+            59,
+            999
+          );
+          query = query
+            .gte("transaction_date", startOfDay.toISOString())
+            .lte("transaction_date", endOfDay.toISOString());
+        } else if (period === "weekly") {
+          const dayOfWeek = now.getDay();
+          const startOfWeek = new Date(now);
+          startOfWeek.setDate(now.getDate() - dayOfWeek);
+          startOfWeek.setHours(0, 0, 0, 0);
+          query = query.gte("transaction_date", startOfWeek.toISOString());
+        } else if (period === "monthly") {
+          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+          query = query.gte("transaction_date", startOfMonth.toISOString());
+        }
 
-      if (period === "daily") {
-        const startOfDay = new Date(
-          activeDate.getFullYear(),
-          activeDate.getMonth(),
-          activeDate.getDate(),
-          0,
-          0,
-          0,
-          0
-        );
-        const endOfDay = new Date(
-          activeDate.getFullYear(),
-          activeDate.getMonth(),
-          activeDate.getDate(),
-          23,
-          59,
-          59,
-          999
-        );
-        query = query
-          .gte("transaction_date", startOfDay.toISOString())
-          .lte("transaction_date", endOfDay.toISOString());
-      } else if (period === "weekly") {
-        const dayOfWeek = now.getDay();
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(now.getDate() - dayOfWeek);
-        startOfWeek.setHours(0, 0, 0, 0);
-        query = query.gte("transaction_date", startOfWeek.toISOString());
-      } else if (period === "monthly") {
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        query = query.gte("transaction_date", startOfMonth.toISOString());
+        const { data: transactions, error } = await query;
+        if (!isCurrent) return;
+
+        if (error) {
+          console.error("Error fetching stats:", error);
+        } else {
+          const withdrawals =
+            transactions
+              ?.filter((t) => t.transaction_type?.toLowerCase() === "withdrawal")
+              .reduce((sum, t) => sum + Number(t.amount || 0), 0) || 0;
+
+          const repayments =
+            transactions
+              ?.filter((t) => t.transaction_type?.toLowerCase() === "repayment")
+              .reduce((sum, t) => sum + Number(t.amount || 0), 0) || 0;
+
+          const commissions =
+            transactions?.reduce(
+              (sum, t) => sum + Number(t.commission || 0),
+              0
+            ) || 0;
+
+          const profit =
+            transactions?.reduce(
+              (sum, t) => sum + (Number(t.commission || 0) - Number(t.site_fee || 0)),
+              0
+            ) || 0;
+
+          setStats({
+            totalWithdrawals: withdrawals,
+            totalRepayments: repayments,
+            totalCommissions: commissions,
+            totalProfit: profit,
+          });
+        }
+      } catch (err) {
+        console.error("Error in fetchStats:", err);
+      } finally {
+        if (isCurrent) setIsLoading(false);
       }
-
-      const { data: transactions, error } = await query;
-
-      if (error) {
-        console.error("Error fetching stats:", error);
-        setIsLoading(false);
-        return;
-      }
-
-      const withdrawals =
-        transactions
-          ?.filter((t) => t.transaction_type?.toLowerCase() === "withdrawal")
-          .reduce((sum, t) => sum + Number(t.amount || 0), 0) || 0;
-
-      const repayments =
-        transactions
-          ?.filter((t) => t.transaction_type?.toLowerCase() === "repayment")
-          .reduce((sum, t) => sum + Number(t.amount || 0), 0) || 0;
-
-      const commissions =
-        transactions?.reduce(
-          (sum, t) => sum + Number(t.commission || 0),
-          0
-        ) || 0;
-
-      const profit =
-        transactions?.reduce(
-          (sum, t) => sum + (Number(t.commission || 0) - Number(t.site_fee || 0)),
-          0
-        ) || 0;
-
-      setStats({
-        totalWithdrawals: withdrawals,
-        totalRepayments: repayments,
-        totalCommissions: commissions,
-        totalProfit: profit,
-      });
-
-      setIsLoading(false);
     };
 
     fetchStats();
+
+    // Fallback timer ensures stats never get stuck loading
+    const timer = setTimeout(() => {
+      if (isCurrent) setIsLoading(false);
+    }, 2000);
 
     // Realtime subscription
     const channel = supabase
@@ -151,6 +160,8 @@ export const StatsCards = ({
       .subscribe();
 
     return () => {
+      isCurrent = false;
+      clearTimeout(timer);
       supabase.removeChannel(channel);
     };
   }, [userId, period, selectedDate]);

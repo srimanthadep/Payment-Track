@@ -22,134 +22,148 @@ export const ProfitChart = ({ userId }: ProfitChartProps) => {
   const [period, setPeriod] = useState<Period>("daily");
 
   useEffect(() => {
+    let isCurrent = true;
+
     const fetchChartData = async () => {
       setIsLoading(true);
-      
-      // Calculate date range based on period
-      const now = new Date();
-      let startDate: Date;
-      let daysBack = 30;
+      try {
+        const now = new Date();
+        let startDate: Date;
+        let daysBack = 30;
 
-      if (period === "daily") {
-        daysBack = 7;
-        startDate = new Date(now);
-        startDate.setDate(now.getDate() - daysBack);
-      } else if (period === "weekly") {
-        daysBack = 84; // 12 weeks
-        startDate = new Date(now);
-        startDate.setDate(now.getDate() - daysBack);
-      } else {
-        // monthly
-        daysBack = 365; // 12 months
-        startDate = new Date(now);
-        startDate.setDate(now.getDate() - daysBack);
-      }
-
-      const { data: transactions, error } = await supabase
-        .from("transactions")
-        .select("transaction_date, commission, site_fee")
-        .eq("user_id", userId)
-        .gte("transaction_date", startDate.toISOString())
-        .order("transaction_date", { ascending: true });
-
-      if (error) {
-        console.error("Error fetching chart data:", error);
-        setIsLoading(false);
-        return;
-      }
-
-      // Generate all dates in range for better visualization
-      const allDates: Date[] = [];
-      const currentDate = new Date(startDate);
-      
-      while (currentDate <= now) {
-        allDates.push(new Date(currentDate));
         if (period === "daily") {
-          currentDate.setDate(currentDate.getDate() + 1);
+          daysBack = 7;
+          startDate = new Date(now);
+          startDate.setDate(now.getDate() - daysBack);
         } else if (period === "weekly") {
-          currentDate.setDate(currentDate.getDate() + 7);
+          daysBack = 84; // 12 weeks
+          startDate = new Date(now);
+          startDate.setDate(now.getDate() - daysBack);
         } else {
           // monthly
-          currentDate.setMonth(currentDate.getMonth() + 1);
+          daysBack = 365; // 12 months
+          startDate = new Date(now);
+          startDate.setDate(now.getDate() - daysBack);
         }
+
+        const { data: transactions, error } = await supabase
+          .from("transactions")
+          .select("transaction_date, commission, site_fee")
+          .eq("user_id", userId)
+          .gte("transaction_date", startDate.toISOString())
+          .order("transaction_date", { ascending: true });
+
+        if (!isCurrent) return;
+
+        if (error) {
+          console.error("Error fetching chart data:", error);
+          setChartData([]);
+        } else {
+          // Generate all dates in range for better visualization
+          const allDates: Date[] = [];
+          const currentDate = new Date(startDate);
+          
+          while (currentDate <= now) {
+            allDates.push(new Date(currentDate));
+            if (period === "daily") {
+              currentDate.setDate(currentDate.getDate() + 1);
+            } else if (period === "weekly") {
+              currentDate.setDate(currentDate.getDate() + 7);
+            } else {
+              currentDate.setMonth(currentDate.getMonth() + 1);
+            }
+          }
+
+          // Group transactions by period
+          const groupedData: Record<string, { profit: number }> = {};
+
+          transactions?.forEach((transaction) => {
+            const date = new Date(transaction.transaction_date);
+            let key: string;
+            let dateKey: Date;
+
+            if (period === "daily") {
+              dateKey = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+              key = dateKey.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+            } else if (period === "weekly") {
+              const weekStart = new Date(date);
+              weekStart.setDate(date.getDate() - date.getDay());
+              weekStart.setHours(0, 0, 0, 0);
+              dateKey = weekStart;
+              key = weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+            } else {
+              dateKey = new Date(date.getFullYear(), date.getMonth(), 1);
+              key = dateKey.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+            }
+
+            if (!groupedData[key]) {
+              groupedData[key] = {
+                date: key,
+                dateKey: dateKey.getTime(),
+                profit: 0,
+              };
+            }
+
+            groupedData[key].profit += Number(transaction.commission || 0);
+          });
+
+          // Fill in missing dates with zero values
+          const formattedData = allDates.map((date) => {
+            let key: string;
+            let dateKey: Date;
+            if (period === "daily") {
+              dateKey = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+              key = dateKey.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+            } else if (period === "weekly") {
+              const weekStart = new Date(date);
+              weekStart.setDate(date.getDate() - date.getDay());
+              weekStart.setHours(0, 0, 0, 0);
+              dateKey = weekStart;
+              key = weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+            } else {
+              dateKey = new Date(date.getFullYear(), date.getMonth(), 1);
+              key = dateKey.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+            }
+
+            return groupedData[key] || {
+              date: key,
+              dateKey: dateKey.getTime(),
+              profit: 0,
+            };
+          });
+
+          // Remove duplicates and sort
+          const uniqueData = formattedData.reduce((acc: Array<ChartDataPoint & { dateKey: number }>, curr) => {
+            const existing = acc.find((item) => item.date === curr.date);
+            if (!existing) {
+              acc.push(curr);
+            } else {
+              existing.profit += curr.profit;
+            }
+            return acc;
+          }, []);
+
+          uniqueData.sort((a, b) => a.dateKey - b.dateKey);
+          setChartData(uniqueData);
+        }
+      } catch (err) {
+        console.error("Error in fetchChartData:", err);
+      } finally {
+        if (isCurrent) setIsLoading(false);
       }
-
-      // Group transactions by period
-      const groupedData: Record<string, { profit: number }> = {};
-
-      transactions?.forEach((transaction) => {
-        const date = new Date(transaction.transaction_date);
-        let key: string;
-        let dateKey: Date;
-
-        if (period === "daily") {
-          dateKey = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-          key = dateKey.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        } else if (period === "weekly") {
-          const weekStart = new Date(date);
-          weekStart.setDate(date.getDate() - date.getDay());
-          weekStart.setHours(0, 0, 0, 0);
-          dateKey = weekStart;
-          key = weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        } else {
-          // monthly
-          dateKey = new Date(date.getFullYear(), date.getMonth(), 1);
-          key = dateKey.toLocaleDateString("en-US", { month: "short", year: "numeric" });
-        }
-
-        if (!groupedData[key]) {
-          groupedData[key] = {
-            date: key,
-            dateKey: dateKey.getTime(),
-            profit: 0,
-          };
-        }
-
-        groupedData[key].profit += Number(transaction.commission || 0);
-      });
-
-      // Fill in missing dates with zero values
-      const formattedData = allDates.map((date) => {
-        let key: string;
-        let dateKey: Date;
-        if (period === "daily") {
-          dateKey = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-          key = dateKey.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        } else if (period === "weekly") {
-          const weekStart = new Date(date);
-          weekStart.setDate(date.getDate() - date.getDay());
-          weekStart.setHours(0, 0, 0, 0);
-          dateKey = weekStart;
-          key = weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        } else {
-          dateKey = new Date(date.getFullYear(), date.getMonth(), 1);
-          key = dateKey.toLocaleDateString("en-US", { month: "short", year: "numeric" });
-        }
-
-        return groupedData[key] || {
-          date: key,
-          dateKey: dateKey.getTime(),
-          profit: 0,
-        };
-      });
-
-      // Remove duplicates and sort
-      const uniqueData = formattedData.reduce((acc: Array<ChartDataPoint & { dateKey: number }>, curr) => {
-        const existing = acc.find((item) => item.date === curr.date);
-        if (!existing) {
-          acc.push(curr);
-        } else {
-          existing.profit += curr.profit;
-        }
-        return acc;
-      }, []);
-
-      uniqueData.sort((a, b) => a.dateKey - b.dateKey);
-      setChartData(uniqueData);
-      setIsLoading(false);
     };
 
     fetchChartData();
+
+    // Fallback timer ensures chart never stays stuck loading
+    const timer = setTimeout(() => {
+      if (isCurrent) setIsLoading(false);
+    }, 2000);
+
+    return () => {
+      isCurrent = false;
+      clearTimeout(timer);
+    };
   }, [userId, period]);
 
   const formatCurrency = (amount: number) => {
