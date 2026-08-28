@@ -35,20 +35,25 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    // Set up auth state listener
+    let mounted = true;
+
+    // 1. Listen for auth state changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
       setSession(session);
       setUser(session?.user ?? null);
+      setIsLoading(false);
 
-      if (!session) {
+      if (!session && event === "SIGNED_OUT") {
         navigate("/auth");
       }
     });
 
-    // Check for existing session
+    // 2. Check for existing session immediately
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
@@ -56,9 +61,22 @@ const Dashboard = () => {
       if (!session) {
         navigate("/auth");
       }
+    }).catch(() => {
+      if (mounted) setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    // 3. Safety timeout fallback: guarantee that skeleton disappears within 1.5s
+    const fallbackTimer = setTimeout(() => {
+      if (mounted) {
+        setIsLoading(false);
+      }
+    }, 1500);
+
+    return () => {
+      mounted = false;
+      clearTimeout(fallbackTimer);
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   // Fetch user profile for greeting
