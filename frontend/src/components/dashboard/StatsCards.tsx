@@ -197,7 +197,7 @@ export const StatsCards = ({
       gradient: "from-purple-500 to-purple-600",
     },
     {
-      title: `${getPeriodLabel()} Profit`,
+      title: `Total Profit (${getPeriodLabel()})`,
       value: stats.totalProfit,
       icon: TrendingUp,
       gradient: "from-success to-success/70",
@@ -226,7 +226,7 @@ export const StatsCards = ({
           </Tabs>
         </div>
       )}
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4 items-stretch">
         {cards.map((card, index) => {
           const Icon = card.icon;
           return (
@@ -235,30 +235,33 @@ export const StatsCards = ({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
+              className="h-full"
             >
-              <Card className="overflow-hidden relative shadow-sm border-border/80">
-                <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-                  <CardTitle className="text-xs sm:text-sm font-medium leading-tight pr-2">
-                    {card.title}
-                  </CardTitle>
-                  <div
-                    className={`p-1.5 sm:p-2 rounded-lg bg-gradient-to-br ${card.gradient} flex-shrink-0`}
-                  >
-                    <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="text-lg sm:text-2xl font-bold">
-                    {isLoading ? (
-                      <div className="h-6 sm:h-8 w-20 sm:w-24 bg-muted animate-pulse rounded" />
-                    ) : (
-                      formatCurrency(card.value)
-                    )}
-                  </div>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
-                    Updated in real-time
-                  </p>
-                </CardContent>
+              <Card className="overflow-hidden relative shadow-sm border-border/80 h-full flex flex-col justify-between">
+                <div>
+                  <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+                    <CardTitle className="text-xs sm:text-sm font-medium leading-tight pr-2 min-h-[2rem] sm:min-h-[2.25rem] flex items-center">
+                      {card.title}
+                    </CardTitle>
+                    <div
+                      className={`p-1.5 sm:p-2 rounded-lg bg-gradient-to-br ${card.gradient} flex-shrink-0`}
+                    >
+                      <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="text-lg sm:text-2xl font-bold">
+                      {isLoading ? (
+                        <div className="h-6 sm:h-8 w-20 sm:w-24 bg-muted animate-pulse rounded" />
+                      ) : (
+                        formatCurrency(card.value)
+                      )}
+                    </div>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
+                      Updated in real-time
+                    </p>
+                  </CardContent>
+                </div>
               </Card>
             </motion.div>
           );
