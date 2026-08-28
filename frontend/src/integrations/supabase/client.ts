@@ -15,9 +15,5 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    // Custom lock function avoids the browser navigator.locks deadlock on token expiry (1 hour)
-    lock: async (_name: string, _acquireTimeout: number, fn: () => Promise<any>) => {
-      return await fn();
-    },
   },
 });

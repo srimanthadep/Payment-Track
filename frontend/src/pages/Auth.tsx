@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Loader2, 
@@ -15,10 +16,9 @@ import {
   Building2, 
   ShieldCheck, 
   Eye, 
-  EyeOff,
-  Sparkles
+  EyeOff, 
+  Sparkles 
 } from "lucide-react";
-import SpecularButton from "@/components/ui/SpecularButton";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { invokeBackendApi } from "@/integrations/backend/api";
@@ -372,21 +372,10 @@ const Auth = () => {
                   </div>
 
                   <div className="pt-2">
-                    <SpecularButton
+                    <Button
                       type="submit"
-                      size="md"
-                      radius={12}
-                      tint="#1d4ed8"
-                      tintOpacity={0.95}
-                      textColor="#ffffff"
-                      lineColor="#93c5fd"
-                      baseColor="#1e3a8a"
-                      intensity={1.2}
-                      thickness={1.5}
-                      speed={0.4}
-                      followMouse
                       disabled={signInLoading}
-                      className="w-full font-semibold shadow-md py-3 text-sm h-11 rounded-xl"
+                      className="w-full font-semibold shadow-md py-3 text-sm h-11 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground transition-all"
                     >
                       {signInLoading ? (
                         <>
@@ -396,7 +385,7 @@ const Auth = () => {
                       ) : (
                         "Sign In to Your Workspace"
                       )}
-                    </SpecularButton>
+                    </Button>
                   </div>
 
                   <div className="text-center pt-2">
@@ -531,21 +520,10 @@ const Auth = () => {
                   </div>
 
                   <div className="pt-2">
-                    <SpecularButton
+                    <Button
                       type="submit"
-                      size="md"
-                      radius={12}
-                      tint="#059669"
-                      tintOpacity={0.95}
-                      textColor="#ffffff"
-                      lineColor="#6ee7b7"
-                      baseColor="#064e3b"
-                      intensity={1.2}
-                      thickness={1.5}
-                      speed={0.4}
-                      followMouse
                       disabled={signUpLoading}
-                      className="w-full font-semibold shadow-md py-3 text-sm h-11 rounded-xl"
+                      className="w-full font-semibold shadow-md py-3 text-sm h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition-all"
                     >
                       {signUpLoading ? (
                         <>
@@ -555,7 +533,7 @@ const Auth = () => {
                       ) : (
                         "Create Private Account"
                       )}
-                    </SpecularButton>
+                    </Button>
                   </div>
 
                   <div className="text-center pt-1">
