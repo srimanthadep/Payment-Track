@@ -47,15 +47,31 @@ const Auth = () => {
   const [showSignUpPassword, setShowSignUpPassword] = useState(false);
 
   useEffect(() => {
-    // Check if user is already logged in, handle stale refresh tokens
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (error) {
-        // Clear invalid stale token
-        supabase.auth.signOut().catch(() => {});
-      } else if (session) {
-        navigate("/dashboard");
+    // Check if user has an active, unexpired session
+    const verifySession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error || !session) {
+          // Clean invalid stale state
+          await supabase.auth.signOut().catch(() => {});
+          return;
+        }
+
+        // Check if JWT token has expired (Supabase JWT expires in 3600s = 1 hour)
+        const nowInSeconds = Math.floor(Date.now() / 1000);
+        if (session.expires_at && session.expires_at <= nowInSeconds) {
+          console.log("[Auth] Session expired after 1 hour, clearing stale token...");
+          await supabase.auth.signOut().catch(() => {});
+          return;
+        }
+
+        // Valid active session
+        navigate("/dashboard", { replace: true });
+      } catch {
+        await supabase.auth.signOut().catch(() => {});
       }
-    });
+    };
+    verifySession();
   }, [navigate]);
 
   useEffect(() => {
@@ -92,6 +108,8 @@ const Auth = () => {
     console.log("[Auth] Attempting sign in for:", signInIdentifier, "->", emailIdentifier);
 
     try {
+      // Clear any stale local auth state before requesting fresh token
+      await supabase.auth.signOut().catch(() => {});
       // Add a 12-second timeout protection so it never hangs indefinitely
       const timeoutPromise = new Promise<{ data: any; error: any }>((_, reject) =>
         setTimeout(
