@@ -79,6 +79,11 @@ const Dashboard = () => {
     };
   }, [navigate]);
 
+  // Ensure view always starts at the top of the page (showing Greeting & Top Section)
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [isLoading]);
+
   // Fetch user profile for greeting
   useEffect(() => {
     if (user) {
