@@ -102,8 +102,14 @@ export const AdminPortals = () => {
     setEditingPortal(portal);
     setFormData({
       name: portal.name,
-      default_commission_rate: portal.default_commission_rate.toString(),
-      default_site_fee: portal.default_site_fee.toString(),
+      default_commission_rate:
+        portal.default_commission_rate && portal.default_commission_rate > 0
+          ? portal.default_commission_rate.toString()
+          : "",
+      default_site_fee:
+        portal.default_site_fee && portal.default_site_fee > 0
+          ? portal.default_site_fee.toString()
+          : "",
       is_active: portal.is_active,
     });
     setEditDialogOpen(true);
@@ -124,8 +130,8 @@ export const AdminPortals = () => {
     try {
       const data = {
         name: formData.name,
-        default_commission_rate: parseFloat(formData.default_commission_rate),
-        default_site_fee: parseFloat(formData.default_site_fee),
+        default_commission_rate: parseFloat(formData.default_commission_rate) || 0,
+        default_site_fee: parseFloat(formData.default_site_fee) || 0,
         is_active: formData.is_active,
       };
 

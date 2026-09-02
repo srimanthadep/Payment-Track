@@ -133,9 +133,15 @@ export const EditTransactionDialog = ({
         portal_id: transaction.portal_id,
         card_type: cardType,
         transaction_type: transaction.transaction_type as "withdrawal" | "repayment",
-        amount: transaction.amount.toString(),
-        commission: transaction.commission.toString(),
-        site_fee: transaction.site_fee.toString(),
+        amount: transaction.amount ? transaction.amount.toString() : "",
+        commission:
+          transaction.commission && transaction.commission > 0
+            ? transaction.commission.toString()
+            : "",
+        site_fee:
+          transaction.site_fee && transaction.site_fee > 0
+            ? transaction.site_fee.toString()
+            : "",
         reference_number: transaction.reference_number || "",
         status: transaction.status,
         transaction_date: transaction.transaction_date

@@ -37,12 +37,14 @@ import {
   Download,
   Upload,
   ArrowRight,
-  Sliders,
   Wallet,
   Receipt,
+  BrainCircuit,
+  Sliders,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
+import { LearningInsightsCard } from "@/components/settings/LearningInsightsCard";
 import {
   settingsService,
   AppSettings,
@@ -90,8 +92,8 @@ const Settings = () => {
   const [cardTypeModalOpen, setCardTypeModalOpen] = useState(false);
   const [editingCardType, setEditingCardType] = useState<CardTypeOption | null>(null);
   const [cardTypeName, setCardTypeName] = useState("");
-  const [cardWithdrawRate, setCardWithdrawRate] = useState("0");
-  const [cardRepayRate, setCardRepayRate] = useState("0");
+  const [cardWithdrawRate, setCardWithdrawRate] = useState("");
+  const [cardRepayRate, setCardRepayRate] = useState("");
 
   const [transactionTypeModalOpen, setTransactionTypeModalOpen] = useState(false);
   const [editingTxType, setEditingTxType] = useState<TransactionTypeOption | null>(null);
@@ -256,7 +258,7 @@ const Settings = () => {
 
         {/* Tabs */}
         <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="grid grid-cols-4 w-full sm:w-[580px] p-1 bg-muted/60 h-auto">
+          <TabsList className="grid grid-cols-5 w-full sm:w-[720px] p-1 bg-muted/60 h-auto">
             <TabsTrigger
               value="profile"
               className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 text-[11px] sm:text-sm font-semibold h-auto"
@@ -277,6 +279,13 @@ const Settings = () => {
             >
               <Receipt className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span>Tx Config</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="ai-learning"
+              className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 text-[11px] sm:text-sm font-semibold h-auto"
+            >
+              <BrainCircuit className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
+              <span>AI Learning</span>
             </TabsTrigger>
             <TabsTrigger
               value="backup"
@@ -562,8 +571,8 @@ const Settings = () => {
                     onClick={() => {
                       setEditingCardType(null);
                       setCardTypeName("");
-                      setCardWithdrawRate("0");
-                      setCardRepayRate("0");
+                      setCardWithdrawRate("");
+                      setCardRepayRate("");
                       setCardTypeModalOpen(true);
                     }}
                     className="h-8 text-xs gap-1"
@@ -590,8 +599,8 @@ const Settings = () => {
                             onClick={() => {
                               setEditingCardType(card);
                               setCardTypeName(card.name);
-                              setCardWithdrawRate(card.withdrawRate.toString());
-                              setCardRepayRate(card.repayRate.toString());
+                              setCardWithdrawRate(card.withdrawRate > 0 ? card.withdrawRate.toString() : "");
+                              setCardRepayRate(card.repayRate > 0 ? card.repayRate.toString() : "");
                               setCardTypeModalOpen(true);
                             }}
                           >
@@ -691,6 +700,11 @@ const Settings = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* ===================== TAB: AI LEARNING & ACCURACY ===================== */}
+          <TabsContent value="ai-learning" className="space-y-6">
+            <LearningInsightsCard />
           </TabsContent>
 
           {/* ===================== TAB 3: BACKUP & RESET ===================== */}
@@ -900,6 +914,7 @@ const Settings = () => {
                   step="0.01"
                   min="0"
                   max="100"
+                  placeholder="0"
                   value={cardWithdrawRate}
                   onChange={(e) => setCardWithdrawRate(e.target.value)}
                 />
@@ -912,6 +927,7 @@ const Settings = () => {
                   step="0.01"
                   min="0"
                   max="100"
+                  placeholder="0"
                   value={cardRepayRate}
                   onChange={(e) => setCardRepayRate(e.target.value)}
                 />

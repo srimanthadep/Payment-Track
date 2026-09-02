@@ -154,12 +154,12 @@ export const ManagePortalsDialog = ({ open, onOpenChange }: ManagePortalsDialogP
             </div>
             <div className="space-y-2">
               <Label htmlFor="portal-commission">Default Commission %</Label>
-              <Input id="portal-commission" type="number" step="0.01" value={form.default_commission_rate}
+              <Input id="portal-commission" type="number" step="0.01" placeholder="0" value={form.default_commission_rate}
                      onChange={(e) => setForm({ ...form, default_commission_rate: e.target.value })} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="portal-sitefee">Default Site Fee ₹</Label>
-              <Input id="portal-sitefee" type="number" step="0.01" value={form.default_site_fee}
+              <Input id="portal-sitefee" type="number" step="0.01" placeholder="0" value={form.default_site_fee}
                      onChange={(e) => setForm({ ...form, default_site_fee: e.target.value })} />
             </div>
           </div>
@@ -189,7 +189,7 @@ export const ManagePortalsDialog = ({ open, onOpenChange }: ManagePortalsDialogP
                     <TableCell className="text-right">{p.default_site_fee?.toFixed?.(2) ?? p.default_site_fee}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button size="icon" variant="outline" onClick={async () => { setEditing(p); setForm({ name: p.name, default_commission_rate: String(p.default_commission_rate ?? 0), default_site_fee: String(p.default_site_fee ?? 0) }); await loadRates(p.id); }}>
+                        <Button size="icon" variant="outline" onClick={async () => { setEditing(p); setForm({ name: p.name, default_commission_rate: p.default_commission_rate && p.default_commission_rate > 0 ? String(p.default_commission_rate) : "", default_site_fee: p.default_site_fee && p.default_site_fee > 0 ? String(p.default_site_fee) : "" }); await loadRates(p.id); }}>
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button size="icon" variant="destructive" onClick={() => remove(p.id)}>

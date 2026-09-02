@@ -96,7 +96,7 @@ export const AdminCardTypes = () => {
     setEditingCardType(cardType);
     setFormData({
       name: cardType.name,
-      percentage: cardType.percentage.toString(),
+      percentage: cardType.percentage && cardType.percentage > 0 ? cardType.percentage.toString() : "",
     });
     setEditDialogOpen(true);
   };
@@ -120,14 +120,16 @@ export const AdminCardTypes = () => {
       return false;
     }
 
-    const percentage = parseFloat(formData.percentage);
-    if (isNaN(percentage) || percentage < 0 || percentage > 100) {
-      toast({
-        title: "Validation Error",
-        description: "Percentage must be between 0 and 100",
-        variant: "destructive",
-      });
-      return false;
+    if (formData.percentage) {
+      const percentage = parseFloat(formData.percentage);
+      if (isNaN(percentage) || percentage < 0 || percentage > 100) {
+        toast({
+          title: "Validation Error",
+          description: "Percentage must be between 0 and 100",
+          variant: "destructive",
+        });
+        return false;
+      }
     }
 
     return true;
@@ -139,7 +141,7 @@ export const AdminCardTypes = () => {
     try {
       const data = {
         name: formData.name.trim(),
-        percentage: parseFloat(formData.percentage),
+        percentage: formData.percentage ? parseFloat(formData.percentage) : 0,
       };
 
       if (editingCardType) {

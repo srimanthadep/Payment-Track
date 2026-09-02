@@ -247,9 +247,9 @@ export const PortalComparisonChart = ({
             <p className="text-sm text-muted-foreground">No transaction data for {getPeriodLabel()}</p>
           </div>
         ) : (
-          <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
+          <div className="flex flex-col lg:flex-row gap-4 lg:gap-8 items-center lg:items-start justify-between">
             {/* Left side: Pie Chart and Legend */}
-            <div className="flex-1 space-y-3">
+            <div className="flex-1 min-w-0 space-y-3 w-full">
               {/* Pie Chart for Profit Distribution */}
               <div className="w-full h-[220px] sm:h-[280px] lg:h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -288,36 +288,48 @@ export const PortalComparisonChart = ({
               </div>
             </div>
 
-            {/* Right side: Summary Cards */}
-            <div className="flex-1 lg:max-w-[300px]">
-              <div className="grid grid-cols-2 lg:grid-cols-1 gap-2 sm:gap-3">
+            {/* Right side: Fixed-Width Summary Cards (1-3 portals: 1 col, 4+ portals: 2 cols) */}
+            <div className="w-full lg:w-auto flex justify-center lg:justify-end items-start flex-shrink-0">
+              <div
+                className={
+                  chartData.length >= 4
+                    ? "grid grid-cols-2 gap-2 sm:gap-2.5"
+                    : "grid grid-cols-1 gap-2 sm:gap-2.5"
+                }
+              >
                 {chartData.map((portal, index) => (
                   <motion.div
                     key={portal.name}
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="rounded-lg border p-2.5 sm:p-3 bg-card/50"
+                    transition={{ delay: index * 0.05 }}
+                    className="w-[150px] min-[400px]:w-[165px] sm:w-[175px] rounded-lg border p-2.5 bg-card/60 shadow-2xs flex flex-col justify-between hover:bg-card/90 transition-colors"
                   >
                     <div className="flex items-center gap-2 mb-2">
                       <div
                         className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                         style={{ backgroundColor: COLORS[index % COLORS.length] }}
                       />
-                      <p className="text-xs font-semibold truncate">{portal.name}</p>
+                      <p className="text-xs font-semibold truncate" title={portal.name}>
+                        {portal.name}
+                      </p>
                     </div>
                     <div className="space-y-1.5">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] text-muted-foreground">Txns</span>
-                        <span className="text-xs font-medium">{portal.transactions}</span>
+                      <div className="flex justify-between items-center text-[10px]">
+                        <span className="text-muted-foreground">Txns</span>
+                        <span className="font-medium text-foreground">{portal.transactions}</span>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] text-muted-foreground">Amount</span>
-                        <span className="text-xs font-semibold truncate ml-1">{formatCurrency(portal.totalAmount)}</span>
+                      <div className="flex justify-between items-center text-[10px]">
+                        <span className="text-muted-foreground">Amount</span>
+                        <span className="font-semibold text-foreground truncate ml-1">
+                          {formatCurrency(portal.totalAmount)}
+                        </span>
                       </div>
-                      <div className="flex justify-between items-center pt-1 border-t">
-                        <span className="text-[10px] text-muted-foreground">Profit</span>
-                        <span className="text-xs font-bold text-success truncate ml-1">{formatCurrency(portal.totalProfit)}</span>
+                      <div className="flex justify-between items-center pt-1 border-t text-[10px]">
+                        <span className="text-muted-foreground">Profit</span>
+                        <span className="font-bold text-success truncate ml-1">
+                          {formatCurrency(portal.totalProfit)}
+                        </span>
                       </div>
                     </div>
                   </motion.div>

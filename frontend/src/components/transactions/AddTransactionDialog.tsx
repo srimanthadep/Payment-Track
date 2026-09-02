@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Calendar as CalendarIcon } from "lucide-react";
+import { Loader2, Calendar as CalendarIcon, Sparkles } from "lucide-react";
 import { format, isToday } from "date-fns";
 import {
   settingsService,
@@ -32,6 +32,7 @@ import {
   RecipientOption,
   TransactionTypeOption,
 } from "@/services/settingsService";
+import { transactionLearningService } from "@/services/transactionLearningService";
 
 interface AddTransactionDialogProps {
   userId: string;
@@ -86,6 +87,53 @@ export const AddTransactionDialog = ({
     transaction_date: new Date(),
   });
 
+  const [isCommissionManual, setIsCommissionManual] = useState(false);
+  const [isSiteFeeManual, setIsSiteFeeManual] = useState(false);
+  const [recommendationInfo, setRecommendationInfo] = useState<{
+    commission: number | null;
+    siteFee: number | null;
+    confidence: number;
+    source: string;
+    explanation?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      transactionLearningService.init();
+    }
+  }, [open]);
+
+  // Helper to query and apply transaction fee recommendations based on historical learning
+  const applyLearningRecommendation = (
+    txType: string,
+    cType: string,
+    recipient: string,
+    manualComm = isCommissionManual,
+    manualFee = isSiteFeeManual
+  ) => {
+    if (!cType && !txType) return;
+
+    const rec = transactionLearningService.getRecommendation({
+      cardType: cType,
+      transactionType: txType,
+      sentTo: recipient,
+    });
+
+    if (rec.source !== "none") {
+      setFormData((prev) => {
+        const next = { ...prev };
+        if (!manualComm && rec.commission !== null) {
+          next.commission_percent = rec.commission > 0 ? rec.commission.toString() : "";
+        }
+        if (!manualFee && rec.siteFee !== null) {
+          next.site_fee_percent = rec.siteFee > 0 ? rec.siteFee.toString() : "";
+        }
+        return next;
+      });
+      setRecommendationInfo(rec);
+    }
+  };
+
   useEffect(() => {
     if (initialData && open) {
       setFormData((prev) => ({
@@ -93,7 +141,12 @@ export const AddTransactionDialog = ({
         amount: initialData.amount !== undefined && initialData.amount !== null ? String(initialData.amount) : prev.amount,
         transaction_type: initialData.transaction_type || prev.transaction_type,
         card_type: initialData.card_type || prev.card_type,
-        commission_percent: initialData.commission_percent !== undefined ? String(initialData.commission_percent) : prev.commission_percent,
+        commission_percent:
+          initialData.commission_percent !== undefined &&
+          initialData.commission_percent !== null &&
+          Number(initialData.commission_percent) > 0
+            ? String(initialData.commission_percent)
+            : "",
         site_fee_percent: initialData.site_fee_percent !== undefined ? String(initialData.site_fee_percent) : prev.site_fee_percent,
         sent_to: initialData.sent_to || prev.sent_to,
       }));
@@ -136,6 +189,9 @@ export const AddTransactionDialog = ({
       reference_number: "",
       transaction_date: new Date(),
     });
+    setIsCommissionManual(false);
+    setIsSiteFeeManual(false);
+    setRecommendationInfo(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -168,15 +224,6 @@ export const AddTransactionDialog = ({
       return;
     }
 
-    if (!formData.commission_percent || parseFloat(formData.commission_percent) <= 0) {
-      toast({
-        title: "Error",
-        description: "Please enter commission percentage",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (!formData.sent_to) {
       toast({
         title: "Error",
@@ -201,7 +248,7 @@ export const AddTransactionDialog = ({
         .from("portals")
         .insert({
           name: formData.sent_to,
-          default_commission_rate: parseFloat(formData.commission_percent),
+          default_commission_rate: parseFloat(formData.commission_percent) || 0,
           default_site_fee: 0,
           is_active: true,
         })
@@ -211,6 +258,7 @@ export const AddTransactionDialog = ({
       }
     }
 
+    const commPercent = parseFloat(formData.commission_percent) || 0;
     const payload = {
       user_id: userId,
       portal_id: portalId,
@@ -222,7 +270,7 @@ export const AddTransactionDialog = ({
       transaction_date: formData.transaction_date.toISOString(),
       reference_number: formData.reference_number || null,
       status: "completed",
-      notes: `Sent to: ${formData.sent_to} | Commission: ${formData.commission_percent}%${
+      notes: `Sent to: ${formData.sent_to} | Commission: ${commPercent}%${
         formData.site_fee_percent ? ` | Site Fee: ${formData.site_fee_percent}%` : ""
       }`,
     };
@@ -239,6 +287,17 @@ export const AddTransactionDialog = ({
       });
     } else {
       const addedDate = formData.transaction_date;
+      // Ingest newly added transaction into learning engine immediately
+      transactionLearningService.recordNewTransaction({
+        card_type: formData.card_type,
+        transaction_type: formData.transaction_type,
+        sent_to: formData.sent_to,
+        amount: parseFloat(formData.amount),
+        commission_percent: parseFloat(formData.commission_percent) || 0,
+        site_fee_percent: parseFloat(formData.site_fee_percent) || 0,
+        transaction_date: formData.transaction_date,
+      });
+
       toast({
         title: "Success",
         description: "Transaction added successfully",
@@ -249,7 +308,7 @@ export const AddTransactionDialog = ({
     }
   };
 
-  const hasEnteredCommission = formData.amount && formData.commission_percent;
+  const hasEnteredCommission = Boolean(formData.amount && parseFloat(formData.amount) > 0);
 
   return (
     <Dialog
@@ -354,17 +413,11 @@ export const AddTransactionDialog = ({
                 value={formData.transaction_type}
                 onValueChange={(val) => {
                   const newType = val as "withdrawal" | "repayment";
-                  // Check if selected card has default rate for this type
-                  const selectedCard = cardTypes.find((c) => c.name === formData.card_type);
-                  let rate = formData.commission_percent;
-                  if (selectedCard) {
-                    rate = (newType === "withdrawal" ? selectedCard.withdrawRate : selectedCard.repayRate).toString();
-                  }
-                  setFormData({
-                    ...formData,
+                  setFormData((prev) => ({
+                    ...prev,
                     transaction_type: newType,
-                    commission_percent: rate || formData.commission_percent,
-                  });
+                  }));
+                  applyLearningRecommendation(newType, formData.card_type, formData.sent_to);
                 }}
                 required
               >
@@ -386,19 +439,11 @@ export const AddTransactionDialog = ({
               <Select
                 value={formData.card_type}
                 onValueChange={(val) => {
-                  const selectedCard = cardTypes.find((c) => c.name === val);
-                  let rate = formData.commission_percent;
-                  if (selectedCard && formData.transaction_type) {
-                    rate = (formData.transaction_type === "withdrawal"
-                      ? selectedCard.withdrawRate
-                      : selectedCard.repayRate
-                    ).toString();
-                  }
-                  setFormData({
-                    ...formData,
+                  setFormData((prev) => ({
+                    ...prev,
                     card_type: val,
-                    commission_percent: rate || formData.commission_percent,
-                  });
+                  }));
+                  applyLearningRecommendation(formData.transaction_type, val, formData.sent_to);
                 }}
                 required
               >
@@ -427,7 +472,18 @@ export const AddTransactionDialog = ({
           {/* 4. Commission (%) & 5. Site Fee (%) */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="commission_percent">Commission (%)</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="commission_percent">Commission (%)</Label>
+                {recommendationInfo && !isCommissionManual && recommendationInfo.commission !== null && formData.commission_percent && (
+                  <span
+                    className="text-[10px] font-semibold text-primary inline-flex items-center gap-1 bg-primary/10 px-1.5 py-0.5 rounded-full"
+                    title={recommendationInfo.explanation}
+                  >
+                    <Sparkles className="h-2.5 w-2.5" />
+                    Auto-learned
+                  </span>
+                )}
+              </div>
               <Input
                 id="commission_percent"
                 type="number"
@@ -436,18 +492,29 @@ export const AddTransactionDialog = ({
                 max="100"
                 placeholder="e.g. 2.0"
                 value={formData.commission_percent}
-                onChange={(e) =>
+                onChange={(e) => {
+                  setIsCommissionManual(true);
                   setFormData({
                     ...formData,
                     commission_percent: e.target.value,
-                  })
-                }
-                required
+                  });
+                }}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="site_fee_percent">Site Fee (%) (Optional)</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="site_fee_percent">Site Fee (%) (Optional)</Label>
+                {recommendationInfo && !isSiteFeeManual && recommendationInfo.siteFee !== null && formData.site_fee_percent && (
+                  <span
+                    className="text-[10px] font-semibold text-primary inline-flex items-center gap-1 bg-primary/10 px-1.5 py-0.5 rounded-full"
+                    title={recommendationInfo.explanation}
+                  >
+                    <Sparkles className="h-2.5 w-2.5" />
+                    Auto-learned
+                  </span>
+                )}
+              </div>
               <Input
                 id="site_fee_percent"
                 type="number"
@@ -456,12 +523,13 @@ export const AddTransactionDialog = ({
                 max="100"
                 placeholder="e.g. 0.5"
                 value={formData.site_fee_percent}
-                onChange={(e) =>
+                onChange={(e) => {
+                  setIsSiteFeeManual(true);
                   setFormData({
                     ...formData,
                     site_fee_percent: e.target.value,
-                  })
-                }
+                  });
+                }}
               />
             </div>
           </div>
@@ -495,9 +563,10 @@ export const AddTransactionDialog = ({
             <Label htmlFor="sent_to">Sent To</Label>
             <Select
               value={formData.sent_to}
-              onValueChange={(val) =>
-                setFormData({ ...formData, sent_to: val })
-              }
+              onValueChange={(val) => {
+                setFormData((prev) => ({ ...prev, sent_to: val }));
+                applyLearningRecommendation(formData.transaction_type, formData.card_type, val);
+              }}
               required
             >
               <SelectTrigger id="sent_to">
