@@ -209,14 +209,12 @@ const Dashboard = () => {
             </div>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
-              {period === "daily" && (
+              {period !== "all" && (
                 <DateSwitch
+                  period={period}
                   selectedDate={selectedDate}
                   onDateChange={(newDate) => {
                     setSelectedDate(newDate);
-                    if (newDate) {
-                      setPeriod("daily");
-                    }
                   }}
                   className="w-full sm:w-auto"
                 />
@@ -224,20 +222,49 @@ const Dashboard = () => {
 
               <Tabs
                 value={period}
-                onValueChange={(v) => setPeriod(v as Period)}
+                onValueChange={(v) => {
+                  setPeriod(v as Period);
+                  if (!selectedDate && v !== "all") {
+                    setSelectedDate(new Date());
+                  }
+                }}
                 className="w-full sm:w-auto"
               >
-                <TabsList className="grid grid-cols-4 w-full sm:w-auto">
-                  <TabsTrigger value="daily" className="text-xs sm:text-sm">
+                <TabsList
+                  className="grid grid-cols-4 w-full sm:w-auto"
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                      e.stopPropagation();
+                      e.preventDefault();
+                    }
+                  }}
+                >
+                  <TabsTrigger
+                    value="daily"
+                    className="text-xs sm:text-sm"
+                    onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                  >
                     Daily
                   </TabsTrigger>
-                  <TabsTrigger value="weekly" className="text-xs sm:text-sm">
+                  <TabsTrigger
+                    value="weekly"
+                    className="text-xs sm:text-sm"
+                    onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                  >
                     Weekly
                   </TabsTrigger>
-                  <TabsTrigger value="monthly" className="text-xs sm:text-sm">
+                  <TabsTrigger
+                    value="monthly"
+                    className="text-xs sm:text-sm"
+                    onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                  >
                     Monthly
                   </TabsTrigger>
-                  <TabsTrigger value="all" className="text-xs sm:text-sm">
+                  <TabsTrigger
+                    value="all"
+                    className="text-xs sm:text-sm"
+                    onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                  >
                     All Time
                   </TabsTrigger>
                 </TabsList>

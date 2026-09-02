@@ -26,7 +26,21 @@ import { PDFReportGenerator } from "@/components/analytics/PDFReportGenerator";
 import { PeriodComparisonCard } from "@/components/analytics/PeriodComparisonCard";
 import { CashFlowForecast } from "@/components/analytics/CashFlowForecast";
 import { DateSwitch } from "@/components/transactions/DateSwitch";
-import { format, subDays, isSameDay, startOfMonth, endOfMonth, subMonths, isToday, isYesterday } from "date-fns";
+import {
+  format,
+  subDays,
+  isSameDay,
+  startOfMonth,
+  endOfMonth,
+  subMonths,
+  isToday,
+  isYesterday,
+  startOfWeek,
+  endOfWeek,
+  subWeeks,
+  isThisWeek,
+  isThisMonth,
+} from "date-fns";
 
 // --- Types ---
 interface Transaction {
@@ -148,36 +162,57 @@ const Analytics = () => {
       prevTx = safeTx.filter((t) => t.transaction_date && isSameDay(new Date(t.transaction_date), prevDate));
       prevExp = safeExp.filter((e) => e.expense_date && isSameDay(new Date(e.expense_date), prevDate));
     } else if (period === "weekly") {
-      const cutoff = subDays(now, 7);
-      filteredTx = safeTx.filter((t) => t.transaction_date && new Date(t.transaction_date) >= cutoff);
-      filteredExp = safeExp.filter((e) => e.expense_date && new Date(e.expense_date) >= cutoff);
-      const prevStart = subDays(now, 14);
-      const prevEnd = subDays(now, 7);
+      const activeDate = selectedDate || now;
+      const start = startOfWeek(activeDate, { weekStartsOn: 1 });
+      const end = endOfWeek(activeDate, { weekStartsOn: 1 });
+      filteredTx = safeTx.filter((t) => {
+        if (!t.transaction_date) return false;
+        const d = new Date(t.transaction_date);
+        return d >= start && d <= end;
+      });
+      filteredExp = safeExp.filter((e) => {
+        if (!e.expense_date) return false;
+        const d = new Date(e.expense_date);
+        return d >= start && d <= end;
+      });
+      const prevStart = subWeeks(start, 1);
+      const prevEnd = subWeeks(end, 1);
       prevTx = safeTx.filter((t) => {
         if (!t.transaction_date) return false;
         const d = new Date(t.transaction_date);
-        return d >= prevStart && d < prevEnd;
+        return d >= prevStart && d <= prevEnd;
       });
       prevExp = safeExp.filter((e) => {
         if (!e.expense_date) return false;
         const d = new Date(e.expense_date);
-        return d >= prevStart && d < prevEnd;
+        return d >= prevStart && d <= prevEnd;
       });
     } else if (period === "monthly") {
-      const monthStart = startOfMonth(now);
-      filteredTx = safeTx.filter((t) => t.transaction_date && new Date(t.transaction_date) >= monthStart);
-      filteredExp = safeExp.filter((e) => e.expense_date && new Date(e.expense_date) >= monthStart);
-      const prevStart = startOfMonth(subMonths(now, 1));
-      const prevEnd = monthStart;
+      const activeDate = selectedDate || now;
+      const start = startOfMonth(activeDate);
+      const end = endOfMonth(activeDate);
+      filteredTx = safeTx.filter((t) => {
+        if (!t.transaction_date) return false;
+        const d = new Date(t.transaction_date);
+        return d >= start && d <= end;
+      });
+      filteredExp = safeExp.filter((e) => {
+        if (!e.expense_date) return false;
+        const d = new Date(e.expense_date);
+        return d >= start && d <= end;
+      });
+      const prevMonth = subMonths(activeDate, 1);
+      const prevStart = startOfMonth(prevMonth);
+      const prevEnd = endOfMonth(prevMonth);
       prevTx = safeTx.filter((t) => {
         if (!t.transaction_date) return false;
         const d = new Date(t.transaction_date);
-        return d >= prevStart && d < prevEnd;
+        return d >= prevStart && d <= prevEnd;
       });
       prevExp = safeExp.filter((e) => {
         if (!e.expense_date) return false;
         const d = new Date(e.expense_date);
-        return d >= prevStart && d < prevEnd;
+        return d >= prevStart && d <= prevEnd;
       });
     }
 
@@ -415,9 +450,22 @@ const Analytics = () => {
   }
 
   const periodLabel = (() => {
+    const activeDate = selectedDate || new Date();
     if (period === "all") return "All Time";
-    if (period === "weekly") return "Last 7 Days";
-    if (period === "monthly") return format(new Date(), "MMMM yyyy");
+    if (period === "weekly") {
+      const start = startOfWeek(activeDate, { weekStartsOn: 1 });
+      const end = endOfWeek(activeDate, { weekStartsOn: 1 });
+      if (isThisWeek(activeDate, { weekStartsOn: 1 })) {
+        return `This Week (${format(start, "dd MMM")} – ${format(end, "dd MMM")})`;
+      }
+      return `${format(start, "dd MMM")} – ${format(end, "dd MMM yyyy")}`;
+    }
+    if (period === "monthly") {
+      if (isThisMonth(activeDate)) {
+        return `This Month (${format(activeDate, "MMM yyyy")})`;
+      }
+      return format(activeDate, "MMMM yyyy");
+    }
     if (period === "daily" && selectedDate) {
       if (isToday(selectedDate)) return `Today, ${format(selectedDate, "dd MMM yyyy")}`;
       if (isYesterday(selectedDate)) return `Yesterday, ${format(selectedDate, "dd MMM yyyy")}`;
@@ -452,14 +500,12 @@ const Analytics = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
-            {period === "daily" && (
+            {period !== "all" && (
               <DateSwitch
+                period={period}
                 selectedDate={selectedDate}
                 onDateChange={(newDate) => {
                   setSelectedDate(newDate);
-                  if (newDate) {
-                    setPeriod("daily");
-                  }
                 }}
                 className="w-full sm:w-auto"
               />
@@ -467,20 +513,49 @@ const Analytics = () => {
 
             <Tabs
               value={period}
-              onValueChange={(v) => setPeriod(v as AnalyticsPeriod)}
+              onValueChange={(v) => {
+                setPeriod(v as AnalyticsPeriod);
+                if (!selectedDate && v !== "all") {
+                  setSelectedDate(new Date());
+                }
+              }}
               className="w-full sm:w-auto"
             >
-              <TabsList className="grid grid-cols-4 w-full sm:w-auto">
-                <TabsTrigger value="daily" className="text-xs sm:text-sm">
+              <TabsList
+                className="grid grid-cols-4 w-full sm:w-auto"
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                    e.stopPropagation();
+                    e.preventDefault();
+                  }
+                }}
+              >
+                <TabsTrigger
+                  value="daily"
+                  className="text-xs sm:text-sm"
+                  onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                >
                   Daily
                 </TabsTrigger>
-                <TabsTrigger value="weekly" className="text-xs sm:text-sm">
+                <TabsTrigger
+                  value="weekly"
+                  className="text-xs sm:text-sm"
+                  onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                >
                   Weekly
                 </TabsTrigger>
-                <TabsTrigger value="monthly" className="text-xs sm:text-sm">
+                <TabsTrigger
+                  value="monthly"
+                  className="text-xs sm:text-sm"
+                  onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                >
                   Monthly
                 </TabsTrigger>
-                <TabsTrigger value="all" className="text-xs sm:text-sm">
+                <TabsTrigger
+                  value="all"
+                  className="text-xs sm:text-sm"
+                  onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                >
                   All Time
                 </TabsTrigger>
               </TabsList>

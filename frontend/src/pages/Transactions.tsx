@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Upload, Layers } from "lucide-react";
 import { motion } from "framer-motion";
-import { subDays, startOfMonth, endOfMonth } from "date-fns";
+import { subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
 
 export type TransactionPeriod = "daily" | "weekly" | "monthly" | "all";
 
@@ -41,16 +41,15 @@ const Transactions = () => {
       return { from: start, to: end };
     }
     if (period === "weekly") {
-      const start = subDays(now, 7);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(now);
-      end.setHours(23, 59, 59, 999);
+      const activeDate = selectedDate || now;
+      const start = startOfWeek(activeDate, { weekStartsOn: 1 });
+      const end = endOfWeek(activeDate, { weekStartsOn: 1 });
       return { from: start, to: end };
     }
     if (period === "monthly") {
-      const start = startOfMonth(now);
-      const end = endOfMonth(now);
-      end.setHours(23, 59, 59, 999);
+      const activeDate = selectedDate || now;
+      const start = startOfMonth(activeDate);
+      const end = endOfMonth(activeDate);
       return { from: start, to: end };
     }
     return { from: null, to: null };
@@ -111,14 +110,12 @@ const Transactions = () => {
 
             {/* Segmented Period Tabs & Daily Date Navigator */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
-              {period === "daily" && (
+              {period !== "all" && (
                 <DateSwitch
+                  period={period}
                   selectedDate={selectedDate}
                   onDateChange={(newDate) => {
                     setSelectedDate(newDate);
-                    if (newDate) {
-                      setPeriod("daily");
-                    }
                   }}
                   className="w-full sm:w-auto"
                 />
@@ -126,20 +123,49 @@ const Transactions = () => {
 
               <Tabs
                 value={period}
-                onValueChange={(v) => setPeriod(v as TransactionPeriod)}
+                onValueChange={(v) => {
+                  setPeriod(v as TransactionPeriod);
+                  if (!selectedDate && v !== "all") {
+                    setSelectedDate(new Date());
+                  }
+                }}
                 className="w-full sm:w-auto"
               >
-                <TabsList className="grid grid-cols-4 w-full sm:w-auto">
-                  <TabsTrigger value="daily" className="text-xs sm:text-sm">
+                <TabsList
+                  className="grid grid-cols-4 w-full sm:w-auto"
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                      e.stopPropagation();
+                      e.preventDefault();
+                    }
+                  }}
+                >
+                  <TabsTrigger
+                    value="daily"
+                    className="text-xs sm:text-sm"
+                    onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                  >
                     Daily
                   </TabsTrigger>
-                  <TabsTrigger value="weekly" className="text-xs sm:text-sm">
+                  <TabsTrigger
+                    value="weekly"
+                    className="text-xs sm:text-sm"
+                    onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                  >
                     Weekly
                   </TabsTrigger>
-                  <TabsTrigger value="monthly" className="text-xs sm:text-sm">
+                  <TabsTrigger
+                    value="monthly"
+                    className="text-xs sm:text-sm"
+                    onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                  >
                     Monthly
                   </TabsTrigger>
-                  <TabsTrigger value="all" className="text-xs sm:text-sm">
+                  <TabsTrigger
+                    value="all"
+                    className="text-xs sm:text-sm"
+                    onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                  >
                     All Time
                   </TabsTrigger>
                 </TabsList>

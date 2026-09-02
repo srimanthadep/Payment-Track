@@ -110,24 +110,32 @@ export const GoalProgressWidget = ({ userId }: GoalProgressWidgetProps) => {
   }
 
   return (
-    <Card className="border-border/80 shadow-xs overflow-hidden">
-      <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-border/50 bg-muted/20">
-        <CardTitle className="text-sm font-bold flex items-center gap-2">
-          <Target className="h-4 w-4 text-primary" />
-          Active Goals
-        </CardTitle>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
-          onClick={() => navigate("/goals")}
-        >
-          View All
-          <ChevronRight className="h-3.5 w-3.5" />
-        </Button>
+    <Card className="border-border/80 shadow-xs">
+      <CardHeader className="p-3.5 sm:p-5 pb-2 sm:pb-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className="p-1 rounded-md bg-primary/10 text-primary">
+              <Target className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            </div>
+            <CardTitle className="text-sm sm:text-base font-semibold">Active Goals</CardTitle>
+            <span className="text-[10px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-md">
+              {goals.length}
+            </span>
+          </div>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 sm:h-7 text-[11px] sm:text-xs gap-1 text-muted-foreground hover:text-foreground px-2 rounded-md hover:bg-muted/60"
+            onClick={() => navigate("/goals")}
+          >
+            <span>View All</span>
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </CardHeader>
 
-      <CardContent className="space-y-3.5 pt-4">
+      <CardContent className="p-3.5 sm:p-5 pt-1 sm:pt-2 pb-3 sm:pb-4 space-y-3">
         {goals.map((goal) => {
           const p = progress[goal.id] || { current: 0, percent: 0 };
           const goalInfo =

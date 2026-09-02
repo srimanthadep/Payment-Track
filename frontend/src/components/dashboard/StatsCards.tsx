@@ -5,7 +5,16 @@ import { ArrowDownCircle, ArrowUpCircle, TrendingUp } from "lucide-react";
 import { RupeeIcon } from "@/components/icons/RupeeIcon";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
-import { format, isToday } from "date-fns";
+import {
+  format,
+  isToday,
+  startOfWeek,
+  endOfWeek,
+  isThisWeek,
+  startOfMonth,
+  endOfMonth,
+  isThisMonth,
+} from "date-fns";
 
 export type Period = "daily" | "weekly" | "monthly" | "all";
 
@@ -83,14 +92,17 @@ export const StatsCards = ({
             .gte("transaction_date", startOfDay.toISOString())
             .lte("transaction_date", endOfDay.toISOString());
         } else if (period === "weekly") {
-          const dayOfWeek = now.getDay();
-          const startOfWeek = new Date(now);
-          startOfWeek.setDate(now.getDate() - dayOfWeek);
-          startOfWeek.setHours(0, 0, 0, 0);
-          query = query.gte("transaction_date", startOfWeek.toISOString());
+          const start = startOfWeek(activeDate, { weekStartsOn: 1 });
+          const end = endOfWeek(activeDate, { weekStartsOn: 1 });
+          query = query
+            .gte("transaction_date", start.toISOString())
+            .lte("transaction_date", end.toISOString());
         } else if (period === "monthly") {
-          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-          query = query.gte("transaction_date", startOfMonth.toISOString());
+          const start = startOfMonth(activeDate);
+          const end = endOfMonth(activeDate);
+          query = query
+            .gte("transaction_date", start.toISOString())
+            .lte("transaction_date", end.toISOString());
         }
 
         const { data: transactions, error } = await query;
@@ -174,15 +186,20 @@ export const StatsCards = ({
   };
 
   const getPeriodLabel = () => {
+    const activeDate = selectedDate || new Date();
     switch (period) {
-      case "daily": {
-        const activeDate = selectedDate || new Date();
+      case "daily":
         return isToday(activeDate) ? "Today" : format(activeDate, "dd MMM");
+      case "weekly": {
+        if (isThisWeek(activeDate, { weekStartsOn: 1 })) return "This Week";
+        const start = startOfWeek(activeDate, { weekStartsOn: 1 });
+        const end = endOfWeek(activeDate, { weekStartsOn: 1 });
+        return `${format(start, "dd MMM")} - ${format(end, "dd MMM")}`;
       }
-      case "weekly":
-        return "This Week";
-      case "monthly":
-        return "This Month";
+      case "monthly": {
+        if (isThisMonth(activeDate)) return "This Month";
+        return format(activeDate, "MMM yyyy");
+      }
       default:
         return "All Time";
     }

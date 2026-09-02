@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Wallet, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
-import { format, isToday, isYesterday, isSameDay, subDays, startOfMonth, endOfMonth } from "date-fns";
+import { format, isToday, isYesterday, isSameDay, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isThisWeek, isThisMonth } from "date-fns";
 
 import { expensesService, Expense, ExpenseStats } from "@/services/expensesService";
 import { settingsService, ExpenseCategoryOption } from "@/services/settingsService";
@@ -114,16 +114,19 @@ const Expenses = () => {
     }
 
     if (period === "weekly") {
-      const weekStart = subDays(now, 7);
+      const activeDate = selectedDate || now;
+      const weekStart = startOfWeek(activeDate, { weekStartsOn: 1 });
+      const weekEnd = endOfWeek(activeDate, { weekStartsOn: 1 });
       return expenses.filter((exp) => {
         const d = new Date(exp.expense_date);
-        return d >= weekStart && d <= now;
+        return d >= weekStart && d <= weekEnd;
       });
     }
 
     if (period === "monthly") {
-      const monthStart = startOfMonth(now);
-      const monthEnd = endOfMonth(now);
+      const activeDate = selectedDate || now;
+      const monthStart = startOfMonth(activeDate);
+      const monthEnd = endOfMonth(activeDate);
       return expenses.filter((exp) => {
         const d = new Date(exp.expense_date);
         return d >= monthStart && d <= monthEnd;
@@ -139,9 +142,22 @@ const Expenses = () => {
   }, [expenses]);
 
   const selectedDateLabel = useMemo(() => {
+    const activeDate = selectedDate || new Date();
     if (period === "all") return "All Time";
-    if (period === "weekly") return "Last 7 Days";
-    if (period === "monthly") return format(new Date(), "MMMM yyyy");
+    if (period === "weekly") {
+      const start = startOfWeek(activeDate, { weekStartsOn: 1 });
+      const end = endOfWeek(activeDate, { weekStartsOn: 1 });
+      if (isThisWeek(activeDate, { weekStartsOn: 1 })) {
+        return `This Week (${format(start, "dd MMM")} – ${format(end, "dd MMM")})`;
+      }
+      return `${format(start, "dd MMM")} – ${format(end, "dd MMM yyyy")}`;
+    }
+    if (period === "monthly") {
+      if (isThisMonth(activeDate)) {
+        return `This Month (${format(activeDate, "MMM yyyy")})`;
+      }
+      return format(activeDate, "MMMM yyyy");
+    }
     if (period === "daily" && selectedDate) {
       if (isToday(selectedDate)) return `Today, ${format(selectedDate, "dd MMM yyyy")}`;
       if (isYesterday(selectedDate)) return `Yesterday, ${format(selectedDate, "dd MMM yyyy")}`;
@@ -183,14 +199,12 @@ const Expenses = () => {
 
             {/* Segmented Period Tabs & Daily Navigator */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
-              {period === "daily" && (
+              {period !== "all" && (
                 <DateSwitch
+                  period={period}
                   selectedDate={selectedDate}
                   onDateChange={(newDate) => {
                     setSelectedDate(newDate);
-                    if (newDate) {
-                      setPeriod("daily");
-                    }
                   }}
                   className="w-full sm:w-auto"
                 />
@@ -198,20 +212,49 @@ const Expenses = () => {
 
               <Tabs
                 value={period}
-                onValueChange={(v) => setPeriod(v as ExpensePeriod)}
+                onValueChange={(v) => {
+                  setPeriod(v as ExpensePeriod);
+                  if (!selectedDate && v !== "all") {
+                    setSelectedDate(new Date());
+                  }
+                }}
                 className="w-full sm:w-auto"
               >
-                <TabsList className="grid grid-cols-4 w-full sm:w-auto">
-                  <TabsTrigger value="daily" className="text-xs sm:text-sm">
+                <TabsList
+                  className="grid grid-cols-4 w-full sm:w-auto"
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                      e.stopPropagation();
+                      e.preventDefault();
+                    }
+                  }}
+                >
+                  <TabsTrigger
+                    value="daily"
+                    className="text-xs sm:text-sm"
+                    onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                  >
                     Daily
                   </TabsTrigger>
-                  <TabsTrigger value="weekly" className="text-xs sm:text-sm">
+                  <TabsTrigger
+                    value="weekly"
+                    className="text-xs sm:text-sm"
+                    onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                  >
                     Weekly
                   </TabsTrigger>
-                  <TabsTrigger value="monthly" className="text-xs sm:text-sm">
+                  <TabsTrigger
+                    value="monthly"
+                    className="text-xs sm:text-sm"
+                    onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                  >
                     Monthly
                   </TabsTrigger>
-                  <TabsTrigger value="all" className="text-xs sm:text-sm">
+                  <TabsTrigger
+                    value="all"
+                    className="text-xs sm:text-sm"
+                    onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                  >
                     All Time
                   </TabsTrigger>
                 </TabsList>
