@@ -33,6 +33,7 @@ import {
   type CardType,
 } from "@/utils/commissionCalculator";
 import { settingsService, CardTypeOption } from "@/services/settingsService";
+import { activityLogService } from "@/services/activityLogService";
 
 interface EditTransactionDialogProps {
   transaction: {
@@ -280,6 +281,19 @@ export const EditTransactionDialog = ({
         variant: "destructive",
       });
     } else {
+      activityLogService.log(
+        "transaction.updated",
+        "transaction",
+        `Edited transaction — Amount: ₹${parseFloat(formData.amount).toLocaleString("en-IN")}, Type: ${formData.transaction_type}`,
+        {
+          transaction_id: transaction.id,
+          old_amount: transaction.amount,
+          new_amount: parseFloat(formData.amount),
+          transaction_type: formData.transaction_type,
+          card_type: formData.card_type,
+          reference_number: formData.reference_number || null,
+        }
+      );
       toast({
         title: "Success",
         description: "Transaction updated successfully",

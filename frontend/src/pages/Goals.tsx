@@ -59,6 +59,7 @@ import {
   GoalType,
   GOAL_TYPE_LABELS,
 } from "@/services/goalsService";
+import { activityLogService } from "@/services/activityLogService";
 import {
   startOfMonth,
   endOfMonth,
@@ -208,6 +209,17 @@ const Goals = () => {
           period_start: periodStart,
           period_end: periodEnd,
         });
+        activityLogService.log(
+          "goal.updated",
+          "goal",
+          `Updated goal: ${GOAL_TYPE_LABELS[formData.goal_type as GoalType] ?? formData.goal_type} — Target: ₹${parseFloat(formData.target_amount).toLocaleString("en-IN")}`,
+          {
+            goal_id: editingGoal.id,
+            goal_type: formData.goal_type,
+            old_target: editingGoal.target_amount,
+            new_target: parseFloat(formData.target_amount),
+          }
+        );
         toast({ title: "Goal Updated", description: "Your goal has been updated successfully" });
       } else {
         await goalsService.createGoal({
@@ -217,6 +229,17 @@ const Goals = () => {
           period_start: periodStart,
           period_end: periodEnd,
         });
+        activityLogService.log(
+          "goal.created",
+          "goal",
+          `Created goal: ${GOAL_TYPE_LABELS[formData.goal_type as GoalType] ?? formData.goal_type} — Target: ₹${parseFloat(formData.target_amount).toLocaleString("en-IN")}`,
+          {
+            goal_type: formData.goal_type,
+            target_amount: parseFloat(formData.target_amount),
+            period_start: periodStart,
+            period_end: periodEnd,
+          }
+        );
         toast({ title: "🎯 Goal Created!", description: "Track your progress on the Goals page" });
       }
 
@@ -249,6 +272,12 @@ const Goals = () => {
     if (!deleteConfirmId) return;
     try {
       await goalsService.deleteGoal(deleteConfirmId);
+      activityLogService.log(
+        "goal.deleted",
+        "goal",
+        `Deleted goal (ID: ${deleteConfirmId})`,
+        { goal_id: deleteConfirmId }
+      );
       toast({ title: "Goal Deleted", description: "Goal removed successfully" });
       setDeleteConfirmId(null);
       fetchGoals();

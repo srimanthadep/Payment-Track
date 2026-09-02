@@ -20,8 +20,8 @@ import {
   Sparkles 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
 import { invokeBackendApi } from "@/integrations/backend/api";
+import { activityLogService } from "@/services/activityLogService";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -141,6 +141,9 @@ const Auth = () => {
           title: "Welcome Back!",
           description: "Signing into your workspace...",
         });
+        activityLogService.log("auth.login", "auth", `Logged in successfully`, {
+          identifier: signInIdentifier,
+        });
         navigate("/dashboard", { replace: true });
       }
     } catch (err: any) {
@@ -243,6 +246,10 @@ const Auth = () => {
         toast({
           title: "Account Created!",
           description: `Welcome ${fullName.trim()}! Your new isolated account is ready.`,
+        });
+        activityLogService.log("auth.signup", "auth", `Account created for ${fullName.trim()}`, {
+          full_name: fullName.trim(),
+          business_name: businessName.trim() || "My Business",
         });
         navigate("/dashboard");
       }

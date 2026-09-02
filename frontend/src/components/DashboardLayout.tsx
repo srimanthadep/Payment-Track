@@ -17,9 +17,11 @@ import {
   BarChart3,
   Target,
   Search,
+  ScrollText,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { activityLogService } from "@/services/activityLogService";
 import {
   Sheet,
   SheetContent,
@@ -95,6 +97,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         variant: "destructive",
       });
     } else {
+      activityLogService.log("auth.logout", "auth", "Logged out successfully");
       setUserProfile(null);
       setIsAdmin(false);
       navigate("/auth");
@@ -107,6 +110,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     { name: "Expenses", href: "/expenses", icon: Wallet },
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
     { name: "Goals", href: "/goals", icon: Target },
+    { name: "Activity Logs", href: "/activity-logs", icon: ScrollText },
     { name: "Settings", href: "/settings", icon: SettingsIcon },
     { name: "Web Scraping", href: "/scraping", icon: Globe },
   ];

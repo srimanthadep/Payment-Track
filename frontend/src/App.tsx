@@ -14,6 +14,7 @@ import Admin from "./pages/Admin";
 import Scraping from "./pages/Scraping";
 import Analytics from "./pages/Analytics";
 import Goals from "./pages/Goals";
+import ActivityLogs from "./pages/ActivityLogs";
 import NotFound from "./pages/NotFound";
 import { useEffect } from "react";
 import { themeService } from "@/services/themeService";
@@ -64,6 +65,7 @@ const App = () => {
             <Route path="/scraping" element={<Scraping />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/goals" element={<Goals />} />
+            <Route path="/activity-logs" element={<ActivityLogs />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

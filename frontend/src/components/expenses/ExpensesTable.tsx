@@ -47,6 +47,7 @@ import { ExpenseCategoryOption } from "@/services/settingsService";
 import { EditExpenseDialog } from "./EditExpenseDialog";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
+import { activityLogService } from "@/services/activityLogService";
 
 interface ExpensesTableProps {
   expenses: Expense[];
@@ -140,6 +141,13 @@ export const ExpensesTable = ({
       if (error) {
         toast({ title: "Error", description: error, variant: "destructive" });
       } else {
+        const count = ids.length;
+        activityLogService.log(
+          "expense.bulk_deleted",
+          "expense",
+          `Bulk deleted ${count} expense${count !== 1 ? "s" : ""}`,
+          { count, ids }
+        );
         toast({ title: "Deleted", description: `${ids.length} expense(s) removed` });
         setSelectedIds(new Set());
         onRefresh();
@@ -149,6 +157,12 @@ export const ExpensesTable = ({
       if (error) {
         toast({ title: "Error", description: error, variant: "destructive" });
       } else {
+        activityLogService.log(
+          "expense.deleted",
+          "expense",
+          `Deleted expense (ID: ${expenseToDelete})`,
+          { expense_id: expenseToDelete }
+        );
         toast({ title: "Expense Deleted", description: "Expense removed successfully" });
         setSelectedIds((prev) => {
           const next = new Set(prev);

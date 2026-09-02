@@ -33,6 +33,7 @@ import {
   TransactionTypeOption,
 } from "@/services/settingsService";
 import { transactionLearningService } from "@/services/transactionLearningService";
+import { activityLogService } from "@/services/activityLogService";
 
 interface AddTransactionDialogProps {
   userId: string;
@@ -297,6 +298,23 @@ export const AddTransactionDialog = ({
         site_fee_percent: parseFloat(formData.site_fee_percent) || 0,
         transaction_date: formData.transaction_date,
       });
+
+      const commPct = parseFloat(formData.commission_percent) || 0;
+      const feePct = parseFloat(formData.site_fee_percent) || 0;
+      activityLogService.log(
+        "transaction.created",
+        "transaction",
+        `Added ${formData.transaction_type} of ₹${parseFloat(formData.amount).toLocaleString("en-IN")} to ${formData.sent_to} (${formData.card_type}${commPct ? `, Commission: ${commPct}%` : ""}${feePct ? `, Site Fee: ${feePct}%` : ""})`,
+        {
+          amount: parseFloat(formData.amount),
+          card_type: formData.card_type,
+          transaction_type: formData.transaction_type,
+          sent_to: formData.sent_to,
+          commission_percent: commPct,
+          site_fee_percent: feePct,
+          reference_number: formData.reference_number || null,
+        }
+      );
 
       toast({
         title: "Success",

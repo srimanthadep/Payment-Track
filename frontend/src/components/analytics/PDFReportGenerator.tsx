@@ -27,6 +27,7 @@ import {
   endOfWeek,
 } from "date-fns";
 import jsPDF from "jspdf";
+import { activityLogService } from "@/services/activityLogService";
 
 interface PDFReportGeneratorProps {
   userId: string;
@@ -419,6 +420,13 @@ export const PDFReportGenerator = ({ userId }: PDFReportGeneratorProps) => {
       // Save
       const fileName = `PaymentTracker_Report_${label.replace(/\s+/g, "_")}.pdf`;
       doc.save(fileName);
+
+      activityLogService.log(
+        "export.pdf_analytics",
+        "export",
+        `Downloaded analytics PDF report: ${fileName}`,
+        { fileName, period: label }
+      );
 
       toast({
         title: "📄 Report Downloaded!",

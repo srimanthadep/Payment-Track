@@ -28,6 +28,7 @@ import { Loader2, Calendar as CalendarIcon, Edit3 } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { expensesService, Expense } from "@/services/expensesService";
 import { settingsService, ExpenseCategoryOption, PaymentMethodOption } from "@/services/settingsService";
+import { activityLogService } from "@/services/activityLogService";
 
 interface EditExpenseDialogProps {
   expense: Expense | null;
@@ -128,6 +129,18 @@ export const EditExpenseDialog = ({
         variant: "destructive",
       });
     } else {
+      activityLogService.log(
+        "expense.updated",
+        "expense",
+        `Updated expense: ₹${amt.toLocaleString("en-IN")} for ${formData.category}${formData.paid_to ? " • Paid to: " + formData.paid_to.trim() : ""}`,
+        {
+          expense_id: expense.id,
+          old_amount: expense.amount,
+          new_amount: amt,
+          category: formData.category,
+          paid_to: formData.paid_to.trim() || null,
+        }
+      );
       toast({
         title: "Expense Updated",
         description: "Expense details updated successfully",

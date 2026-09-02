@@ -24,6 +24,7 @@ import { TransactionsTableSkeleton } from "@/components/ui/skeletons";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { motion, AnimatePresence } from "framer-motion";
 import { useInView } from "react-intersection-observer";
+import { activityLogService } from "@/services/activityLogService";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -480,6 +481,13 @@ export const TransactionsTable = ({
 
       if (error) throw error;
 
+      activityLogService.log(
+        "transaction.deleted",
+        "transaction",
+        `Deleted transaction (ID: ${transactionToDelete})`,
+        { transaction_id: transactionToDelete }
+      );
+
       toast({
         title: "Success",
         description: "Transaction deleted successfully",
@@ -550,7 +558,14 @@ export const TransactionsTable = ({
         .in("id", Array.from(selectedIds))
         .eq("user_id", userId);
       if (error) throw error;
-      toast({ title: "Deleted", description: `Deleted ${selectedIds.size} transactions` });
+      const count = selectedIds.size;
+      activityLogService.log(
+        "transaction.bulk_deleted",
+        "transaction",
+        `Bulk deleted ${count} transaction${count !== 1 ? "s" : ""}`,
+        { count, ids: Array.from(selectedIds) }
+      );
+      toast({ title: "Deleted", description: `Deleted ${count} transactions` });
       setSelectedIds(new Set());
       setSelectAll(false);
     } catch (e: any) {
@@ -569,6 +584,12 @@ export const TransactionsTable = ({
         return;
       }
       exportTransactionsToCSV(filteredTransactions);
+      activityLogService.log(
+        "export.csv_transactions",
+        "export",
+        `Exported ${filteredTransactions.length} transactions to CSV`,
+        { count: filteredTransactions.length }
+      );
       toast({
         title: "Success",
         description: "Transactions exported to CSV",
@@ -619,9 +640,15 @@ export const TransactionsTable = ({
         return;
       }
       await exportToPDF({
-        transactions: filteredTransactions, // Export all filtered, not just displayed
+        transactions: filteredTransactions,
         dateRange: filters.dateRange,
       });
+      activityLogService.log(
+        "export.pdf_transactions",
+        "export",
+        `Downloaded PDF report for ${filteredTransactions.length} transactions`,
+        { count: filteredTransactions.length }
+      );
       toast({
         title: "Success",
         description: "PDF report generated and downloaded",

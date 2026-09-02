@@ -28,6 +28,7 @@ import { Loader2, Calendar as CalendarIcon, Wallet } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { expensesService } from "@/services/expensesService";
 import { settingsService, ExpenseCategoryOption, PaymentMethodOption } from "@/services/settingsService";
+import { activityLogService } from "@/services/activityLogService";
 
 interface AddExpenseDialogProps {
   userId: string;
@@ -139,6 +140,17 @@ export const AddExpenseDialog = ({
         variant: "destructive",
       });
     } else {
+      activityLogService.log(
+        "expense.created",
+        "expense",
+        `Added expense: ₹${amt.toLocaleString("en-IN")} for ${formData.category}${formData.paid_to ? " • Paid to: " + formData.paid_to : ""}`,
+        {
+          amount: amt,
+          category: formData.category,
+          paid_to: formData.paid_to || null,
+          payment_method: formData.payment_method || null,
+        }
+      );
       toast({
         title: "Expense Added",
         description: `₹${amt.toLocaleString("en-IN")} recorded under ${formData.category}`,
