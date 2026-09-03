@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -20,11 +20,14 @@ import {
   Zap, PieChart as PieChartIcon, Globe,
   ArrowRightLeft, Shield, Crown, Trophy,
   Banknote, Receipt, Percent, ArrowDown, ArrowUp,
+  Sparkles, ShieldCheck,
 } from "lucide-react";
 import { expensesService, Expense } from "@/services/expensesService";
 import { PDFReportGenerator } from "@/components/analytics/PDFReportGenerator";
 import { PeriodComparisonCard } from "@/components/analytics/PeriodComparisonCard";
 import { CashFlowForecast } from "@/components/analytics/CashFlowForecast";
+import { PredictionsDetailView } from "@/components/analytics/PredictionsDetailView";
+import { calculateEnsembleForecast } from "@/utils/forecastingEngine";
 import { DateSwitch } from "@/components/transactions/DateSwitch";
 import {
   format,
@@ -64,12 +67,18 @@ type AnalyticsPeriod = "daily" | "weekly" | "monthly" | "all";
 const formatINR = (n: number) =>
   `₹${Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const formatINRShort = (n: number) => {
+const formatINRAxis = (n: number) => {
   const num = Number(n || 0);
   if (Math.abs(num) >= 10000000) return `₹${(num / 10000000).toFixed(1)}Cr`;
   if (Math.abs(num) >= 100000) return `₹${(num / 100000).toFixed(1)}L`;
   if (Math.abs(num) >= 1000) return `₹${(num / 1000).toFixed(1)}K`;
   return `₹${num.toFixed(0)}`;
+};
+
+const formatINRShort = (n: number) => {
+  const num = Number(n || 0);
+  if (Math.abs(num) >= 10000000) return `₹${(num / 10000000).toFixed(1)}Cr`;
+  return `₹${Math.round(num).toLocaleString("en-IN")}`;
 };
 
 const CHART_COLORS = [
@@ -78,15 +87,91 @@ const CHART_COLORS = [
   "hsl(330, 70%, 55%)", "hsl(60, 80%, 45%)",
 ];
 
+interface AnalyticsProps {
+  defaultTab?: "overview" | "predictions";
+}
+
 // --- Page Component ---
-const Analytics = () => {
+const Analytics = ({ defaultTab }: AnalyticsProps = {}) => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeView =
+    searchParams.get("tab") === "predictions" || defaultTab === "predictions"
+      ? "predictions"
+      : "overview";
+
+  const handleViewChange = (view: "overview" | "predictions") => {
+    if (view === "predictions") {
+      setSearchParams({ tab: "predictions" });
+    } else {
+      const p = new URLSearchParams(searchParams);
+      p.delete("tab");
+      setSearchParams(p);
+    }
+  };
+
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [period, setPeriod] = useState<AnalyticsPeriod>("daily");
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+
+  // Current month aggregates dedicated for high-accuracy predictions
+  const currentMonthData = useMemo(() => {
+    const now = new Date();
+    const start = startOfMonth(now);
+    const end = endOfMonth(now);
+    const safeTx = Array.isArray(transactions) ? transactions : [];
+    const safeExp = Array.isArray(expenses) ? expenses : [];
+
+    const mTx = safeTx.filter((t) => {
+      if (!t.transaction_date) return false;
+      const d = new Date(t.transaction_date);
+      return d >= start && d <= end;
+    });
+
+    const mExp = safeExp.filter((e) => {
+      if (!e.expense_date) return false;
+      const d = new Date(e.expense_date);
+      return d >= start && d <= end;
+    });
+
+    const rev = mTx.reduce((s, t) => {
+      const p =
+        t.profit !== undefined
+          ? Number(t.profit)
+          : Number(t.commission || 0) - Number(t.site_fee || 0);
+      return s + p;
+    }, 0);
+
+    const exp = mExp.reduce((s, e) => s + Number(e.amount || 0), 0);
+    const profit = rev - exp;
+    const vol = mTx.reduce((s, t) => s + Number(t.amount || 0), 0);
+
+    return {
+      transactions: mTx,
+      expenses: mExp,
+      revenue: rev,
+      expensesTotal: exp,
+      profit,
+      volume: vol,
+      count: mTx.length,
+    };
+  }, [transactions, expenses]);
+
+  // Real-time forecast metrics for live accuracy indicator
+  const liveForecast = useMemo(() => {
+    return calculateEnsembleForecast({
+      allTransactions: transactions,
+      allExpenses: expenses,
+      currentMonthRevenue: currentMonthData.revenue,
+      currentMonthExpenses: currentMonthData.expensesTotal,
+      currentMonthProfit: currentMonthData.profit,
+      currentMonthVolume: currentMonthData.volume,
+      currentMonthTxCount: currentMonthData.count,
+    });
+  }, [transactions, expenses, currentMonthData]);
 
   // Auth
   useEffect(() => {
@@ -482,86 +567,147 @@ const Analytics = () => {
         transition={{ duration: 0.3 }}
         className="space-y-6 max-w-7xl mx-auto"
       >
-        {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pb-2 border-b border-border/60">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
-                Analytics
-              </h1>
-              <Badge variant="outline" className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border-primary/20">
-                {periodLabel}
-              </Badge>
+        {/* Top View Switcher & Sub-Header */}
+        <div className="space-y-4 pb-2 border-b border-border/60">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
+                  {activeView === "predictions" ? "Predictions & Forecasting" : "Analytics"}
+                </h1>
+                {activeView === "predictions" ? (
+                  <Badge className="text-xs font-semibold px-2.5 py-0.5 rounded-full border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>{liveForecast.accuracyScore}% Accuracy</span>
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border-primary/20">
+                    {periodLabel}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                {activeView === "predictions"
+                  ? "Multi-factor ensemble time-series projection with Day-of-Week Seasonality, 30-day Trajectory & What-If Simulator"
+                  : "Complete business intelligence — revenue, expenses, profitability & trends"}
+              </p>
+              {user && activeView === "overview" && <PDFReportGenerator userId={user.id} />}
             </div>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              Complete business intelligence — revenue, expenses, profitability & trends
-            </p>
-            {user && <PDFReportGenerator userId={user.id} />}
-          </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
-            {period !== "all" && (
-              <DateSwitch
-                period={period}
-                selectedDate={selectedDate}
-                onDateChange={(newDate) => {
-                  setSelectedDate(newDate);
-                }}
-                className="w-full sm:w-auto"
-              />
-            )}
-
+            {/* View Switcher using standard shadcn Tabs */}
             <Tabs
-              value={period}
-              onValueChange={(v) => {
-                setPeriod(v as AnalyticsPeriod);
-                if (!selectedDate && v !== "all") {
-                  setSelectedDate(new Date());
-                }
-              }}
+              value={activeView}
+              onValueChange={(v) => handleViewChange(v as "overview" | "predictions")}
               className="w-full sm:w-auto"
             >
-              <TabsList
-                className="grid grid-cols-4 w-full sm:w-auto"
-                onKeyDown={(e) => {
-                  if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-                    e.stopPropagation();
-                    e.preventDefault();
-                  }
-                }}
-              >
+              <TabsList className="grid grid-cols-2 w-full sm:w-auto h-10 p-1 bg-muted/60 border border-border/60 rounded-xl overflow-hidden">
                 <TabsTrigger
-                  value="daily"
-                  className="text-xs sm:text-sm"
-                  onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                  value="overview"
+                  className="h-8 text-xs sm:text-sm flex items-center justify-center gap-1.5 rounded-lg data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs transition-all"
                 >
-                  Daily
+                  <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
+                  Overview
                 </TabsTrigger>
                 <TabsTrigger
-                  value="weekly"
-                  className="text-xs sm:text-sm"
-                  onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                  value="predictions"
+                  className="h-8 text-xs sm:text-sm flex items-center justify-center gap-1.5 rounded-lg data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs transition-all"
                 >
-                  Weekly
-                </TabsTrigger>
-                <TabsTrigger
-                  value="monthly"
-                  className="text-xs sm:text-sm"
-                  onClick={(e) => (e.currentTarget as HTMLElement).blur()}
-                >
-                  Monthly
-                </TabsTrigger>
-                <TabsTrigger
-                  value="all"
-                  className="text-xs sm:text-sm"
-                  onClick={(e) => (e.currentTarget as HTMLElement).blur()}
-                >
-                  All Time
+                  <TrendingUp className="h-3.5 w-3.5 text-primary" />
+                  Predictions
+                  <span className="text-[10px] leading-none px-1.5 py-0.5 rounded-full font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
+                    {liveForecast.accuracyScore}%
+                  </span>
                 </TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
+
+          {/* Period selector (only for Overview) */}
+          {activeView === "overview" && (
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3 pt-1 border-t border-border/40">
+              <div className="text-xs text-muted-foreground font-medium hidden sm:block">
+                Select Analysis Timeframe:
+              </div>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                {period !== "all" && (
+                  <DateSwitch
+                    period={period}
+                    selectedDate={selectedDate}
+                    onDateChange={(newDate) => {
+                      setSelectedDate(newDate);
+                    }}
+                    className="w-full sm:w-auto"
+                  />
+                )}
+
+                <Tabs
+                  value={period}
+                  onValueChange={(v) => {
+                    setPeriod(v as AnalyticsPeriod);
+                    if (!selectedDate && v !== "all") {
+                      setSelectedDate(new Date());
+                    }
+                  }}
+                  className="w-full sm:w-auto"
+                >
+                  <TabsList
+                    className="grid grid-cols-4 w-full sm:w-auto"
+                    onKeyDown={(e) => {
+                      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                        e.stopPropagation();
+                        e.preventDefault();
+                      }
+                    }}
+                  >
+                    <TabsTrigger
+                      value="daily"
+                      className="text-xs sm:text-sm"
+                      onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                    >
+                      Daily
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="weekly"
+                      className="text-xs sm:text-sm"
+                      onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                    >
+                      Weekly
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="monthly"
+                      className="text-xs sm:text-sm"
+                      onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                    >
+                      Monthly
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="all"
+                      className="text-xs sm:text-sm"
+                      onClick={(e) => (e.currentTarget as HTMLElement).blur()}
+                    >
+                      All Time
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* --- Render Predictions View vs Overview View --- */}
+        {activeView === "predictions" ? (
+          <PredictionsDetailView
+            transactions={transactions}
+            expenses={expenses}
+            currentMonthRevenue={currentMonthData.revenue}
+            currentMonthExpenses={currentMonthData.expensesTotal}
+            currentMonthProfit={currentMonthData.profit}
+            currentMonthVolume={currentMonthData.volume}
+            transactionCount={currentMonthData.count}
+            currentMonthTransactions={currentMonthData.transactions}
+          />
+        ) : (
+          <>
 
         {/* --- KPI Cards Row (with period-over-period growth on all) --- */}
         <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
@@ -677,6 +823,10 @@ const Analytics = () => {
           currentMonthProfit={analytics.netProfit}
           currentMonthVolume={analytics.totalVolume}
           transactionCount={analytics.txCount}
+          allTransactions={transactions}
+          allExpenses={expenses}
+          currentMonthTransactions={currentMonthData.transactions}
+          onViewDetailedPredictions={() => handleViewChange("predictions")}
         />
 
         {/* --- Cash Flow & Site Fee Efficiency Row --- */}
@@ -788,7 +938,7 @@ const Analytics = () => {
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" vertical={false} />
                       <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-                      <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={formatINRShort} width={55} />
+                      <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={formatINRAxis} width={55} />
                       <Tooltip
                         cursor={{ stroke: "hsl(var(--muted-foreground))", strokeWidth: 1, strokeDasharray: "4 4" }}
                         content={({ active, payload }) => {
@@ -844,7 +994,7 @@ const Analytics = () => {
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" vertical={false} />
                         <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-                        <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={formatINRShort} width={55} />
+                        <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={formatINRAxis} width={55} />
                         <Tooltip
                           cursor={{ stroke: "hsl(var(--muted-foreground))", strokeWidth: 1, strokeDasharray: "4 4" }}
                           content={({ active, payload }) => {
@@ -887,7 +1037,7 @@ const Analytics = () => {
                       <BarChart data={analytics.dailyActivityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" vertical={false} />
                         <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-                        <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={formatINRShort} width={55} />
+                        <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={formatINRAxis} width={55} />
                         <Tooltip
                           cursor={false}
                           content={({ active, payload }) => {
@@ -1101,7 +1251,7 @@ const Analytics = () => {
                     <BarChart data={analytics.portalProfitBarData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" vertical={false} />
                       <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickLine={false} axisLine={false} />
-                      <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={formatINRShort} width={55} />
+                      <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={formatINRAxis} width={55} />
                       <Tooltip
                         cursor={false}
                         content={({ active, payload }) => {
@@ -1148,7 +1298,7 @@ const Analytics = () => {
                       <BarChart data={analytics.cardBreakdown} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" vertical={false} />
                         <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickLine={false} axisLine={false} />
-                        <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={formatINRShort} width={55} />
+                        <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={formatINRAxis} width={55} />
                         <Tooltip
                           cursor={false}
                           content={({ active, payload }) => {
@@ -1378,8 +1528,10 @@ const Analytics = () => {
             </Card>
           </motion.div>
         )}
-      </motion.div>
-    </DashboardLayout>
+      </>
+    )}
+  </motion.div>
+</DashboardLayout>
   );
 };
 

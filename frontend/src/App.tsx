@@ -64,6 +64,7 @@ const App = () => {
             <Route path="/admin" element={<Admin />} />
             <Route path="/scraping" element={<Scraping />} />
             <Route path="/analytics" element={<Analytics />} />
+            <Route path="/analytics/predictions" element={<Analytics defaultTab="predictions" />} />
             <Route path="/goals" element={<Goals />} />
             <Route path="/activity-logs" element={<ActivityLogs />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
