@@ -75,17 +75,51 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     }
   };
 
-  // Global Ctrl+K shortcut for search
+  // Global shortcuts:
+  // 1. Ctrl+K / Cmd+K for command palette search
+  // 2. 'N' key to open Add Transaction dialog
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+      // 1. Search shortcut
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setSearchOpen((prev) => !prev);
+        return;
+      }
+
+      // 2. 'n' / 'N' shortcut for Add Transaction
+      if (e.key.toLowerCase() === "n" && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        const target = e.target as HTMLElement | null;
+        if (
+          target &&
+          (target.tagName === "INPUT" ||
+            target.tagName === "TEXTAREA" ||
+            target.tagName === "SELECT" ||
+            target.isContentEditable ||
+            target.closest("input, textarea, select, [contenteditable='true']") ||
+            target.closest("[role='dialog']") ||
+            target.closest(".monaco-editor"))
+        ) {
+          return;
+        }
+
+        // Do not open if another modal dialog or alert is already active
+        const hasOpenDialog = document.querySelector("[role='dialog'], [role='alertdialog']");
+        if (hasOpenDialog) {
+          return;
+        }
+
+        e.preventDefault();
+        if (location.pathname === "/transactions") {
+          window.dispatchEvent(new CustomEvent("open-add-transaction"));
+        } else {
+          navigate("/transactions?add=true");
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [location.pathname, navigate]);
 
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();

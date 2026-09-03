@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -20,6 +20,7 @@ export type TransactionPeriod = "daily" | "weekly" | "monthly" | "all";
 
 const Transactions = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [managePortalsOpen, setManagePortalsOpen] = useState(false);
@@ -85,6 +86,49 @@ const Transactions = () => {
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  // Open dialog if navigated with ?add=true query param
+  useEffect(() => {
+    if (searchParams.get("add") === "true") {
+      setIsDialogOpen(true);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("add");
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
+  // Listen for global custom event or direct 'n' / 'N' key press
+  useEffect(() => {
+    const handleOpenEvent = () => setIsDialogOpen(true);
+    window.addEventListener("open-add-transaction", handleOpenEvent);
+
+    const handleDirectKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === "n" && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        const target = e.target as HTMLElement | null;
+        if (
+          target &&
+          (target.tagName === "INPUT" ||
+            target.tagName === "TEXTAREA" ||
+            target.tagName === "SELECT" ||
+            target.isContentEditable ||
+            target.closest("input, textarea, select, [contenteditable='true']") ||
+            target.closest("[role='dialog']"))
+        ) {
+          return;
+        }
+        if (document.querySelector("[role='dialog'], [role='alertdialog']")) return;
+        e.preventDefault();
+        setIsDialogOpen(true);
+      }
+    };
+
+    window.addEventListener("keydown", handleDirectKey);
+
+    return () => {
+      window.removeEventListener("open-add-transaction", handleOpenEvent);
+      window.removeEventListener("keydown", handleDirectKey);
+    };
+  }, []);
 
   if (!user) return null;
 
@@ -176,11 +220,14 @@ const Transactions = () => {
           {/* Action Buttons Row */}
           <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
             <Button
-              className="w-full sm:w-auto text-sm h-9 hidden sm:flex items-center gap-1.5"
+              className="w-full sm:w-auto text-sm h-9 hidden sm:flex items-center gap-2 shadow-xs"
               onClick={() => setIsDialogOpen(true)}
             >
               <Plus className="h-3.5 w-3.5" />
-              Add Transaction
+              <span>Add Transaction</span>
+              <kbd className="hidden lg:inline-flex items-center justify-center h-4.5 min-w-[18px] px-1 text-[10px] font-mono font-semibold rounded bg-primary-foreground/20 text-primary-foreground">
+                N
+              </kbd>
             </Button>
             <Button
               className="w-full sm:w-auto text-xs sm:text-sm h-9 flex items-center justify-center gap-1.5"
