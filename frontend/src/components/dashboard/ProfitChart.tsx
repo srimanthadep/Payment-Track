@@ -48,7 +48,7 @@ export const ProfitChart = ({ userId }: ProfitChartProps) => {
 
         const { data: transactions, error } = await supabase
           .from("transactions")
-          .select("transaction_date, commission, site_fee")
+          .select("transaction_date, commission, site_fee, profit")
           .eq("user_id", userId)
           .gte("transaction_date", startDate.toISOString())
           .order("transaction_date", { ascending: true });
@@ -104,7 +104,13 @@ export const ProfitChart = ({ userId }: ProfitChartProps) => {
               };
             }
 
-            groupedData[key].profit += Number(transaction.commission || 0);
+            // Calculate true net profit: commission - site_fee (or profit column if explicitly present)
+            const netProfit =
+              transaction.profit !== undefined && transaction.profit !== null && !isNaN(Number(transaction.profit))
+                ? Number(transaction.profit)
+                : Number(transaction.commission || 0) - Number(transaction.site_fee || 0);
+
+            groupedData[key].profit += netProfit;
           });
 
           // Fill in missing dates with zero values
