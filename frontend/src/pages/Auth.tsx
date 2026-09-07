@@ -16,8 +16,7 @@ import {
   Building2, 
   ShieldCheck, 
   Eye, 
-  EyeOff, 
-  Sparkles 
+  EyeOff 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { invokeBackendApi } from "@/integrations/backend/api";
@@ -290,14 +289,6 @@ const Auth = () => {
           <CardDescription className="text-xs sm:text-sm text-muted-foreground px-4">
             Secure multi-user payment transaction and profit tracking
           </CardDescription>
-
-          {/* Privacy badge */}
-          <div className="pt-1 flex justify-center">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium bg-primary/10 text-primary border border-primary/20">
-              <Sparkles className="h-3 w-3 text-primary animate-pulse" />
-              Isolated & 100% Private Account Data
-            </span>
-          </div>
         </CardHeader>
 
         <CardContent className="px-5 sm:px-6 pb-6">

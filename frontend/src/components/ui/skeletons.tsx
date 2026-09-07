@@ -11,7 +11,7 @@ export const DashboardSkeleton = () => {
 
       {/* Stats Cards Skeleton */}
       <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
+        {[...Array(8)].map((_, i) => (
           <Card key={i}>
             <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
               <Skeleton className="h-4 w-24" />

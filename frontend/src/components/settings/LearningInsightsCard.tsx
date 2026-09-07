@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
+import { AiIcon } from "@/components/icons/AiIcon";
 import {
   Sparkles,
   BrainCircuit,
@@ -110,10 +111,8 @@ export const LearningInsightsCard = () => {
         <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
         <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-                <BrainCircuit className="h-4 w-4" />
-              </div>
+            <div className="flex items-center gap-2.5">
+              <AiIcon className="h-6 w-6" />
               <CardTitle className="text-lg sm:text-xl font-bold tracking-tight">
                 AI Transaction Learning & Accuracy
               </CardTitle>
@@ -164,7 +163,7 @@ export const LearningInsightsCard = () => {
             <div className="p-3.5 sm:p-4 rounded-xl border bg-card/60 backdrop-blur-xs space-y-1.5">
               <div className="flex items-center justify-between text-muted-foreground">
                 <span className="text-xs font-medium">All-Tiers Commission</span>
-                <Sparkles className="h-4 w-4 text-primary" />
+                <AiIcon className="h-4 w-4" />
               </div>
               <div className="text-xl sm:text-2xl font-bold text-foreground">
                 {backtestStats ? `${backtestStats.commissionAccuracy}%` : "--"}
@@ -237,7 +236,7 @@ export const LearningInsightsCard = () => {
             </div>
             {testResult && testResult.source !== "none" && (
               <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-xs gap-1">
-                <Sparkles className="h-3 w-3" />
+                <AiIcon className="h-3.5 w-3.5" />
                 {Math.round(testResult.confidence * 100)}% Confidence
               </Badge>
             )}

@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowDownCircle, ArrowUpCircle, TrendingUp } from "lucide-react";
+import {
+  ArrowDownCircle,
+  ArrowUpCircle,
+  TrendingUp,
+  ArrowLeftRight,
+  Percent,
+} from "lucide-react";
 import { RupeeIcon } from "@/components/icons/RupeeIcon";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
@@ -31,7 +37,55 @@ interface Stats {
   totalRepayments: number;
   totalCommissions: number;
   totalProfit: number;
+  totalTransactions: number;
+  bharatRupaySiteFee: number;
+  upenderRupaySiteFee: number;
+  totalRupaySiteFee: number;
 }
+
+// Letter B Icon for Barath Portal
+const LetterBIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    className={className}
+  >
+    <text
+      x="50%"
+      y="50%"
+      dominantBaseline="central"
+      textAnchor="middle"
+      fontSize="18"
+      fontFamily="Arial, sans-serif"
+      fontWeight="bold"
+    >
+      B
+    </text>
+  </svg>
+);
+
+// Letter U Icon for Upender Portal
+const LetterUIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    className={className}
+  >
+    <text
+      x="50%"
+      y="50%"
+      dominantBaseline="central"
+      textAnchor="middle"
+      fontSize="18"
+      fontFamily="Arial, sans-serif"
+      fontWeight="bold"
+    >
+      U
+    </text>
+  </svg>
+);
 
 export const StatsCards = ({
   userId,
@@ -45,6 +99,10 @@ export const StatsCards = ({
     totalRepayments: 0,
     totalCommissions: 0,
     totalProfit: 0,
+    totalTransactions: 0,
+    bharatRupaySiteFee: 0,
+    upenderRupaySiteFee: 0,
+    totalRupaySiteFee: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [internalPeriod, setInternalPeriod] = useState<Period>("daily");
@@ -63,7 +121,9 @@ export const StatsCards = ({
       try {
         let query = supabase
           .from("transactions")
-          .select("transaction_type, amount, commission, site_fee, transaction_date")
+          .select(
+            "transaction_type, amount, commission, site_fee, transaction_date, card_type, notes, portals(name)"
+          )
           .eq("user_id", userId);
 
         const now = new Date();
@@ -105,7 +165,20 @@ export const StatsCards = ({
             .lte("transaction_date", end.toISOString());
         }
 
-        const { data: transactions, error } = await query;
+        let { data: transactions, error } = await query;
+
+        // Resilient fallback if relationship query encounters any schema variation
+        if (error) {
+          const fallbackRes = await supabase
+            .from("transactions")
+            .select("transaction_type, amount, commission, site_fee, transaction_date, card_type, notes")
+            .eq("user_id", userId);
+          if (!fallbackRes.error && fallbackRes.data) {
+            transactions = fallbackRes.data as any;
+            error = null;
+          }
+        }
+
         if (!isCurrent) return;
 
         if (error) {
@@ -133,11 +206,65 @@ export const StatsCards = ({
               0
             ) || 0;
 
+          // Combined sum of Withdrawals and Repayments
+          const totalTransactions = withdrawals + repayments;
+
+          // Helper to check if card type is Rupay
+          const isRupay = (t: any) => {
+            const card = (t.card_type || "").toLowerCase();
+            return card.includes("rupay") || (t.notes && t.notes.toLowerCase().includes("rupay"));
+          };
+
+          // Helper to get portal name from relation, field, or notes fallback
+          const getPortalName = (t: any) => {
+            if (t.portals?.name) return t.portals.name;
+            if (typeof t.portals === "string") return t.portals;
+            if (t.portal_name) return t.portal_name;
+            if (t.notes) {
+              const match = t.notes.match(/Sent to:\s*([^|]+)/i);
+              if (match && match[1]) return match[1].trim();
+            }
+            return "";
+          };
+
+          const isBharatPortal = (t: any) => {
+            const name = getPortalName(t).toLowerCase();
+            return (
+              name.includes("bharat") ||
+              name.includes("barath") ||
+              (t.notes && (t.notes.toLowerCase().includes("bharat") || t.notes.toLowerCase().includes("barath")))
+            );
+          };
+
+          const isUpenderPortal = (t: any) => {
+            const name = getPortalName(t).toLowerCase();
+            return name.includes("upender") || (t.notes && t.notes.toLowerCase().includes("upender"));
+          };
+
+          // Rupay site fee from Bharat Portal
+          const bharatRupaySiteFee =
+            transactions
+              ?.filter((t) => isRupay(t) && isBharatPortal(t))
+              .reduce((sum, t) => sum + Number(t.site_fee || 0), 0) || 0;
+
+          // Rupay site fee from Upender Portal
+          const upenderRupaySiteFee =
+            transactions
+              ?.filter((t) => isRupay(t) && isUpenderPortal(t))
+              .reduce((sum, t) => sum + Number(t.site_fee || 0), 0) || 0;
+
+          // Combined Rupay site fee from Bharat Portal + Upender Portal
+          const totalRupaySiteFee = bharatRupaySiteFee + upenderRupaySiteFee;
+
           setStats({
             totalWithdrawals: withdrawals,
             totalRepayments: repayments,
             totalCommissions: commissions,
             totalProfit: profit,
+            totalTransactions,
+            bharatRupaySiteFee,
+            upenderRupaySiteFee,
+            totalRupaySiteFee,
           });
         }
       } catch (err) {
@@ -206,6 +333,7 @@ export const StatsCards = ({
   };
 
   const cards = [
+    // Row 1: Existing 4 Status Cards
     {
       title: `Total Withdrawals (${getPeriodLabel()})`,
       value: stats.totalWithdrawals,
@@ -229,6 +357,31 @@ export const StatsCards = ({
       value: stats.totalProfit,
       icon: TrendingUp,
       gradient: "from-success to-success/70",
+    },
+    // Row 2: Additional 4 Status Cards
+    {
+      title: `Total Transactions (${getPeriodLabel()})`,
+      value: stats.totalTransactions,
+      icon: ArrowLeftRight,
+      gradient: "from-indigo-500 to-indigo-600",
+    },
+    {
+      title: `RuPay Barath (${getPeriodLabel()})`,
+      value: stats.bharatRupaySiteFee,
+      icon: LetterBIcon,
+      gradient: "from-orange-500 to-amber-600",
+    },
+    {
+      title: `RuPay Upender (${getPeriodLabel()})`,
+      value: stats.upenderRupaySiteFee,
+      icon: LetterUIcon,
+      gradient: "from-teal-500 to-emerald-600",
+    },
+    {
+      title: `Total Rupay Site Fee (${getPeriodLabel()})`,
+      value: stats.totalRupaySiteFee,
+      icon: Percent,
+      gradient: "from-rose-500 to-pink-600",
     },
   ];
 
@@ -268,7 +421,7 @@ export const StatsCards = ({
               <Card className="overflow-hidden relative shadow-sm border-border/80 h-full flex flex-col justify-between">
                 <div>
                   <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-                    <CardTitle className="text-xs sm:text-sm font-medium leading-tight pr-2 min-h-[2rem] sm:min-h-[2.25rem] flex items-center">
+                    <CardTitle className="text-xs sm:text-sm font-medium leading-tight pr-2 min-h-[2.25rem] sm:min-h-[2.5rem] flex items-center">
                       {card.title}
                     </CardTitle>
                     <div

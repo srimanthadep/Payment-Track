@@ -50,6 +50,12 @@ const formatINR = (n: number) =>
     maximumFractionDigits: 0,
   })}`;
 
+const formatINRShort = (n: number) => {
+  const num = Number(n || 0);
+  if (Math.abs(num) >= 10000000) return `₹${(num / 10000000).toFixed(1)}Cr`;
+  return `₹${Math.round(num).toLocaleString("en-IN")}`;
+};
+
 export const CashFlowForecast = ({
   currentMonthRevenue,
   currentMonthExpenses,
@@ -319,36 +325,38 @@ export const CashFlowForecast = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 items-stretch">
             {/* 1. Total Estimated Net Profit Card */}
-            <div className="p-4 rounded-xl bg-card border border-border/80 shadow-xs space-y-2 hover:border-primary/40 hover:shadow-md transition-all">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-xs">
-                    <Wallet className="h-3.5 w-3.5" />
+            <div className="p-3 sm:p-4 rounded-xl bg-card border border-border/80 shadow-xs space-y-2 hover:border-primary/40 hover:shadow-md transition-all flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center justify-between gap-1">
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                    <div className="p-1 sm:p-1.5 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-xs shrink-0">
+                      <Wallet className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    </div>
+                    <span className="text-[11px] sm:text-xs font-semibold text-foreground truncate">Total Est. Profit</span>
                   </div>
-                  <span className="text-xs font-semibold text-foreground">Total Estimated Profit</span>
+                  <Badge
+                    variant="outline"
+                    className="text-[9px] sm:text-[10px] font-bold px-1.5 py-0 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 shrink-0 hidden sm:inline-flex"
+                  >
+                    All Portals
+                  </Badge>
                 </div>
-                <Badge
-                  variant="outline"
-                  className="text-[10px] font-bold px-1.5 py-0 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
-                >
-                  All Portals
-                </Badge>
+
+                <div className="text-base sm:text-xl lg:text-2xl font-extrabold text-foreground tracking-tight mt-1 sm:mt-1.5 truncate">
+                  {formatINR(forecast.projectedProfit)}
+                </div>
               </div>
 
-              <div className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight">
-                {formatINR(forecast.projectedProfit)}
-              </div>
-
-              <div className="space-y-1.5 pt-1 border-t border-border/50 text-[11px] text-muted-foreground">
-                <div className="flex justify-between">
-                  <span>Booked Actuals:</span>
-                  <span className="font-semibold text-foreground">{formatINR(forecast.actualProfit)}</span>
+              <div className="space-y-1 sm:space-y-1.5 pt-1.5 border-t border-border/50 text-[10px] sm:text-[11px] text-muted-foreground">
+                <div className="flex justify-between items-center">
+                  <span>Booked:</span>
+                  <span className="font-semibold text-foreground truncate ml-1">{formatINRShort(forecast.actualProfit)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Est. Total Revenue:</span>
-                  <span className="font-semibold text-primary">{formatINR(forecast.projectedRevenue)}</span>
+                <div className="flex justify-between items-center">
+                  <span>Revenue:</span>
+                  <span className="font-semibold text-primary truncate ml-1">{formatINRShort(forecast.projectedRevenue)}</span>
                 </div>
                 <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mt-1">
                   <div
@@ -376,39 +384,41 @@ export const CashFlowForecast = ({
                 return (
                   <div
                     key={portal.name}
-                    className="p-4 rounded-xl bg-card border border-border/80 shadow-xs space-y-2 hover:border-primary/40 hover:shadow-md transition-all"
+                    className="p-3 sm:p-4 rounded-xl bg-card border border-border/80 shadow-xs space-y-2 hover:border-primary/40 hover:shadow-md transition-all flex flex-col justify-between h-full"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={`w-6 h-6 rounded-lg bg-gradient-to-br ${grad} text-white flex items-center justify-center text-[10px] font-bold shadow-xs`}
-                        >
-                          {portal.name.charAt(0).toUpperCase()}
+                    <div>
+                      <div className="flex items-center justify-between gap-1">
+                        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                          <div
+                            className={`w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-gradient-to-br ${grad} text-white flex items-center justify-center text-[9px] sm:text-[10px] font-bold shadow-xs shrink-0`}
+                          >
+                            {portal.name.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="text-[11px] sm:text-xs font-semibold text-foreground truncate max-w-[85px] sm:max-w-[120px]" title={portal.name}>
+                            {portal.name}
+                          </span>
                         </div>
-                        <span className="text-xs font-semibold text-foreground truncate max-w-[120px]" title={portal.name}>
-                          {portal.name}
-                        </span>
+                        <Badge
+                          variant="outline"
+                          className="text-[9px] sm:text-[10px] font-bold px-1 sm:px-1.5 py-0 bg-primary/10 text-primary border-primary/20 shrink-0"
+                        >
+                          {portal.sharePercent}%
+                        </Badge>
                       </div>
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] font-bold px-1.5 py-0 bg-primary/10 text-primary border-primary/20"
-                      >
-                        {portal.sharePercent}% Share
-                      </Badge>
+
+                      <div className="text-base sm:text-xl lg:text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight mt-1 sm:mt-1.5 truncate">
+                        {formatINR(portal.projectedAmount)}
+                      </div>
                     </div>
 
-                    <div className="text-xl sm:text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight">
-                      {formatINR(portal.projectedAmount)}
-                    </div>
-
-                    <div className="space-y-1.5 pt-1 border-t border-border/50 text-[11px] text-muted-foreground">
-                      <div className="flex justify-between">
+                    <div className="space-y-1 sm:space-y-1.5 pt-1.5 border-t border-border/50 text-[10px] sm:text-[11px] text-muted-foreground">
+                      <div className="flex justify-between items-center">
                         <span>Booked:</span>
-                        <span className="font-semibold text-foreground">{formatINR(portal.actualAmount)}</span>
+                        <span className="font-semibold text-foreground truncate ml-1">{formatINRShort(portal.actualAmount)}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Transactions:</span>
-                        <span className="font-medium text-foreground">{portal.transactionCount} completed</span>
+                      <div className="flex justify-between items-center">
+                        <span>Txns:</span>
+                        <span className="font-medium text-foreground truncate ml-1">{portal.transactionCount} done</span>
                       </div>
                       <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mt-1">
                         <div
@@ -422,20 +432,20 @@ export const CashFlowForecast = ({
               })
             ) : (
               <>
-                <div className="p-4 rounded-xl bg-card border border-border/80 shadow-xs space-y-2">
-                  <span className="text-[11px] text-muted-foreground font-medium">Projected Revenue</span>
-                  <div className="text-xl font-bold text-primary">{formatINR(forecast.projectedRevenue)}</div>
-                  <span className="text-[10px] text-muted-foreground block">Gross commission less fees</span>
+                <div className="p-3 sm:p-4 rounded-xl bg-card border border-border/80 shadow-xs space-y-1.5 sm:space-y-2 flex flex-col justify-between h-full">
+                  <span className="text-[10px] sm:text-[11px] text-muted-foreground font-medium truncate">Projected Revenue</span>
+                  <div className="text-base sm:text-xl font-bold text-primary truncate">{formatINR(forecast.projectedRevenue)}</div>
+                  <span className="text-[9px] sm:text-[10px] text-muted-foreground block truncate">Gross comm less fees</span>
                 </div>
-                <div className="p-4 rounded-xl bg-card border border-border/80 shadow-xs space-y-2">
-                  <span className="text-[11px] text-muted-foreground font-medium">Projected Turnover</span>
-                  <div className="text-xl font-bold text-foreground">{formatINR(forecast.projectedVolume)}</div>
-                  <span className="text-[10px] text-muted-foreground block">{formatINR(forecast.dailyVolumeRunRate)}/day avg</span>
+                <div className="p-3 sm:p-4 rounded-xl bg-card border border-border/80 shadow-xs space-y-1.5 sm:space-y-2 flex flex-col justify-between h-full">
+                  <span className="text-[10px] sm:text-[11px] text-muted-foreground font-medium truncate">Projected Turnover</span>
+                  <div className="text-base sm:text-xl font-bold text-foreground truncate">{formatINR(forecast.projectedVolume)}</div>
+                  <span className="text-[9px] sm:text-[10px] text-muted-foreground block truncate">{formatINR(forecast.dailyVolumeRunRate)}/day avg</span>
                 </div>
-                <div className="p-4 rounded-xl bg-card border border-border/80 shadow-xs space-y-2">
-                  <span className="text-[11px] text-muted-foreground font-medium">Projected Txns</span>
-                  <div className="text-xl font-bold text-foreground">{forecast.projectedTransactions} transactions</div>
-                  <span className="text-[10px] text-muted-foreground block">{forecast.daysRemaining} days remaining</span>
+                <div className="p-3 sm:p-4 rounded-xl bg-card border border-border/80 shadow-xs space-y-1.5 sm:space-y-2 flex flex-col justify-between h-full">
+                  <span className="text-[10px] sm:text-[11px] text-muted-foreground font-medium truncate">Projected Txns</span>
+                  <div className="text-base sm:text-xl font-bold text-foreground truncate">{forecast.projectedTransactions} txns</div>
+                  <span className="text-[9px] sm:text-[10px] text-muted-foreground block truncate">{forecast.daysRemaining} days remaining</span>
                 </div>
               </>
             )}

@@ -20,6 +20,7 @@ import {
   Download,
   Sparkles
 } from "lucide-react";
+import { AiIcon } from "@/components/icons/AiIcon";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -123,7 +124,7 @@ const Index = () => {
                 {/* Left Side - Hero Content */}
                 <div className="text-center lg:text-left space-y-4 sm:space-y-5 lg:space-y-6">
                   <Badge className="bg-white/20 text-white hover:bg-white/30 border-white/30 inline-flex text-xs sm:text-sm px-2 sm:px-3 py-1">
-                    <Sparkles className="mr-1.5 sm:mr-2 h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                    <AiIcon className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     <span className="whitespace-nowrap">Trusted by {stats.users > 0 ? `${stats.users}+` : 'hundreds of'} businesses</span>
                   </Badge>
                   

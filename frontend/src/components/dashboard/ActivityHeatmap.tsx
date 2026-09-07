@@ -229,42 +229,72 @@ export const ActivityHeatmap = ({
 
   return (
     <Card className="border-border/80 shadow-xs">
-      {/* Responsive Header: 2 tight rows on mobile, side-by-side on desktop */}
-      <CardHeader className="p-3.5 sm:p-5 pb-2.5 sm:pb-3">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
-          {/* Row 1 on mobile: Title & Period pill */}
-          <div className="flex items-center justify-between sm:justify-start gap-2">
-            <div className="flex items-center gap-2">
-              <div className="p-1 rounded-md bg-primary/10 text-primary">
-                <CalendarIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+      {/* Responsive Header: Streak & Amount in top row on mobile, side-by-side on desktop */}
+      <CardHeader className="p-3 sm:p-5 pb-2.5 sm:pb-3">
+        {/* Mobile Header (< sm) */}
+        <div className="flex flex-col gap-1.5 sm:hidden">
+          {/* Row 1: Title & Badges (Days Streak & Amount) in the header */}
+          <div className="flex items-center justify-between gap-1.5">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div className="p-1 rounded-md bg-primary/10 text-primary flex-shrink-0">
+                <CalendarIcon className="h-3.5 w-3.5" />
               </div>
-              <CardTitle className="text-sm sm:text-base font-semibold">Activity Heatmap</CardTitle>
+              <CardTitle className="text-xs font-semibold truncate">Activity Heatmap</CardTitle>
             </div>
-            <span className="text-[10px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-md sm:hidden">
+
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <Badge
+                variant="outline"
+                className="text-[10px] font-medium px-1.5 py-0.5 h-5 bg-card flex items-center"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 inline-block" />
+                <span>{heatmapData.activeDays30}d</span>
+              </Badge>
+
+              <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-700 text-[10px] font-bold px-1.5 py-0.5 h-5">
+                {formatINR(heatmapData.totalProfit30)}
+              </Badge>
+            </div>
+          </div>
+
+          {/* Row 2: Date range & 30 Days pill */}
+          <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-0.5">
+            <span>
+              {format(heatmapData.thirtyDaysAgo, "dd MMM")} – {format(heatmapData.today, "dd MMM yyyy")}
+            </span>
+            <span className="font-medium bg-muted/60 px-1.5 py-0.5 rounded text-[10px]">
               30 Days
             </span>
           </div>
+        </div>
 
-          {/* Row 2 on mobile: Date Range + Badges */}
-          <div className="flex items-center justify-between sm:justify-end gap-2 text-xs">
-            <span className="text-[11px] sm:text-xs text-muted-foreground">
+        {/* Desktop Header (sm+) */}
+        <div className="hidden sm:flex sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className="p-1 rounded-md bg-primary/10 text-primary">
+              <CalendarIcon className="h-4 w-4" />
+            </div>
+            <CardTitle className="text-base font-semibold">Activity Heatmap</CardTitle>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-xs text-muted-foreground">
               {format(heatmapData.thirtyDaysAgo, "dd MMM")} – {format(heatmapData.today, "dd MMM yyyy")}
             </span>
 
             <div className="flex items-center gap-1.5">
               <Badge
                 variant="outline"
-                className="text-[10px] sm:text-xs font-medium px-2 py-0.5 h-5 sm:h-6 bg-card"
+                className="text-xs font-medium px-2 py-0.5 h-6 bg-card"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 inline-block" />
                 <span>{heatmapData.activeDays30}</span>
-                <span className="hidden sm:inline ml-1">active days</span>
-                <span className="sm:hidden ml-0.5">d</span>
+                <span className="ml-1">active days</span>
               </Badge>
 
-              <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-700 text-[10px] sm:text-xs font-bold px-2 py-0.5 h-5 sm:h-6">
+              <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-700 text-xs font-bold px-2 py-0.5 h-6">
                 {formatINR(heatmapData.totalProfit30)}
-                <span className="hidden sm:inline font-normal ml-1">earned</span>
+                <span className="font-normal ml-1">earned</span>
               </Badge>
             </div>
           </div>

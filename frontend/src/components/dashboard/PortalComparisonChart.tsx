@@ -288,14 +288,18 @@ export const PortalComparisonChart = ({
               </div>
             </div>
 
-            {/* Right side: Fixed-Width Summary Cards (1-3 portals: 1 col, 4+ portals: 2 cols) */}
+            {/* Right side: Summary Cards (Desktop: 1-3 portals: 1 col, 4+ portals: 2 cols | Mobile: 3 portals: 3-in-a-row, 4+ portals: 2-in-a-row) */}
             <div className="w-full lg:w-auto flex justify-center lg:justify-end items-start flex-shrink-0">
               <div
-                className={
+                className={`w-full lg:w-auto grid gap-1.5 sm:gap-2.5 ${
                   chartData.length >= 4
-                    ? "grid grid-cols-2 gap-2 sm:gap-2.5"
-                    : "grid grid-cols-1 gap-2 sm:gap-2.5"
-                }
+                    ? "grid-cols-2 lg:grid-cols-2"
+                    : chartData.length === 3
+                    ? "grid-cols-3 lg:grid-cols-1"
+                    : chartData.length === 2
+                    ? "grid-cols-2 lg:grid-cols-1"
+                    : "grid-cols-1 lg:grid-cols-1"
+                }`}
               >
                 {chartData.map((portal, index) => (
                   <motion.div
@@ -303,31 +307,31 @@ export const PortalComparisonChart = ({
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: index * 0.05 }}
-                    className="w-[150px] min-[400px]:w-[165px] sm:w-[175px] rounded-lg border p-2.5 bg-card/60 shadow-2xs flex flex-col justify-between hover:bg-card/90 transition-colors"
+                    className="w-full lg:w-[175px] rounded-lg border p-2 sm:p-2.5 bg-card/60 shadow-2xs flex flex-col justify-between hover:bg-card/90 transition-colors"
                   >
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
                       <div
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                        className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0"
                         style={{ backgroundColor: COLORS[index % COLORS.length] }}
                       />
-                      <p className="text-xs font-semibold truncate" title={portal.name}>
+                      <p className="text-[11px] sm:text-xs font-semibold truncate" title={portal.name}>
                         {portal.name}
                       </p>
                     </div>
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between items-center text-[10px]">
+                    <div className="space-y-1 sm:space-y-1.5">
+                      <div className="flex justify-between items-center text-[9px] sm:text-[10px]">
                         <span className="text-muted-foreground">Txns</span>
                         <span className="font-medium text-foreground">{portal.transactions}</span>
                       </div>
-                      <div className="flex justify-between items-center text-[10px]">
+                      <div className="flex justify-between items-center text-[9px] sm:text-[10px]">
                         <span className="text-muted-foreground">Amount</span>
-                        <span className="font-semibold text-foreground truncate ml-1">
+                        <span className="font-semibold text-foreground truncate ml-0.5 sm:ml-1">
                           {formatCurrency(portal.totalAmount)}
                         </span>
                       </div>
-                      <div className="flex justify-between items-center pt-1 border-t text-[10px]">
+                      <div className="flex justify-between items-center pt-1 border-t text-[9px] sm:text-[10px]">
                         <span className="text-muted-foreground">Profit</span>
-                        <span className="font-bold text-success truncate ml-1">
+                        <span className="font-bold text-success truncate ml-0.5 sm:ml-1">
                           {formatCurrency(portal.totalProfit)}
                         </span>
                       </div>

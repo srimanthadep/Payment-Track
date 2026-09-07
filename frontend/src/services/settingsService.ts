@@ -83,6 +83,7 @@ export const DEFAULT_CARD_TYPES: CardTypeOption[] = [
 
 export const DEFAULT_RECIPIENTS: RecipientOption[] = [
   { id: "upender", name: "Upender", isDefault: true },
+  { id: "bharat", name: "Bharat", isDefault: true },
   { id: "chummi", name: "Chummi", isDefault: true },
 ];
 

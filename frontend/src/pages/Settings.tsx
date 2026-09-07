@@ -42,6 +42,7 @@ import {
   BrainCircuit,
   Sliders,
 } from "lucide-react";
+import { AiIcon } from "@/components/icons/AiIcon";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { LearningInsightsCard } from "@/components/settings/LearningInsightsCard";
@@ -284,7 +285,7 @@ const Settings = () => {
               value="ai-learning"
               className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 text-[11px] sm:text-sm font-semibold h-auto"
             >
-              <BrainCircuit className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
+              <AiIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span>AI Learning</span>
             </TabsTrigger>
             <TabsTrigger

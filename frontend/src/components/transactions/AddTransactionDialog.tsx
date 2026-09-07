@@ -24,7 +24,8 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Calendar as CalendarIcon, Sparkles } from "lucide-react";
+import { Loader2, Calendar as CalendarIcon } from "lucide-react";
+import { AiIcon } from "@/components/icons/AiIcon";
 import { format, isToday } from "date-fns";
 import {
   settingsService,
@@ -328,6 +329,20 @@ export const AddTransactionDialog = ({
 
   const hasEnteredCommission = Boolean(formData.amount && parseFloat(formData.amount) > 0);
 
+  const isCommissionAutoLearned = Boolean(
+    recommendationInfo &&
+      !isCommissionManual &&
+      recommendationInfo.commission !== null &&
+      formData.commission_percent
+  );
+
+  const isSiteFeeAutoLearned = Boolean(
+    recommendationInfo &&
+      !isSiteFeeManual &&
+      recommendationInfo.siteFee !== null &&
+      formData.site_fee_percent
+  );
+
   return (
     <Dialog
       open={open}
@@ -488,67 +503,85 @@ export const AddTransactionDialog = ({
           </div>
 
           {/* 4. Commission (%) & 5. Site Fee (%) */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="commission_percent">Commission (%)</Label>
-                {recommendationInfo && !isCommissionManual && recommendationInfo.commission !== null && formData.commission_percent && (
-                  <span
-                    className="text-[10px] font-semibold text-primary inline-flex items-center gap-1 bg-primary/10 px-1.5 py-0.5 rounded-full"
-                    title={recommendationInfo.explanation}
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label
+                htmlFor="commission_percent"
+                className="text-xs sm:text-sm font-medium truncate block"
+              >
+                Commission (%)
+              </Label>
+              <div className="relative">
+                <Input
+                  id="commission_percent"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  placeholder="e.g. 2.0"
+                  className={
+                    isCommissionAutoLearned
+                      ? "border-primary/40 bg-primary/[0.02] pr-8"
+                      : ""
+                  }
+                  value={formData.commission_percent}
+                  onChange={(e) => {
+                    setIsCommissionManual(true);
+                    setFormData({
+                      ...formData,
+                      commission_percent: e.target.value,
+                    });
+                  }}
+                />
+                {isCommissionAutoLearned && (
+                  <div
+                    className="absolute right-2.5 inset-y-0 flex items-center justify-center pointer-events-none transition-opacity duration-300 animate-in fade-in -translate-y-[1px]"
+                    title={recommendationInfo?.explanation || "AI Auto-learned"}
                   >
-                    <Sparkles className="h-2.5 w-2.5" />
-                    Auto-learned
-                  </span>
+                    <AiIcon className="h-4 w-4 animate-pulse block" />
+                  </div>
                 )}
               </div>
-              <Input
-                id="commission_percent"
-                type="number"
-                step="0.01"
-                min="0"
-                max="100"
-                placeholder="e.g. 2.0"
-                value={formData.commission_percent}
-                onChange={(e) => {
-                  setIsCommissionManual(true);
-                  setFormData({
-                    ...formData,
-                    commission_percent: e.target.value,
-                  });
-                }}
-              />
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="site_fee_percent">Site Fee (%) (Optional)</Label>
-                {recommendationInfo && !isSiteFeeManual && recommendationInfo.siteFee !== null && formData.site_fee_percent && (
-                  <span
-                    className="text-[10px] font-semibold text-primary inline-flex items-center gap-1 bg-primary/10 px-1.5 py-0.5 rounded-full"
-                    title={recommendationInfo.explanation}
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label
+                htmlFor="site_fee_percent"
+                className="text-xs sm:text-sm font-medium truncate block"
+              >
+                Site Fee (%) <span className="text-[10px] font-normal text-muted-foreground"><span className="hidden sm:inline">(Optional)</span><span className="sm:hidden">(Opt)</span></span>
+              </Label>
+              <div className="relative">
+                <Input
+                  id="site_fee_percent"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  placeholder="e.g. 0.5"
+                  className={
+                    isSiteFeeAutoLearned
+                      ? "border-primary/40 bg-primary/[0.02] pr-8"
+                      : ""
+                  }
+                  value={formData.site_fee_percent}
+                  onChange={(e) => {
+                    setIsSiteFeeManual(true);
+                    setFormData({
+                      ...formData,
+                      site_fee_percent: e.target.value,
+                    });
+                  }}
+                />
+                {isSiteFeeAutoLearned && (
+                  <div
+                    className="absolute right-2.5 inset-y-0 flex items-center justify-center pointer-events-none transition-opacity duration-300 animate-in fade-in -translate-y-[1px]"
+                    title={recommendationInfo?.explanation || "AI Auto-learned"}
                   >
-                    <Sparkles className="h-2.5 w-2.5" />
-                    Auto-learned
-                  </span>
+                    <AiIcon className="h-4 w-4 animate-pulse block" />
+                  </div>
                 )}
               </div>
-              <Input
-                id="site_fee_percent"
-                type="number"
-                step="0.01"
-                min="0"
-                max="100"
-                placeholder="e.g. 0.5"
-                value={formData.site_fee_percent}
-                onChange={(e) => {
-                  setIsSiteFeeManual(true);
-                  setFormData({
-                    ...formData,
-                    site_fee_percent: e.target.value,
-                  });
-                }}
-              />
             </div>
           </div>
 
