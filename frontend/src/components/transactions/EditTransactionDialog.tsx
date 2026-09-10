@@ -47,6 +47,7 @@ interface EditTransactionDialogProps {
     status: string;
     transaction_date: string;
     card_type: string | null;
+    notes?: string | null;
   } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -87,8 +88,9 @@ export const EditTransactionDialog = ({
     amount: "",
     commission: "",
     site_fee: "",
-    reference_number: "",
     status: "completed",
+    customer_name: "",
+    customer_phone: "",
     transaction_date: new Date(),
   });
 
@@ -130,6 +132,15 @@ export const EditTransactionDialog = ({
         }
       }
 
+      let custName = "";
+      let custPhone = "";
+      if (transaction.notes) {
+        const nameMatch = transaction.notes.match(/Customer:\s*([^|]+)/i);
+        const phoneMatch = transaction.notes.match(/Phone:\s*([^|]+)/i);
+        if (nameMatch) custName = nameMatch[1].trim();
+        if (phoneMatch) custPhone = phoneMatch[1].trim();
+      }
+
       setFormData({
         portal_id: transaction.portal_id,
         card_type: cardType,
@@ -143,8 +154,9 @@ export const EditTransactionDialog = ({
           transaction.site_fee && transaction.site_fee > 0
             ? transaction.site_fee.toString()
             : "",
-        reference_number: transaction.reference_number || "",
         status: transaction.status,
+        customer_name: custName,
+        customer_phone: custPhone,
         transaction_date: transaction.transaction_date
           ? new Date(transaction.transaction_date)
           : new Date(),
@@ -255,6 +267,27 @@ export const EditTransactionDialog = ({
 
     setIsLoading(true);
 
+    const selectedPortal = portals.find((p) => p.id === formData.portal_id);
+    const isChummi = selectedPortal?.name?.trim().toLowerCase() === "chummi";
+
+    let notes = transaction.notes || "";
+    if (isChummi) {
+      let cleanNotes = notes
+        .replace(/\s*\|\s*Customer:\s*[^|]+/gi, "")
+        .replace(/\s*\|\s*Phone:\s*[^|]+/gi, "")
+        .trim();
+      if (!cleanNotes && selectedPortal) {
+        cleanNotes = `Sent to: ${selectedPortal.name}`;
+      }
+      if (formData.customer_name.trim()) {
+        cleanNotes += ` | Customer: ${formData.customer_name.trim()}`;
+      }
+      if (formData.customer_phone.trim()) {
+        cleanNotes += ` | Phone: ${formData.customer_phone.trim()}`;
+      }
+      notes = cleanNotes;
+    }
+
     const updatePayload = {
       portal_id: formData.portal_id,
       card_type: formData.card_type,
@@ -262,9 +295,9 @@ export const EditTransactionDialog = ({
       amount: parseFloat(formData.amount),
       commission: parseFloat(formData.commission || "0"),
       site_fee: formData.site_fee ? parseFloat(formData.site_fee) : 0,
-      reference_number: formData.reference_number || null,
       status: formData.status,
       transaction_date: formData.transaction_date.toISOString(),
+      notes: notes || null,
     };
 
     const { error } = await supabase
@@ -284,14 +317,15 @@ export const EditTransactionDialog = ({
       activityLogService.log(
         "transaction.updated",
         "transaction",
-        `Edited transaction — Amount: ₹${parseFloat(formData.amount).toLocaleString("en-IN")}, Type: ${formData.transaction_type}`,
+        `Edited transaction — Amount: ₹${parseFloat(formData.amount).toLocaleString("en-IN")}, Type: ${formData.transaction_type}${isChummi && formData.customer_name.trim() ? `, Customer: ${formData.customer_name.trim()}` : ""}`,
         {
           transaction_id: transaction.id,
           old_amount: transaction.amount,
           new_amount: parseFloat(formData.amount),
           transaction_type: formData.transaction_type,
           card_type: formData.card_type,
-          reference_number: formData.reference_number || null,
+          customer_name: isChummi ? formData.customer_name.trim() || null : null,
+          customer_phone: isChummi ? formData.customer_phone.trim() || null : null,
         }
       );
       toast({
@@ -306,6 +340,8 @@ export const EditTransactionDialog = ({
   if (!transaction) return null;
 
   const hasEnteredCommission = formData.amount && formData.commission;
+  const selectedPortal = portals.find((p) => p.id === formData.portal_id);
+  const isChummi = selectedPortal?.name?.trim().toLowerCase() === "chummi";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -576,19 +612,42 @@ export const EditTransactionDialog = ({
             </div>
           </div>
 
-          {/* 6. Reference Number */}
-          <div className="space-y-2">
-            <Label htmlFor="edit-reference">Reference Number (Optional)</Label>
-            <Input
-              id="edit-reference"
-              type="text"
-              placeholder="e.g. TXN123456"
-              value={formData.reference_number}
-              onChange={(e) =>
-                setFormData({ ...formData, reference_number: e.target.value })
-              }
-            />
-          </div>
+          {/* Conditional Customer Info for Chummi Portal */}
+          {isChummi && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 p-3.5 rounded-xl border border-primary/20 bg-primary/[0.03] animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label htmlFor="edit-customer_name" className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
+                  Customer Name
+                  <span className="text-[10px] font-normal text-muted-foreground">(Optional)</span>
+                </Label>
+                <Input
+                  id="edit-customer_name"
+                  type="text"
+                  placeholder="Enter customer name"
+                  value={formData.customer_name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, customer_name: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label htmlFor="edit-customer_phone" className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
+                  Phone Number
+                  <span className="text-[10px] font-normal text-muted-foreground">(Optional)</span>
+                </Label>
+                <Input
+                  id="edit-customer_phone"
+                  type="tel"
+                  placeholder="Enter phone number"
+                  value={formData.customer_phone}
+                  onChange={(e) =>
+                    setFormData({ ...formData, customer_phone: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex justify-end space-x-2 pt-4">

@@ -39,7 +39,8 @@ erDiagram
         text card_type
         timestamp transaction_date
         text status
-        text reference_number
+        text customer_name
+        text customer_phone
         text notes
         timestamp created_at
         timestamp updated_at
@@ -135,8 +136,9 @@ Stores credit card withdrawals, repayments, customer charges, commissions, and p
 | `card_type` | `text` | YES | - | Card brand / category (`Visa`, `Mastercard`, `Amex`, etc.) |
 | `transaction_date` | `timestamptz` | NO | - | Date/time transaction occurred |
 | `status` | `text` | YES | - | State (`completed`, `pending`, `cancelled`) |
-| `reference_number` | `text` | YES | - | External payment/bank reference code |
-| `notes` | `text` | YES | - | User-entered transaction notes |
+| `customer_name` | `text` | YES | - | Optional customer name (e.g. for Chummi portal) |
+| `customer_phone` | `text` | YES | - | Optional customer phone number |
+| `notes` | `text` | YES | - | User-entered transaction notes and metadata |
 | `created_at` | `timestamptz` | NO | - | Record creation timestamp |
 | `updated_at` | `timestamptz` | NO | - | Record update timestamp |
 

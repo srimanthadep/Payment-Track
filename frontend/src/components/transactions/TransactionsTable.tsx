@@ -43,6 +43,16 @@ interface TransactionsTableProps {
   onPortalFilterSummaryChange?: (summary: { portalNames: string[]; totalAmount: number; count: number } | null) => void;
 }
 
+const extractCustomerInfo = (notes?: string | null) => {
+  if (!notes) return null;
+  const nameMatch = notes.match(/Customer:\s*([^|]+)/i);
+  const phoneMatch = notes.match(/Phone:\s*([^|]+)/i);
+  const name = nameMatch ? nameMatch[1].trim() : null;
+  const phone = phoneMatch ? phoneMatch[1].trim() : null;
+  if (!name && !phone) return null;
+  return { name, phone };
+};
+
 interface Transaction {
   id: string;
   portal_id: string;
@@ -52,9 +62,10 @@ interface Transaction {
   site_fee: number;
   profit: number;
   transaction_date: string;
-  reference_number: string | null;
+  reference_number?: string | null;
   status: string;
   card_type: string | null;
+  notes?: string | null;
   portals: {
     name: string;
   };
@@ -131,9 +142,9 @@ export const TransactionsTable = ({
           site_fee,
           profit,
           transaction_date,
-          reference_number,
           status,
           card_type,
+          notes,
           portals (
             name
           )
@@ -233,11 +244,12 @@ export const TransactionsTable = ({
 
     // Text search
     if (searchQuery) {
+      const q = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (t) =>
-          t.portals.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          t.transaction_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          t.reference_number?.toLowerCase().includes(searchQuery.toLowerCase())
+          t.portals.name.toLowerCase().includes(q) ||
+          t.transaction_type.toLowerCase().includes(q) ||
+          (t.notes && t.notes.toLowerCase().includes(q))
       );
     }
 
@@ -455,8 +467,9 @@ export const TransactionsTable = ({
         site_fee,
         profit,
         transaction_date,
-        reference_number,
         status,
+        card_type,
+        notes,
         portals (
           name
         )
@@ -505,9 +518,9 @@ export const TransactionsTable = ({
           site_fee,
           profit,
           transaction_date,
-          reference_number,
           status,
           card_type,
+          notes,
           portals (
             name
           )
@@ -809,6 +822,16 @@ export const TransactionsTable = ({
                           );
                         })()}
                         <div className="text-[10px] text-muted-foreground truncate">{transaction.portals.name}</div>
+                        {(() => {
+                          const cust = extractCustomerInfo(transaction.notes);
+                          if (!cust) return null;
+                          return (
+                            <div className="text-[10px] text-muted-foreground/90 space-y-0.5 mt-0.5">
+                              {cust.name && <div className="truncate font-medium text-foreground/80">👤 {cust.name}</div>}
+                              {cust.phone && <div className="truncate text-muted-foreground">📞 {cust.phone}</div>}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -1069,7 +1092,19 @@ export const TransactionsTable = ({
                       );
                     })()}
                   </TableCell>
-                  <TableCell>{transaction.portals.name}</TableCell>
+                  <TableCell>
+                    <div className="font-medium text-foreground">{transaction.portals.name}</div>
+                    {(() => {
+                      const cust = extractCustomerInfo(transaction.notes);
+                      if (!cust) return null;
+                      return (
+                        <div className="text-[11px] text-muted-foreground space-y-0.5 mt-0.5">
+                          {cust.name && <div className="truncate font-medium text-foreground/85">👤 {cust.name}</div>}
+                          {cust.phone && <div className="truncate text-muted-foreground">📞 {cust.phone}</div>}
+                        </div>
+                      );
+                    })()}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={transaction.transaction_type?.toLowerCase() === "withdrawal" ? "default" : "secondary"}>
                       {transaction.transaction_type

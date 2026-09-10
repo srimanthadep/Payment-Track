@@ -49,6 +49,8 @@ interface AddTransactionDialogProps {
     commission_percent?: string | number;
     site_fee_percent?: string | number;
     sent_to?: string;
+    customer_name?: string;
+    customer_phone?: string;
     portal_id?: string;
   } | null;
 }
@@ -85,7 +87,8 @@ export const AddTransactionDialog = ({
     commission_percent: "",
     site_fee_percent: "",
     sent_to: "",
-    reference_number: "",
+    customer_name: "",
+    customer_phone: "",
     transaction_date: new Date(),
   });
 
@@ -151,6 +154,8 @@ export const AddTransactionDialog = ({
             : "",
         site_fee_percent: initialData.site_fee_percent !== undefined ? String(initialData.site_fee_percent) : prev.site_fee_percent,
         sent_to: initialData.sent_to || prev.sent_to,
+        customer_name: initialData.customer_name || prev.customer_name,
+        customer_phone: initialData.customer_phone || prev.customer_phone,
       }));
     }
   }, [initialData, open]);
@@ -188,7 +193,8 @@ export const AddTransactionDialog = ({
       commission_percent: "",
       site_fee_percent: "",
       sent_to: "",
-      reference_number: "",
+      customer_name: "",
+      customer_phone: "",
       transaction_date: new Date(),
     });
     setIsCommissionManual(false);
@@ -260,7 +266,19 @@ export const AddTransactionDialog = ({
       }
     }
 
-    const commPercent = parseFloat(formData.commission_percent) || 0;
+    const isChummi = formData.sent_to?.trim().toLowerCase() === "chummi";
+    let notesStr = `Sent to: ${formData.sent_to} | Commission: ${commPercent}%${
+      formData.site_fee_percent ? ` | Site Fee: ${formData.site_fee_percent}%` : ""
+    }`;
+    if (isChummi) {
+      if (formData.customer_name.trim()) {
+        notesStr += ` | Customer: ${formData.customer_name.trim()}`;
+      }
+      if (formData.customer_phone.trim()) {
+        notesStr += ` | Phone: ${formData.customer_phone.trim()}`;
+      }
+    }
+
     const payload = {
       user_id: userId,
       portal_id: portalId,
@@ -270,11 +288,8 @@ export const AddTransactionDialog = ({
       commission: commissionAmount,
       site_fee: siteFeeAmount,
       transaction_date: formData.transaction_date.toISOString(),
-      reference_number: formData.reference_number || null,
       status: "completed",
-      notes: `Sent to: ${formData.sent_to} | Commission: ${commPercent}%${
-        formData.site_fee_percent ? ` | Site Fee: ${formData.site_fee_percent}%` : ""
-      }`,
+      notes: notesStr,
     };
 
     const { error } = await supabase.from("transactions").insert(payload);
@@ -305,7 +320,7 @@ export const AddTransactionDialog = ({
       activityLogService.log(
         "transaction.created",
         "transaction",
-        `Added ${formData.transaction_type} of ₹${parseFloat(formData.amount).toLocaleString("en-IN")} to ${formData.sent_to} (${formData.card_type}${commPct ? `, Commission: ${commPct}%` : ""}${feePct ? `, Site Fee: ${feePct}%` : ""})`,
+        `Added ${formData.transaction_type} of ₹${parseFloat(formData.amount).toLocaleString("en-IN")} to ${formData.sent_to} (${formData.card_type}${commPct ? `, Commission: ${commPct}%` : ""}${feePct ? `, Site Fee: ${feePct}%` : ""}${isChummi && formData.customer_name.trim() ? `, Customer: ${formData.customer_name.trim()}` : ""})`,
         {
           amount: parseFloat(formData.amount),
           card_type: formData.card_type,
@@ -313,7 +328,8 @@ export const AddTransactionDialog = ({
           sent_to: formData.sent_to,
           commission_percent: commPct,
           site_fee_percent: feePct,
-          reference_number: formData.reference_number || null,
+          customer_name: isChummi ? formData.customer_name.trim() || null : null,
+          customer_phone: isChummi ? formData.customer_phone.trim() || null : null,
         }
       );
 
@@ -342,6 +358,8 @@ export const AddTransactionDialog = ({
       recommendationInfo.siteFee !== null &&
       formData.site_fee_percent
   );
+
+  const isChummi = formData.sent_to?.trim().toLowerCase() === "chummi";
 
   return (
     <Dialog
@@ -633,19 +651,42 @@ export const AddTransactionDialog = ({
             </Select>
           </div>
 
-          {/* 8. Reference Number (Optional) */}
-          <div className="space-y-2">
-            <Label htmlFor="reference">Reference Number (Optional)</Label>
-            <Input
-              id="reference"
-              type="text"
-              placeholder="e.g. TXN123456"
-              value={formData.reference_number}
-              onChange={(e) =>
-                setFormData({ ...formData, reference_number: e.target.value })
-              }
-            />
-          </div>
+          {/* Conditional Customer Info for Chummi Portal */}
+          {isChummi && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 p-3.5 rounded-xl border border-primary/20 bg-primary/[0.03] animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label htmlFor="customer_name" className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
+                  Customer Name
+                  <span className="text-[10px] font-normal text-muted-foreground">(Optional)</span>
+                </Label>
+                <Input
+                  id="customer_name"
+                  type="text"
+                  placeholder="Enter customer name"
+                  value={formData.customer_name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, customer_name: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label htmlFor="customer_phone" className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
+                  Phone Number
+                  <span className="text-[10px] font-normal text-muted-foreground">(Optional)</span>
+                </Label>
+                <Input
+                  id="customer_phone"
+                  type="tel"
+                  placeholder="Enter phone number"
+                  value={formData.customer_phone}
+                  onChange={(e) =>
+                    setFormData({ ...formData, customer_phone: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex justify-end space-x-2 pt-4">

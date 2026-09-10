@@ -214,11 +214,13 @@ export type Database = {
           commission: number | null
           created_at: string
           card_type: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
           id: string
           notes: string | null
           portal_id: string
           profit: number | null
-          reference_number: string | null
+          reference_number?: string | null
           site_fee: number | null
           status: string | null
           transaction_date: string
@@ -231,6 +233,8 @@ export type Database = {
           commission?: number | null
           created_at?: string
           card_type?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
           id?: string
           notes?: string | null
           portal_id: string
@@ -248,6 +252,8 @@ export type Database = {
           commission?: number | null
           created_at?: string
           card_type?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
           id?: string
           notes?: string | null
           portal_id?: string
