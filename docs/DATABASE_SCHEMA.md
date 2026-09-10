@@ -8,12 +8,14 @@ Complete database architecture, tables, columns, primary keys, foreign keys, and
 
 ```mermaid
 erDiagram
+    PROFILES ||--o{ CUSTOMERS : "user_id"
     PROFILES ||--o{ TRANSACTIONS : "user_id"
     PROFILES ||--o{ EXPENSES : "user_id"
     PROFILES ||--o{ APP_SETTINGS : "user_id"
     PROFILES ||--o{ USER_ROLES : "user_id"
     PROFILES ||--o{ SCRAPING_CONFIGS : "user_id"
     
+    CUSTOMERS ||--o{ TRANSACTIONS : "customer_id"
     PORTALS ||--o{ TRANSACTIONS : "portal_id"
     PORTALS ||--o{ PORTAL_RATES : "portal_id"
     PORTALS ||--o{ SCRAPING_CONFIGS : "portal_id"
@@ -27,10 +29,22 @@ erDiagram
         timestamp updated_at
     }
 
+    CUSTOMERS {
+        uuid id PK
+        uuid user_id FK
+        text name
+        text phone
+        text phone_normalized
+        text notes
+        timestamp created_at
+        timestamp updated_at
+    }
+
     TRANSACTIONS {
         uuid id PK
         uuid user_id FK
         uuid portal_id FK
+        uuid customer_id FK
         numeric amount
         numeric commission
         numeric site_fee
@@ -136,15 +150,32 @@ Stores credit card withdrawals, repayments, customer charges, commissions, and p
 | `card_type` | `text` | YES | - | Card brand / category (`Visa`, `Mastercard`, `Amex`, etc.) |
 | `transaction_date` | `timestamptz` | NO | - | Date/time transaction occurred |
 | `status` | `text` | YES | - | State (`completed`, `pending`, `cancelled`) |
-| `customer_name` | `text` | YES | - | Optional customer name (e.g. for Chummi portal) |
-| `customer_phone` | `text` | YES | - | Optional customer phone number |
+| `customer_id` | `uuid` | YES | **FK** -> `customers.id` | Reference to canonical customer record |
+| `customer_name` | `text` | YES | - | Legacy/fallback customer name (e.g. for Chummi portal) |
+| `customer_phone` | `text` | YES | - | Legacy/fallback customer phone number |
 | `notes` | `text` | YES | - | User-entered transaction notes and metadata |
 | `created_at` | `timestamptz` | NO | - | Record creation timestamp |
 | `updated_at` | `timestamptz` | NO | - | Record update timestamp |
 
 ---
 
-### 2. `expenses`
+### 2. `customers`
+Dedicated canonical customer records for customer tracking, repeat customer auto-fill, and CRM analytics.
+
+| Column Name | Data Type | Nullable | Key / Ref | Description |
+|-------------|-----------|----------|-----------|-------------|
+| `id` | `uuid` | NO | **PK** (gen_random_uuid()) | Unique customer ID |
+| `user_id` | `uuid` | NO | **FK** -> `auth.users.id` | User/merchant who owns this customer record (Multi-tenant) |
+| `name` | `text` | NO | - | Customer full name |
+| `phone` | `text` | YES | - | Formatted customer phone number for display |
+| `phone_normalized` | `text` | YES | - | Digits-only normalized phone number for search & deduplication |
+| `notes` | `text` | YES | - | Notes, preferences, or customer history remarks |
+| `created_at` | `timestamptz` | NO | - | Customer record creation timestamp |
+| `updated_at` | `timestamptz` | NO | - | Customer record last update timestamp |
+
+---
+
+### 3. `expenses`
 Stores business operating costs, worker salaries, rent, petrol, and overheads.
 
 | Column Name | Data Type | Nullable | Key / Ref | Description |
@@ -163,7 +194,7 @@ Stores business operating costs, worker salaries, rent, petrol, and overheads.
 
 ---
 
-### 3. `portals`
+### 4. `portals`
 Stores external gateways and portals through which transactions are processed.
 
 | Column Name | Data Type | Nullable | Key / Ref | Description |
@@ -178,7 +209,7 @@ Stores external gateways and portals through which transactions are processed.
 
 ---
 
-### 4. `portal_rates`
+### 5. `portal_rates`
 Card-specific commission rates configured per portal.
 
 | Column Name | Data Type | Nullable | Key / Ref | Description |
@@ -192,7 +223,7 @@ Card-specific commission rates configured per portal.
 
 ---
 
-### 5. `profiles`
+### 6. `profiles`
 User profiles synced with Supabase Auth (`auth.users`).
 
 | Column Name | Data Type | Nullable | Key / Ref | Description |
@@ -206,7 +237,7 @@ User profiles synced with Supabase Auth (`auth.users`).
 
 ---
 
-### 6. `user_roles`
+### 7. `user_roles`
 Role-based access control (RBAC).
 
 | Column Name | Data Type | Nullable | Key / Ref | Description |
@@ -218,7 +249,7 @@ Role-based access control (RBAC).
 
 ---
 
-### 7. `app_settings`
+### 8. `app_settings`
 User custom settings, dropdown configurations, and UI preferences.
 
 | Column Name | Data Type | Nullable | Key / Ref | Description |
@@ -231,7 +262,7 @@ User custom settings, dropdown configurations, and UI preferences.
 
 ---
 
-### 8. `card_types`
+### 9. `card_types`
 Global card types registry.
 
 | Column Name | Data Type | Nullable | Key / Ref | Description |
@@ -244,7 +275,7 @@ Global card types registry.
 
 ---
 
-### 9. `scraping_configs`
+### 10. `scraping_configs`
 Automated portal scraping rules and credentials.
 
 | Column Name | Data Type | Nullable | Key / Ref | Description |

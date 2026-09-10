@@ -16,6 +16,7 @@ import {
   ArrowRight,
   Clock,
   IndianRupee,
+  Users,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
@@ -28,7 +29,7 @@ interface CommandPaletteProps {
 
 interface SearchResult {
   id: string;
-  type: "transaction" | "expense" | "page";
+  type: "transaction" | "expense" | "page" | "customer";
   title: string;
   subtitle: string;
   icon: React.ReactNode;
@@ -61,6 +62,14 @@ const PAGES: SearchResult[] = [
     subtitle: "Track business expenses",
     icon: <Wallet className="h-4 w-4" />,
     href: "/expenses",
+  },
+  {
+    id: "page-customers",
+    type: "page",
+    title: "Customers",
+    subtitle: "Customer CRM and transaction history",
+    icon: <Users className="h-4 w-4" />,
+    href: "/customers",
   },
   {
     id: "page-analytics",
@@ -221,6 +230,42 @@ export const CommandPalette = ({
                 badgeVariant: "secondary" as const,
               }))
             );
+          }
+        } catch {
+          // Silently fail
+        }
+
+        // 4. Search customers
+        try {
+          const { data: custTxns } = await supabase
+            .from("transactions")
+            .select("customer_name, customer_phone, amount, transaction_date")
+            .eq("user_id", userId)
+            .or(`customer_name.ilike.%${q}%,customer_phone.ilike.%${q}%,notes.ilike.%Customer%${q}%`)
+            .order("transaction_date", { ascending: false })
+            .limit(10);
+
+          if (custTxns && custTxns.length > 0) {
+            const seen = new Set<string>();
+            for (const ct of custTxns) {
+              const name = ct.customer_name?.trim();
+              const phone = ct.customer_phone?.trim();
+              const display = name || phone;
+              if (display && !seen.has(display.toLowerCase())) {
+                seen.add(display.toLowerCase());
+                allResults.push({
+                  id: `cust-${display}`,
+                  type: "customer" as const,
+                  title: name || "Customer",
+                  subtitle: phone ? `Phone: ${phone}` : "Customer profile",
+                  icon: <Users className="h-4 w-4" />,
+                  href: "/customers",
+                  badge: "Customer",
+                  badgeVariant: "default" as const,
+                });
+                if (seen.size >= 4) break;
+              }
+            }
           }
         } catch {
           // Silently fail

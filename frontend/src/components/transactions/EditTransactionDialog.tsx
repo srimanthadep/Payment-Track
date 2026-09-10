@@ -34,10 +34,13 @@ import {
 } from "@/utils/commissionCalculator";
 import { settingsService, CardTypeOption } from "@/services/settingsService";
 import { activityLogService } from "@/services/activityLogService";
+import { CustomerCombobox, CustomerValue } from "@/components/customers/CustomerCombobox";
+import { customerService } from "@/services/customerService";
 
 interface EditTransactionDialogProps {
   transaction: {
     id: string;
+    user_id?: string;
     portal_id: string;
     transaction_type: string;
     amount: number;
@@ -47,6 +50,9 @@ interface EditTransactionDialogProps {
     status: string;
     transaction_date: string;
     card_type: string | null;
+    customer_id?: string | null;
+    customer_name?: string | null;
+    customer_phone?: string | null;
     notes?: string | null;
   } | null;
   open: boolean;
@@ -72,6 +78,14 @@ export const EditTransactionDialog = ({
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [portals, setPortals] = useState<Portal[]>([]);
   const [customCards, setCustomCards] = useState<CardTypeOption[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [customerValue, setCustomerValue] = useState<CustomerValue | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setCurrentUserId(user.id);
+    });
+  }, []);
 
   useEffect(() => {
     const updateCards = () => {
@@ -132,13 +146,24 @@ export const EditTransactionDialog = ({
         }
       }
 
-      let custName = "";
-      let custPhone = "";
-      if (transaction.notes) {
+      let custName = transaction.customer_name || "";
+      let custPhone = transaction.customer_phone || "";
+      if (!custName && transaction.notes) {
         const nameMatch = transaction.notes.match(/Customer:\s*([^|]+)/i);
         const phoneMatch = transaction.notes.match(/Phone:\s*([^|]+)/i);
         if (nameMatch) custName = nameMatch[1].trim();
         if (phoneMatch) custPhone = phoneMatch[1].trim();
+      }
+
+      if (transaction.customer_id || custName || custPhone) {
+        setCustomerValue({
+          id: transaction.customer_id || null,
+          name: custName,
+          phone: custPhone,
+          isNew: !transaction.customer_id,
+        });
+      } else {
+        setCustomerValue(null);
       }
 
       setFormData({
@@ -270,6 +295,35 @@ export const EditTransactionDialog = ({
     const selectedPortal = portals.find((p) => p.id === formData.portal_id);
     const isChummi = selectedPortal?.name?.trim().toLowerCase() === "chummi";
 
+    let customerId: string | null = null;
+    let customerName: string | null = null;
+    let customerPhone: string | null = null;
+
+    if (isChummi && customerValue && (customerValue.name.trim() || customerValue.phone.trim())) {
+      customerName = customerValue.name.trim() || null;
+      customerPhone = customerValue.phone.trim() || null;
+
+      if (customerValue.id) {
+        customerId = customerValue.id;
+        customerService.updateCustomer(customerValue.id, {
+          name: customerValue.name,
+          phone: customerValue.phone,
+        }).catch((err) => console.warn("Failed to update customer:", err));
+      } else {
+        const effectiveUserId = transaction.user_id || currentUserId;
+        if (effectiveUserId) {
+          const { data: newCust } = await customerService.createCustomer(
+            effectiveUserId,
+            customerValue.name || "Customer",
+            customerValue.phone || null
+          );
+          if (newCust) {
+            customerId = newCust.id;
+          }
+        }
+      }
+    }
+
     let notes = transaction.notes || "";
     if (isChummi) {
       let cleanNotes = notes
@@ -279,11 +333,11 @@ export const EditTransactionDialog = ({
       if (!cleanNotes && selectedPortal) {
         cleanNotes = `Sent to: ${selectedPortal.name}`;
       }
-      if (formData.customer_name.trim()) {
-        cleanNotes += ` | Customer: ${formData.customer_name.trim()}`;
+      if (customerName) {
+        cleanNotes += ` | Customer: ${customerName}`;
       }
-      if (formData.customer_phone.trim()) {
-        cleanNotes += ` | Phone: ${formData.customer_phone.trim()}`;
+      if (customerPhone) {
+        cleanNotes += ` | Phone: ${customerPhone}`;
       }
       notes = cleanNotes;
     }
@@ -297,6 +351,9 @@ export const EditTransactionDialog = ({
       site_fee: formData.site_fee ? parseFloat(formData.site_fee) : 0,
       status: formData.status,
       transaction_date: formData.transaction_date.toISOString(),
+      customer_id: customerId,
+      customer_name: customerName,
+      customer_phone: customerPhone,
       notes: notes || null,
     };
 
@@ -614,38 +671,13 @@ export const EditTransactionDialog = ({
 
           {/* Conditional Customer Info for Chummi Portal */}
           {isChummi && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 p-3.5 rounded-xl border border-primary/20 bg-primary/[0.03] animate-in fade-in slide-in-from-top-2 duration-200">
-              <div className="space-y-1.5 sm:space-y-2">
-                <Label htmlFor="edit-customer_name" className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
-                  Customer Name
-                  <span className="text-[10px] font-normal text-muted-foreground">(Optional)</span>
-                </Label>
-                <Input
-                  id="edit-customer_name"
-                  type="text"
-                  placeholder="Enter customer name"
-                  value={formData.customer_name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, customer_name: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="space-y-1.5 sm:space-y-2">
-                <Label htmlFor="edit-customer_phone" className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
-                  Phone Number
-                  <span className="text-[10px] font-normal text-muted-foreground">(Optional)</span>
-                </Label>
-                <Input
-                  id="edit-customer_phone"
-                  type="tel"
-                  placeholder="Enter phone number"
-                  value={formData.customer_phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, customer_phone: e.target.value })
-                  }
-                />
-              </div>
+            <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+              <CustomerCombobox
+                userId={transaction.user_id || currentUserId}
+                value={customerValue}
+                onChange={setCustomerValue}
+                disabled={isLoading}
+              />
             </div>
           )}
 

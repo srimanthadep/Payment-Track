@@ -18,6 +18,7 @@ import {
   Target,
   Search,
   ScrollText,
+  Users,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -142,6 +143,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "Transactions", href: "/transactions", icon: Receipt },
     { name: "Expenses", href: "/expenses", icon: Wallet },
+    { name: "Customers", href: "/customers", icon: Users },
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
     { name: "Goals", href: "/goals", icon: Target },
     { name: "Activity Logs", href: "/activity-logs", icon: ScrollText },

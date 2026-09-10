@@ -43,10 +43,22 @@ interface TransactionsTableProps {
   onPortalFilterSummaryChange?: (summary: { portalNames: string[]; totalAmount: number; count: number } | null) => void;
 }
 
-const extractCustomerInfo = (notes?: string | null) => {
-  if (!notes) return null;
-  const nameMatch = notes.match(/Customer:\s*([^|]+)/i);
-  const phoneMatch = notes.match(/Phone:\s*([^|]+)/i);
+const extractCustomerInfo = (t: { notes?: string | null; customer_name?: string | null; customer_phone?: string | null } | string | null | undefined) => {
+  if (!t) return null;
+  if (typeof t === "string") {
+    const nameMatch = t.match(/Customer:\s*([^|]+)/i);
+    const phoneMatch = t.match(/Phone:\s*([^|]+)/i);
+    const name = nameMatch ? nameMatch[1].trim() : null;
+    const phone = phoneMatch ? phoneMatch[1].trim() : null;
+    if (!name && !phone) return null;
+    return { name, phone };
+  }
+  if (t.customer_name || t.customer_phone) {
+    return { name: t.customer_name || null, phone: t.customer_phone || null };
+  }
+  if (!t.notes) return null;
+  const nameMatch = t.notes.match(/Customer:\s*([^|]+)/i);
+  const phoneMatch = t.notes.match(/Phone:\s*([^|]+)/i);
   const name = nameMatch ? nameMatch[1].trim() : null;
   const phone = phoneMatch ? phoneMatch[1].trim() : null;
   if (!name && !phone) return null;
@@ -55,6 +67,7 @@ const extractCustomerInfo = (notes?: string | null) => {
 
 interface Transaction {
   id: string;
+  user_id?: string;
   portal_id: string;
   transaction_type: string;
   amount: number;
@@ -65,6 +78,9 @@ interface Transaction {
   reference_number?: string | null;
   status: string;
   card_type: string | null;
+  customer_id?: string | null;
+  customer_name?: string | null;
+  customer_phone?: string | null;
   notes?: string | null;
   portals: {
     name: string;
@@ -144,6 +160,9 @@ export const TransactionsTable = ({
           transaction_date,
           status,
           card_type,
+          customer_id,
+          customer_name,
+          customer_phone,
           notes,
           portals (
             name
@@ -823,7 +842,7 @@ export const TransactionsTable = ({
                         })()}
                         <div className="text-[10px] text-muted-foreground truncate">{transaction.portals.name}</div>
                         {(() => {
-                          const cust = extractCustomerInfo(transaction.notes);
+                          const cust = extractCustomerInfo(transaction);
                           if (!cust) return null;
                           return (
                             <div className="text-[10px] text-muted-foreground/90 space-y-0.5 mt-0.5">
@@ -1095,7 +1114,7 @@ export const TransactionsTable = ({
                   <TableCell>
                     <div className="font-medium text-foreground">{transaction.portals.name}</div>
                     {(() => {
-                      const cust = extractCustomerInfo(transaction.notes);
+                      const cust = extractCustomerInfo(transaction);
                       if (!cust) return null;
                       return (
                         <div className="text-[11px] text-muted-foreground space-y-0.5 mt-0.5">

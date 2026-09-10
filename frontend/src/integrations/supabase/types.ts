@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      customers: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          phone: string | null
+          phone_normalized: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          phone?: string | null
+          phone_normalized?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          phone?: string | null
+          phone_normalized?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       expenses: {
         Row: {
           id: string
@@ -214,6 +247,7 @@ export type Database = {
           commission: number | null
           created_at: string
           card_type: string | null
+          customer_id: string | null
           customer_name?: string | null
           customer_phone?: string | null
           id: string
@@ -233,6 +267,7 @@ export type Database = {
           commission?: number | null
           created_at?: string
           card_type?: string | null
+          customer_id?: string | null
           customer_name?: string | null
           customer_phone?: string | null
           id?: string
@@ -252,6 +287,7 @@ export type Database = {
           commission?: number | null
           created_at?: string
           card_type?: string | null
+          customer_id?: string | null
           customer_name?: string | null
           customer_phone?: string | null
           id?: string
@@ -272,6 +308,13 @@ export type Database = {
             columns: ["portal_id"]
             isOneToOne: false
             referencedRelation: "portals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]

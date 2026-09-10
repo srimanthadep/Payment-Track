@@ -35,6 +35,8 @@ import {
 } from "@/services/settingsService";
 import { transactionLearningService } from "@/services/transactionLearningService";
 import { activityLogService } from "@/services/activityLogService";
+import { CustomerCombobox, CustomerValue } from "@/components/customers/CustomerCombobox";
+import { customerService } from "@/services/customerService";
 
 interface AddTransactionDialogProps {
   userId: string;
@@ -91,6 +93,8 @@ export const AddTransactionDialog = ({
     customer_phone: "",
     transaction_date: new Date(),
   });
+
+  const [customerValue, setCustomerValue] = useState<CustomerValue | null>(null);
 
   const [isCommissionManual, setIsCommissionManual] = useState(false);
   const [isSiteFeeManual, setIsSiteFeeManual] = useState(false);
@@ -157,6 +161,15 @@ export const AddTransactionDialog = ({
         customer_name: initialData.customer_name || prev.customer_name,
         customer_phone: initialData.customer_phone || prev.customer_phone,
       }));
+
+      if (initialData.customer_name || initialData.customer_phone || (initialData as any).customer_id) {
+        setCustomerValue({
+          id: (initialData as any).customer_id || null,
+          name: initialData.customer_name || "",
+          phone: initialData.customer_phone || "",
+          isNew: !(initialData as any).customer_id,
+        });
+      }
     }
   }, [initialData, open]);
 
@@ -197,6 +210,7 @@ export const AddTransactionDialog = ({
       customer_phone: "",
       transaction_date: new Date(),
     });
+    setCustomerValue(null);
     setIsCommissionManual(false);
     setIsSiteFeeManual(false);
     setRecommendationInfo(null);
@@ -268,15 +282,46 @@ export const AddTransactionDialog = ({
 
     const commPercent = parseFloat(formData.commission_percent) || 0;
     const isChummi = formData.sent_to?.trim().toLowerCase() === "chummi";
+
+    let customerId: string | null = null;
+    let customerName: string | null = null;
+    let customerPhone: string | null = null;
+
+    if (isChummi && customerValue && (customerValue.name.trim() || customerValue.phone.trim())) {
+      customerName = customerValue.name.trim() || null;
+      customerPhone = customerValue.phone.trim() || null;
+
+      if (customerValue.id) {
+        customerId = customerValue.id;
+        // Asynchronously update existing customer record with latest phone/name
+        customerService.updateCustomer(customerValue.id, {
+          name: customerValue.name,
+          phone: customerValue.phone,
+        }).catch((err) => console.warn("Failed to update customer details:", err));
+      } else {
+        // Create new customer record in customers table first
+        const { data: newCust, error: custErr } = await customerService.createCustomer(
+          userId,
+          customerValue.name || "Customer",
+          customerValue.phone || null
+        );
+        if (!custErr && newCust) {
+          customerId = newCust.id;
+        } else if (custErr) {
+          console.warn("Could not create customer record:", custErr);
+        }
+      }
+    }
+
     let notesStr = `Sent to: ${formData.sent_to} | Commission: ${commPercent}%${
       formData.site_fee_percent ? ` | Site Fee: ${formData.site_fee_percent}%` : ""
     }`;
     if (isChummi) {
-      if (formData.customer_name.trim()) {
-        notesStr += ` | Customer: ${formData.customer_name.trim()}`;
+      if (customerName) {
+        notesStr += ` | Customer: ${customerName}`;
       }
-      if (formData.customer_phone.trim()) {
-        notesStr += ` | Phone: ${formData.customer_phone.trim()}`;
+      if (customerPhone) {
+        notesStr += ` | Phone: ${customerPhone}`;
       }
     }
 
@@ -290,6 +335,9 @@ export const AddTransactionDialog = ({
       site_fee: siteFeeAmount,
       transaction_date: formData.transaction_date.toISOString(),
       status: "completed",
+      customer_id: customerId,
+      customer_name: customerName,
+      customer_phone: customerPhone,
       notes: notesStr,
     };
 
@@ -635,6 +683,9 @@ export const AddTransactionDialog = ({
               value={formData.sent_to}
               onValueChange={(val) => {
                 setFormData((prev) => ({ ...prev, sent_to: val }));
+                if (val.trim().toLowerCase() !== "chummi") {
+                  setCustomerValue(null);
+                }
                 applyLearningRecommendation(formData.transaction_type, formData.card_type, val);
               }}
               required
@@ -654,38 +705,13 @@ export const AddTransactionDialog = ({
 
           {/* Conditional Customer Info for Chummi Portal */}
           {isChummi && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 p-3.5 rounded-xl border border-primary/20 bg-primary/[0.03] animate-in fade-in slide-in-from-top-2 duration-200">
-              <div className="space-y-1.5 sm:space-y-2">
-                <Label htmlFor="customer_name" className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
-                  Customer Name
-                  <span className="text-[10px] font-normal text-muted-foreground">(Optional)</span>
-                </Label>
-                <Input
-                  id="customer_name"
-                  type="text"
-                  placeholder="Enter customer name"
-                  value={formData.customer_name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, customer_name: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="space-y-1.5 sm:space-y-2">
-                <Label htmlFor="customer_phone" className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
-                  Phone Number
-                  <span className="text-[10px] font-normal text-muted-foreground">(Optional)</span>
-                </Label>
-                <Input
-                  id="customer_phone"
-                  type="tel"
-                  placeholder="Enter phone number"
-                  value={formData.customer_phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, customer_phone: e.target.value })
-                  }
-                />
-              </div>
+            <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+              <CustomerCombobox
+                userId={userId}
+                value={customerValue}
+                onChange={setCustomerValue}
+                disabled={isLoading}
+              />
             </div>
           )}
 
