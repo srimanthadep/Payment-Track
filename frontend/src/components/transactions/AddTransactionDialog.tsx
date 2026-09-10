@@ -266,6 +266,7 @@ export const AddTransactionDialog = ({
       }
     }
 
+    const commPercent = parseFloat(formData.commission_percent) || 0;
     const isChummi = formData.sent_to?.trim().toLowerCase() === "chummi";
     let notesStr = `Sent to: ${formData.sent_to} | Commission: ${commPercent}%${
       formData.site_fee_percent ? ` | Site Fee: ${formData.site_fee_percent}%` : ""
