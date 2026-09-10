@@ -319,6 +319,42 @@ export const customerService = {
   },
 
   /**
+   * Deletes a customer record and detaches linked transactions safely
+   */
+  async deleteCustomer(
+    userId: string,
+    customerId: string,
+    fallback?: { name?: string | null; phone?: string | null }
+  ): Promise<{ error: any }> {
+    try {
+      const txUpdatePayload = {
+        customer_id: null,
+        customer_name: fallback?.name || null,
+        customer_phone: fallback?.phone || null,
+      };
+
+      const { error: txError } = await supabase
+        .from("transactions")
+        .update(txUpdatePayload)
+        .eq("user_id", userId)
+        .eq("customer_id", customerId);
+
+      if (txError) return { error: txError };
+
+      const { error } = await supabase
+        .from("customers")
+        .delete()
+        .eq("user_id", userId)
+        .eq("id", customerId);
+
+      return { error };
+    } catch (error) {
+      console.error("Error deleting customer:", error);
+      return { error };
+    }
+  },
+
+  /**
    * Fetches full customer profiles with all associated transactions for CRM view
    */
   async getCustomers(userId: string): Promise<{ data: CustomerProfile[]; error: any }> {
