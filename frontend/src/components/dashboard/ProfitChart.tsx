@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { FilterState } from "@/components/transactions/TransactionFilters";
+import { getCardTypeDisplayName } from "@/utils/commissionCalculator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -7,6 +9,7 @@ import { motion } from "framer-motion";
 
 interface ProfitChartProps {
   userId: string;
+  filters?: FilterState;
 }
 
 type Period = "daily" | "weekly" | "monthly";
@@ -16,7 +19,7 @@ interface ChartDataPoint {
   profit: number;
 }
 
-export const ProfitChart = ({ userId }: ProfitChartProps) => {
+export const ProfitChart = ({ userId, filters }: ProfitChartProps) => {
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [period, setPeriod] = useState<Period>("daily");
@@ -29,9 +32,17 @@ export const ProfitChart = ({ userId }: ProfitChartProps) => {
       try {
         const now = new Date();
         let startDate: Date;
+        let endDate: Date | null = null;
         let daysBack = 30;
 
-        if (period === "daily") {
+        if (filters?.dateRange?.from || filters?.dateRange?.to) {
+          startDate = filters.dateRange.from ? new Date(filters.dateRange.from) : new Date(0);
+          startDate.setHours(0, 0, 0, 0);
+          if (filters.dateRange.to) {
+            endDate = new Date(filters.dateRange.to);
+            endDate.setHours(23, 59, 59, 999);
+          }
+        } else if (period === "daily") {
           daysBack = 7;
           startDate = new Date(now);
           startDate.setDate(now.getDate() - daysBack);
@@ -46,12 +57,17 @@ export const ProfitChart = ({ userId }: ProfitChartProps) => {
           startDate.setDate(now.getDate() - daysBack);
         }
 
-        const { data: transactions, error } = await supabase
+        let query = supabase
           .from("transactions")
-          .select("transaction_date, commission, site_fee, profit")
+          .select("transaction_date, commission, site_fee, profit, portal_id, status, transaction_type, card_type, amount")
           .eq("user_id", userId)
-          .gte("transaction_date", startDate.toISOString())
-          .order("transaction_date", { ascending: true });
+          .gte("transaction_date", startDate.toISOString());
+
+        if (endDate) {
+          query = query.lte("transaction_date", endDate.toISOString());
+        }
+
+        const { data: transactions, error } = await query.order("transaction_date", { ascending: true });
 
         if (!isCurrent) return;
 
@@ -59,6 +75,67 @@ export const ProfitChart = ({ userId }: ProfitChartProps) => {
           console.error("Error fetching chart data:", error);
           setChartData([]);
         } else {
+          // Apply dashboard filters client-side
+          let filtered = (transactions as any[]) || [];
+          if (filters) {
+            if (filters.portals && filters.portals.length > 0) {
+              filtered = filtered.filter((t: any) => filters.portals.includes(t.portal_id));
+            }
+            if (filters.status && filters.status.length > 0) {
+              filtered = filtered.filter((t: any) => filters.status.includes(t.status));
+            }
+            if (filters.transactionType && filters.transactionType.length > 0) {
+              const types = filters.transactionType.map((x: string) => x.toLowerCase());
+              filtered = filtered.filter((t: any) =>
+                types.includes((t.transaction_type || "").toLowerCase())
+              );
+            }
+            if (filters.amountRange && filters.amountRange.min !== null) {
+              filtered = filtered.filter((t: any) => Number(t.amount || 0) >= filters.amountRange.min!);
+            }
+            if (filters.amountRange && filters.amountRange.max !== null) {
+              filtered = filtered.filter((t: any) => Number(t.amount || 0) <= filters.amountRange.max!);
+            }
+            if (filters.cardTypes && filters.cardTypes.length > 0) {
+              filtered = filtered.filter((t: any) => {
+                if (!t.card_type) return false;
+                const rawType = t.card_type.toLowerCase();
+                const displayName = (getCardTypeDisplayName(t.card_type) || "").toLowerCase();
+                return filters.cardTypes.some((sel) => {
+                  const s = sel.toLowerCase();
+                  if (rawType === s || displayName === s) return true;
+                  if (s === "rupay" && (rawType.includes("rupay") || displayName.includes("rupay"))) return true;
+                  if (s === "visa" && (rawType.includes("visa") || displayName.includes("visa"))) return true;
+                  if (s === "mastercard" && (rawType.includes("master") || displayName.includes("master"))) return true;
+                  if (s === "business" && (rawType.includes("business") || displayName.includes("business"))) return true;
+                  if (s === "au_card" && (rawType.includes("au") || displayName.includes("au"))) return true;
+                  if (s === "amex_diners" && (rawType.includes("amex") || rawType.includes("diners") || displayName.includes("amex") || displayName.includes("diners"))) return true;
+                  if (s === "machine_swiping" && (rawType.includes("swip") || rawType.includes("machine") || displayName.includes("swip") || displayName.includes("machine"))) return true;
+                  return false;
+                });
+              });
+            }
+            if (filters.dateRange?.from && filters.dateRange?.to) {
+              const from = new Date(filters.dateRange.from);
+              from.setHours(0, 0, 0, 0);
+              const to = new Date(filters.dateRange.to);
+              to.setHours(23, 59, 59, 999);
+              filtered = filtered.filter((t: any) => {
+                const d = new Date(t.transaction_date);
+                return d >= from && d <= to;
+              });
+            } else if (filters.dateRange?.from) {
+              const from = new Date(filters.dateRange.from);
+              from.setHours(0, 0, 0, 0);
+              const to = new Date(filters.dateRange.from);
+              to.setHours(23, 59, 59, 999);
+              filtered = filtered.filter((t: any) => {
+                const d = new Date(t.transaction_date);
+                return d >= from && d <= to;
+              });
+            }
+          }
+
           // Generate all dates in range for better visualization
           const allDates: Date[] = [];
           const currentDate = new Date(startDate);
@@ -77,7 +154,7 @@ export const ProfitChart = ({ userId }: ProfitChartProps) => {
           // Group transactions by period
           const groupedData: Record<string, { profit: number }> = {};
 
-          transactions?.forEach((transaction) => {
+          filtered.forEach((transaction) => {
             const date = new Date(transaction.transaction_date);
             let key: string;
             let dateKey: Date;
@@ -170,7 +247,7 @@ export const ProfitChart = ({ userId }: ProfitChartProps) => {
       isCurrent = false;
       clearTimeout(timer);
     };
-  }, [userId, period]);
+  }, [userId, period, filters]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {

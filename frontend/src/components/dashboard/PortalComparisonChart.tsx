@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { FilterState } from "@/components/transactions/TransactionFilters";
+import { getCardTypeDisplayName } from "@/utils/commissionCalculator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { motion } from "framer-motion";
@@ -18,6 +20,7 @@ interface PortalComparisonProps {
   userId: string;
   period?: "daily" | "weekly" | "monthly" | "all";
   selectedDate?: Date | null;
+  filters?: FilterState;
 }
 
 interface PortalData {
@@ -34,6 +37,7 @@ export const PortalComparisonChart = ({
   userId,
   period = "daily",
   selectedDate,
+  filters,
 }: PortalComparisonProps) => {
   const [chartData, setChartData] = useState<PortalData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,14 +47,25 @@ export const PortalComparisonChart = ({
     try {
       let query = supabase
         .from("transactions")
-        .select("amount, commission, site_fee, profit, transaction_date, portals(name)")
+        .select("amount, commission, site_fee, profit, transaction_date, portal_id, status, transaction_type, card_type, portals(name)")
         .eq("user_id", userId);
 
       // Apply date filter based on selectedDate and period
       const now = new Date();
       const activeDate = selectedDate || now;
 
-      if (period === "daily") {
+      // If a specific date range is set in the filters, honor it at query level
+      if (filters?.dateRange?.from || filters?.dateRange?.to) {
+        const from = filters.dateRange.from ? new Date(filters.dateRange.from) : new Date(0);
+        from.setHours(0, 0, 0, 0);
+        const to = filters.dateRange.to
+          ? new Date(filters.dateRange.to)
+          : (filters.dateRange.from ? new Date(filters.dateRange.from) : new Date());
+        to.setHours(23, 59, 59, 999);
+        query = query
+          .gte("transaction_date", from.toISOString())
+          .lte("transaction_date", to.toISOString());
+      } else if (period === "daily") {
         const startOfDay = new Date(
           activeDate.getFullYear(),
           activeDate.getMonth(),
@@ -90,10 +105,71 @@ export const PortalComparisonChart = ({
 
       if (error) throw error;
 
+      // Apply dashboard filters client-side
+      let filtered = transactions as any[] || [];
+      if (filters) {
+        if (filters.portals && filters.portals.length > 0) {
+          filtered = filtered.filter((t: any) => filters.portals.includes(t.portal_id));
+        }
+        if (filters.status && filters.status.length > 0) {
+          filtered = filtered.filter((t: any) => filters.status.includes(t.status));
+        }
+        if (filters.transactionType && filters.transactionType.length > 0) {
+          const types = filters.transactionType.map((x: string) => x.toLowerCase());
+          filtered = filtered.filter((t: any) =>
+            types.includes((t.transaction_type || "").toLowerCase())
+          );
+        }
+        if (filters.amountRange && filters.amountRange.min !== null) {
+          filtered = filtered.filter((t: any) => Number(t.amount || 0) >= filters.amountRange.min!);
+        }
+        if (filters.amountRange && filters.amountRange.max !== null) {
+          filtered = filtered.filter((t: any) => Number(t.amount || 0) <= filters.amountRange.max!);
+        }
+        if (filters.cardTypes && filters.cardTypes.length > 0) {
+          filtered = filtered.filter((t: any) => {
+            if (!t.card_type) return false;
+            const rawType = t.card_type.toLowerCase();
+            const displayName = (getCardTypeDisplayName(t.card_type) || "").toLowerCase();
+            return filters.cardTypes.some((sel) => {
+              const s = sel.toLowerCase();
+              if (rawType === s || displayName === s) return true;
+              if (s === "rupay" && (rawType.includes("rupay") || displayName.includes("rupay"))) return true;
+              if (s === "visa" && (rawType.includes("visa") || displayName.includes("visa"))) return true;
+              if (s === "mastercard" && (rawType.includes("master") || displayName.includes("master"))) return true;
+              if (s === "business" && (rawType.includes("business") || displayName.includes("business"))) return true;
+              if (s === "au_card" && (rawType.includes("au") || displayName.includes("au"))) return true;
+              if (s === "amex_diners" && (rawType.includes("amex") || rawType.includes("diners") || displayName.includes("amex") || displayName.includes("diners"))) return true;
+              if (s === "machine_swiping" && (rawType.includes("swip") || rawType.includes("machine") || displayName.includes("swip") || displayName.includes("machine"))) return true;
+              return false;
+            });
+          });
+        }
+        if (filters.dateRange?.from && filters.dateRange?.to) {
+          const from = new Date(filters.dateRange.from);
+          from.setHours(0, 0, 0, 0);
+          const to = new Date(filters.dateRange.to);
+          to.setHours(23, 59, 59, 999);
+          filtered = filtered.filter((t: any) => {
+            const d = new Date(t.transaction_date);
+            return d >= from && d <= to;
+          });
+        } else if (filters.dateRange?.from) {
+          const from = new Date(filters.dateRange.from);
+          from.setHours(0, 0, 0, 0);
+          const to = new Date(filters.dateRange.from);
+          to.setHours(23, 59, 59, 999);
+          filtered = filtered.filter((t: any) => {
+            const d = new Date(t.transaction_date);
+            return d >= from && d <= to;
+          });
+        }
+      }
+
       // Group by portal
       const portalMap: Record<string, PortalData> = {};
 
-      transactions?.forEach((tx: any) => {
+      filtered.forEach((tx: any) => {
         const portalName = tx.portals?.name || "Unknown";
         if (!portalMap[portalName]) {
           portalMap[portalName] = {
@@ -149,7 +225,7 @@ export const PortalComparisonChart = ({
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, period, selectedDate]);
+  }, [userId, period, selectedDate, filters]);
 
   const formatCurrency = (amount: number) => {
     return `₹${amount.toLocaleString("en-IN", {

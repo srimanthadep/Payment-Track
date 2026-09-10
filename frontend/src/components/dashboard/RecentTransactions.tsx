@@ -4,9 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
+import { FilterState } from "@/components/transactions/TransactionFilters";
+import { getCardTypeDisplayName } from "@/utils/commissionCalculator";
 
 interface RecentTransactionsProps {
   userId: string;
+  filters?: FilterState;
 }
 
 interface Transaction {
@@ -15,12 +18,15 @@ interface Transaction {
   amount: number;
   commission: number;
   transaction_date: string;
+  portal_id: string;
+  status: string;
+  card_type: string | null;
   portals: {
     name: string;
   };
 }
 
-export const RecentTransactions = ({ userId }: RecentTransactionsProps) => {
+export const RecentTransactions = ({ userId, filters }: RecentTransactionsProps) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -30,6 +36,18 @@ export const RecentTransactions = ({ userId }: RecentTransactionsProps) => {
     const fetchTransactions = async () => {
       setIsLoading(true);
       try {
+        // Fetch more rows when filters are active so enough survive filtering
+        const hasActiveFilters = filters && (
+          filters.portals.length > 0 ||
+          filters.status.length > 0 ||
+          filters.transactionType.length > 0 ||
+          (filters.cardTypes && filters.cardTypes.length > 0) ||
+          filters.amountRange.min !== null ||
+          filters.amountRange.max !== null ||
+          filters.dateRange.from || filters.dateRange.to
+        );
+        const fetchLimit = hasActiveFilters ? 100 : 5;
+
         const { data, error } = await supabase
           .from("transactions")
           .select(`
@@ -38,13 +56,16 @@ export const RecentTransactions = ({ userId }: RecentTransactionsProps) => {
             amount,
             commission,
             transaction_date,
+            portal_id,
+            status,
+            card_type,
             portals (
               name
             )
           `)
           .eq("user_id", userId)
           .order("transaction_date", { ascending: false })
-          .limit(5);
+          .limit(fetchLimit);
 
         if (!isCurrent) return;
 
@@ -52,7 +73,70 @@ export const RecentTransactions = ({ userId }: RecentTransactionsProps) => {
           console.error("Error fetching recent transactions:", error);
           setTransactions([]);
         } else {
-          setTransactions((data as Transaction[]) || []);
+          let result = (data as Transaction[]) || [];
+
+          // Apply dashboard filters client-side
+          if (filters) {
+            if (filters.portals && filters.portals.length > 0) {
+              result = result.filter((t) => filters.portals.includes(t.portal_id));
+            }
+            if (filters.status && filters.status.length > 0) {
+              result = result.filter((t) => filters.status.includes(t.status));
+            }
+            if (filters.transactionType && filters.transactionType.length > 0) {
+              const types = filters.transactionType.map((x) => x.toLowerCase());
+              result = result.filter((t) =>
+                types.includes((t.transaction_type || "").toLowerCase())
+              );
+            }
+            if (filters.amountRange && filters.amountRange.min !== null) {
+              result = result.filter((t) => Number(t.amount || 0) >= filters.amountRange.min!);
+            }
+            if (filters.amountRange && filters.amountRange.max !== null) {
+              result = result.filter((t) => Number(t.amount || 0) <= filters.amountRange.max!);
+            }
+            if (filters.cardTypes && filters.cardTypes.length > 0) {
+              result = result.filter((t) => {
+                if (!t.card_type) return false;
+                const rawType = t.card_type.toLowerCase();
+                const displayName = (getCardTypeDisplayName(t.card_type) || "").toLowerCase();
+                return filters.cardTypes.some((sel) => {
+                  const s = sel.toLowerCase();
+                  if (rawType === s || displayName === s) return true;
+                  if (s === "rupay" && (rawType.includes("rupay") || displayName.includes("rupay"))) return true;
+                  if (s === "visa" && (rawType.includes("visa") || displayName.includes("visa"))) return true;
+                  if (s === "mastercard" && (rawType.includes("master") || displayName.includes("master"))) return true;
+                  if (s === "business" && (rawType.includes("business") || displayName.includes("business"))) return true;
+                  if (s === "au_card" && (rawType.includes("au") || displayName.includes("au"))) return true;
+                  if (s === "amex_diners" && (rawType.includes("amex") || rawType.includes("diners") || displayName.includes("amex") || displayName.includes("diners"))) return true;
+                  if (s === "machine_swiping" && (rawType.includes("swip") || rawType.includes("machine") || displayName.includes("swip") || displayName.includes("machine"))) return true;
+                  return false;
+                });
+              });
+            }
+            if (filters.dateRange?.from && filters.dateRange?.to) {
+              const from = new Date(filters.dateRange.from);
+              from.setHours(0, 0, 0, 0);
+              const to = new Date(filters.dateRange.to);
+              to.setHours(23, 59, 59, 999);
+              result = result.filter((t) => {
+                const d = new Date(t.transaction_date);
+                return d >= from && d <= to;
+              });
+            } else if (filters.dateRange?.from) {
+              const from = new Date(filters.dateRange.from);
+              from.setHours(0, 0, 0, 0);
+              const to = new Date(filters.dateRange.from);
+              to.setHours(23, 59, 59, 999);
+              result = result.filter((t) => {
+                const d = new Date(t.transaction_date);
+                return d >= from && d <= to;
+              });
+            }
+          }
+
+          // Always show at most 5 results
+          setTransactions(result.slice(0, 5));
         }
       } catch (err) {
         console.error("Error in fetchTransactions:", err);
@@ -88,7 +172,7 @@ export const RecentTransactions = ({ userId }: RecentTransactionsProps) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId]);
+  }, [userId, filters]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {

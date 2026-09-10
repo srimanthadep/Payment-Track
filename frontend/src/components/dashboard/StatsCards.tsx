@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { FilterState } from "@/components/transactions/TransactionFilters";
+import { getCardTypeDisplayName } from "@/utils/commissionCalculator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ArrowDownCircle,
@@ -30,6 +32,7 @@ interface StatsCardsProps {
   selectedDate?: Date | null;
   onPeriodChange?: (period: Period) => void;
   showTabs?: boolean;
+  filters?: FilterState;
 }
 
 interface Stats {
@@ -93,6 +96,7 @@ export const StatsCards = ({
   selectedDate,
   onPeriodChange,
   showTabs = false,
+  filters,
 }: StatsCardsProps) => {
   const [stats, setStats] = useState<Stats>({
     totalWithdrawals: 0,
@@ -122,14 +126,25 @@ export const StatsCards = ({
         let query = supabase
           .from("transactions")
           .select(
-            "transaction_type, amount, commission, site_fee, transaction_date, card_type, notes, portals(name)"
+            "transaction_type, amount, commission, site_fee, transaction_date, card_type, notes, portal_id, status, portals(name)"
           )
           .eq("user_id", userId);
 
         const now = new Date();
         const activeDate = selectedDate || now;
 
-        if (period === "daily") {
+        // If a specific date range is set in the filters, honor it at query level
+        if (filters?.dateRange?.from || filters?.dateRange?.to) {
+          const from = filters.dateRange.from ? new Date(filters.dateRange.from) : new Date(0);
+          from.setHours(0, 0, 0, 0);
+          const to = filters.dateRange.to
+            ? new Date(filters.dateRange.to)
+            : (filters.dateRange.from ? new Date(filters.dateRange.from) : new Date());
+          to.setHours(23, 59, 59, 999);
+          query = query
+            .gte("transaction_date", from.toISOString())
+            .lte("transaction_date", to.toISOString());
+        } else if (period === "daily") {
           const startOfDay = new Date(
             activeDate.getFullYear(),
             activeDate.getMonth(),
@@ -171,7 +186,7 @@ export const StatsCards = ({
         if (error) {
           const fallbackRes = await supabase
             .from("transactions")
-            .select("transaction_type, amount, commission, site_fee, transaction_date, card_type, notes")
+            .select("transaction_type, amount, commission, site_fee, transaction_date, card_type, notes, portal_id, status")
             .eq("user_id", userId);
           if (!fallbackRes.error && fallbackRes.data) {
             transactions = fallbackRes.data as any;
@@ -184,6 +199,67 @@ export const StatsCards = ({
         if (error) {
           console.error("Error fetching stats:", error);
         } else {
+          // Apply dashboard filters client-side
+          if (filters && transactions) {
+            if (filters.portals && filters.portals.length > 0) {
+              transactions = transactions.filter((t: any) =>
+                filters.portals.includes(t.portal_id)
+              );
+            }
+            if (filters.status && filters.status.length > 0) {
+              transactions = transactions.filter((t: any) => filters.status.includes(t.status));
+            }
+            if (filters.transactionType && filters.transactionType.length > 0) {
+              const types = filters.transactionType.map((x: string) => x.toLowerCase());
+              transactions = transactions.filter((t: any) =>
+                types.includes((t.transaction_type || "").toLowerCase())
+              );
+            }
+            if (filters.amountRange && filters.amountRange.min !== null) {
+              transactions = transactions.filter((t: any) => Number(t.amount || 0) >= filters.amountRange.min!);
+            }
+            if (filters.amountRange && filters.amountRange.max !== null) {
+              transactions = transactions.filter((t: any) => Number(t.amount || 0) <= filters.amountRange.max!);
+            }
+            if (filters.cardTypes && filters.cardTypes.length > 0) {
+              transactions = transactions.filter((t: any) => {
+                if (!t.card_type) return false;
+                const rawType = t.card_type.toLowerCase();
+                const displayName = (getCardTypeDisplayName(t.card_type) || "").toLowerCase();
+                return filters.cardTypes.some((sel) => {
+                  const s = sel.toLowerCase();
+                  if (rawType === s || displayName === s) return true;
+                  if (s === "rupay" && (rawType.includes("rupay") || displayName.includes("rupay"))) return true;
+                  if (s === "visa" && (rawType.includes("visa") || displayName.includes("visa"))) return true;
+                  if (s === "mastercard" && (rawType.includes("master") || displayName.includes("master"))) return true;
+                  if (s === "business" && (rawType.includes("business") || displayName.includes("business"))) return true;
+                  if (s === "au_card" && (rawType.includes("au") || displayName.includes("au"))) return true;
+                  if (s === "amex_diners" && (rawType.includes("amex") || rawType.includes("diners") || displayName.includes("amex") || displayName.includes("diners"))) return true;
+                  if (s === "machine_swiping" && (rawType.includes("swip") || rawType.includes("machine") || displayName.includes("swip") || displayName.includes("machine"))) return true;
+                  return false;
+                });
+              });
+            }
+            if (filters.dateRange?.from && filters.dateRange?.to) {
+              const from = new Date(filters.dateRange.from);
+              from.setHours(0, 0, 0, 0);
+              const to = new Date(filters.dateRange.to);
+              to.setHours(23, 59, 59, 999);
+              transactions = transactions.filter((t: any) => {
+                const d = new Date(t.transaction_date);
+                return d >= from && d <= to;
+              });
+            } else if (filters.dateRange?.from) {
+              const from = new Date(filters.dateRange.from);
+              from.setHours(0, 0, 0, 0);
+              const to = new Date(filters.dateRange.from);
+              to.setHours(23, 59, 59, 999);
+              transactions = transactions.filter((t: any) => {
+                const d = new Date(t.transaction_date);
+                return d >= from && d <= to;
+              });
+            }
+          }
           const withdrawals =
             transactions
               ?.filter((t) => t.transaction_type?.toLowerCase() === "withdrawal")
@@ -303,7 +379,7 @@ export const StatsCards = ({
       clearTimeout(timer);
       supabase.removeChannel(channel);
     };
-  }, [userId, period, selectedDate]);
+  }, [userId, period, selectedDate, filters]);
 
   const formatCurrency = (amount: number) => {
     return `₹${amount.toLocaleString("en-IN", {
