@@ -206,6 +206,14 @@ const Customers = () => {
         customer={selectedCustomer}
         open={isDetailOpen}
         onOpenChange={setIsDetailOpen}
+        userId={user.id}
+        onCustomerUpdated={() => {
+          setRefreshKey((k) => k + 1);
+        }}
+        onCustomerDeleted={() => {
+          setSelectedCustomer(null);
+          setRefreshKey((k) => k + 1);
+        }}
       />
 
       {/* Add Transaction Dialog */}

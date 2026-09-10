@@ -2,12 +2,17 @@ import { useState } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -31,26 +36,58 @@ import {
   Percent,
   Clock,
   UserCheck,
+  Edit3,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { exportTransactionsToCSV } from "@/utils/exportUtils";
+import { customerService } from "@/services/customerService";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface CustomerDetailDialogProps {
   customer: CustomerProfile | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  userId: string;
+  onCustomerUpdated?: () => void;
+  onCustomerDeleted?: () => void;
 }
 
 export const CustomerDetailDialog = ({
   customer,
   open,
   onOpenChange,
+  userId,
+  onCustomerUpdated,
+  onCustomerDeleted,
 }: CustomerDetailDialogProps) => {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    phone: "",
+    notes: "",
+  });
 
   if (!customer) return null;
+
+  const isVirtualCustomer =
+    customer.id.startsWith("phone:") || customer.id.startsWith("name:");
 
   const handleCopyPhone = () => {
     if (!customer.phone) return;
@@ -97,6 +134,77 @@ export const CustomerDetailDialog = ({
     .map((w) => w[0]?.toUpperCase())
     .slice(0, 2)
     .join("") || "C";
+
+  const openEditDialog = () => {
+    setEditForm({
+      name: customer.name,
+      phone: customer.phone || "",
+      notes: customer.notes || "",
+    });
+    setIsEditOpen(true);
+  };
+
+  const handleSaveCustomer = async () => {
+    const trimmedName = editForm.name.trim();
+    if (!trimmedName) {
+      toast({
+        title: "Name required",
+        description: "Customer name cannot be empty.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    const { error } = await customerService.updateCustomer(customer.id, {
+      name: trimmedName,
+      phone: editForm.phone.trim() || null,
+      notes: editForm.notes.trim() || null,
+    });
+    setIsSaving(false);
+
+    if (error) {
+      toast({
+        title: "Update failed",
+        description: error.message || "Could not update customer.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Customer updated",
+      description: `${trimmedName} was updated successfully.`,
+    });
+    setIsEditOpen(false);
+    onCustomerUpdated?.();
+  };
+
+  const handleDeleteCustomer = async () => {
+    setIsDeleting(true);
+    const { error } = await customerService.deleteCustomer(userId, customer.id, {
+      name: customer.name,
+      phone: customer.phone,
+    });
+    setIsDeleting(false);
+
+    if (error) {
+      toast({
+        title: "Delete failed",
+        description: error.message || "Could not delete customer.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Customer deleted",
+      description: `${customer.name} was removed.`,
+    });
+    setIsDeleteOpen(false);
+    onOpenChange(false);
+    onCustomerDeleted?.();
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -171,6 +279,28 @@ export const CustomerDetailDialog = ({
 
             {/* Actions */}
             <div className="flex items-center gap-2 self-start sm:self-center">
+              {!isVirtualCustomer && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-8 gap-1.5 shadow-xs"
+                    onClick={openEditDialog}
+                  >
+                    <Edit3 className="h-3.5 w-3.5" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="text-xs h-8 gap-1.5 shadow-xs"
+                    onClick={() => setIsDeleteOpen(true)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete
+                  </Button>
+                </>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -393,6 +523,87 @@ export const CustomerDetailDialog = ({
           </Button>
         </div>
       </DialogContent>
+
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Customer</DialogTitle>
+            <DialogDescription>
+              Update customer details used across your CRM records.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="customer-name">Name</Label>
+              <Input
+                id="customer-name"
+                value={editForm.name}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="Customer name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="customer-phone">Phone</Label>
+              <Input
+                id="customer-phone"
+                value={editForm.phone}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, phone: e.target.value }))}
+                placeholder="Phone number"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="customer-notes">Notes</Label>
+              <Textarea
+                id="customer-notes"
+                value={editForm.notes}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
+                placeholder="Optional notes"
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsEditOpen(false)}
+              disabled={isSaving}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleSaveCustomer} disabled={isSaving}>
+              {isSaving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete customer?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the customer profile from your directory. Transaction records stay intact.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (!isDeleting) {
+                  handleDeleteCustomer();
+                }
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 };
