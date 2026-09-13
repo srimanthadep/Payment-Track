@@ -209,10 +209,10 @@ export const CommandPalette = ({
         try {
           const { data: expenses } = await supabase
             .from("expenses")
-            .select("id, amount, category, expense_date, paid_to, notes")
+            .select("id, amount, category, expense_date, notes")
             .eq("user_id", userId)
             .or(
-              `category.ilike.%${q}%,paid_to.ilike.%${q}%,notes.ilike.%${q}%${!isNaN(Number(q)) ? `,amount.eq.${q}` : ""}`
+              `category.ilike.%${q}%,notes.ilike.%${q}%${!isNaN(Number(q)) ? `,amount.eq.${q}` : ""}`
             )
             .order("expense_date", { ascending: false })
             .limit(5);
@@ -223,7 +223,7 @@ export const CommandPalette = ({
                 id: `exp-${e.id}`,
                 type: "expense" as const,
                 title: `₹${Number(e.amount || 0).toLocaleString("en-IN")} – ${e.category}`,
-                subtitle: `${e.paid_to || "Unknown"} • ${format(new Date(e.expense_date), "dd MMM yyyy")}`,
+                subtitle: `${e.notes ? e.notes + " • " : ""}${format(new Date(e.expense_date), "dd MMM yyyy")}`,
                 icon: <Wallet className="h-4 w-4" />,
                 href: "/expenses",
                 badge: "Expense",

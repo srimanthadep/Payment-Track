@@ -48,7 +48,6 @@ interface ExpenseRow {
   amount: number;
   category: string;
   expense_date: string;
-  paid_to: string | null;
 }
 
 export const PDFReportGenerator = ({ userId }: PDFReportGeneratorProps) => {
@@ -115,7 +114,7 @@ export const PDFReportGenerator = ({ userId }: PDFReportGeneratorProps) => {
       // Fetch expenses
       const { data: expenses } = await supabase
         .from("expenses")
-        .select("amount, category, expense_date, paid_to")
+        .select("amount, category, expense_date")
         .eq("user_id", userId)
         .gte("expense_date", startStr)
         .lte("expense_date", endStr)

@@ -6,9 +6,6 @@ export interface Expense {
   category: string;
   amount: number;
   expense_date: string;
-  paid_to: string | null;
-  payment_method: string | null;
-  reference_number: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -19,9 +16,6 @@ export interface CreateExpenseInput {
   category: string;
   amount: number;
   expense_date: string;
-  paid_to?: string | null;
-  payment_method?: string | null;
-  reference_number?: string | null;
   notes?: string | null;
 }
 
@@ -29,9 +23,6 @@ export interface UpdateExpenseInput {
   category?: string;
   amount?: number;
   expense_date?: string;
-  paid_to?: string | null;
-  payment_method?: string | null;
-  reference_number?: string | null;
   notes?: string | null;
 }
 
@@ -45,8 +36,15 @@ export interface ExpenseStats {
     count: number;
     percentage: number;
   }[];
-  todayAmount: number;
-  thisMonthAmount: number;
+  monthlyTrend: {
+    month: string;
+    amount: number;
+  }[];
+  paymentMethodBreakdown: {
+    method: string;
+    amount: number;
+    count: number;
+  }[];
 }
 
 const EXPENSES_CACHE_KEY_PREFIX = "payment_track_expenses_cache_u_";
@@ -57,20 +55,17 @@ class ExpensesService {
   }
 
   private getCachedExpenses(userId: string): Expense[] {
-    if (!userId) return [];
     try {
-      const stored = localStorage.getItem(this.getCacheKey(userId));
-      if (stored) {
-        return JSON.parse(stored);
-      }
+      const raw = localStorage.getItem(this.getCacheKey(userId));
+      if (!raw) return [];
+      return JSON.parse(raw);
     } catch (e) {
       console.warn("Failed to read cached expenses", e);
+      return [];
     }
-    return [];
   }
 
   private setCachedExpenses(userId: string, expenses: Expense[]): void {
-    if (!userId) return;
     try {
       localStorage.setItem(this.getCacheKey(userId), JSON.stringify(expenses));
     } catch (e) {
@@ -79,7 +74,6 @@ class ExpensesService {
   }
 
   public async getExpenses(userId: string): Promise<{ data: Expense[]; error: string | null }> {
-    if (!userId) return { data: [], error: "No user ID provided" };
     try {
       const { data, error } = await supabase
         .from("expenses")
@@ -89,20 +83,17 @@ class ExpensesService {
 
       if (error) {
         console.error("Supabase getExpenses error:", error);
-        // Return local cache as fallback if network fails
-        return { data: this.getCachedExpenses(userId), error: error.message };
+        const cached = this.getCachedExpenses(userId);
+        return { data: cached, error: error.message };
       }
 
-      if (data) {
-        const remoteExpenses = data as unknown as Expense[];
-        this.setCachedExpenses(userId, remoteExpenses);
-        return { data: remoteExpenses, error: null };
-      }
-
-      return { data: [], error: null };
+      const list = (data as unknown as Expense[]) || [];
+      this.setCachedExpenses(userId, list);
+      return { data: list, error: null };
     } catch (err: any) {
       console.error("Failed to fetch expenses from database:", err);
-      return { data: this.getCachedExpenses(userId), error: err.message || "Failed to fetch expenses" };
+      const cached = this.getCachedExpenses(userId);
+      return { data: cached, error: err.message || "Network error fetching expenses" };
     }
   }
 
@@ -115,9 +106,6 @@ class ExpensesService {
       category: input.category,
       amount: Number(input.amount),
       expense_date: input.expense_date || now,
-      paid_to: input.paid_to || null,
-      payment_method: input.payment_method || "Cash",
-      reference_number: input.reference_number || null,
       notes: input.notes || null,
       created_at: now,
       updated_at: now,
@@ -293,9 +281,6 @@ class ExpensesService {
       "Date",
       "Category",
       "Amount (INR)",
-      "Paid To / Worker",
-      "Payment Method",
-      "Reference No",
       "Notes",
     ];
 
@@ -303,9 +288,6 @@ class ExpensesService {
       exp.expense_date.slice(0, 10),
       `"${(exp.category || "").replace(/"/g, '""')}"`,
       Number(exp.amount || 0).toFixed(2),
-      `"${(exp.paid_to || "").replace(/"/g, '""')}"`,
-      `"${(exp.payment_method || "").replace(/"/g, '""')}"`,
-      `"${(exp.reference_number || "").replace(/"/g, '""')}"`,
       `"${(exp.notes || "").replace(/"/g, '""')}"`,
     ]);
 

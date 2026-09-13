@@ -210,7 +210,7 @@ export const LearningInsightsCard = () => {
               </div>
               <div className="space-y-1 pt-1">
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                  <Zap className="h-3 w-3" /> Live incremental updates
+                  <Zap className="h-3 w-3" /> Self Incrimental Learning (SIL)
                 </span>
                 <p className="text-[11px] text-muted-foreground">
                   Learns from every new transaction
@@ -316,8 +316,8 @@ export const LearningInsightsCard = () => {
                 {testResult?.source === "card_tx_portal"
                   ? "Tier 1: Card + Tx + Portal Match"
                   : testResult?.source === "card_tx"
-                  ? "Tier 2: Card + Tx Fallback"
-                  : "No Pattern Discovered"}
+                    ? "Tier 2: Card + Tx Fallback"
+                    : "No Pattern Discovered"}
               </span>
               <span>{testResult?.explanation || "Requires at least 2 historical matches"}</span>
             </div>

@@ -12,7 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -81,7 +80,6 @@ export const CustomerDetailDialog = ({
   const [editForm, setEditForm] = useState({
     name: "",
     phone: "",
-    notes: "",
   });
 
   if (!customer) return null;
@@ -138,7 +136,6 @@ export const CustomerDetailDialog = ({
     setEditForm({
       name: customer.name,
       phone: customer.phone || "",
-      notes: customer.notes || "",
     });
     setIsEditOpen(true);
   };
@@ -158,7 +155,6 @@ export const CustomerDetailDialog = ({
     const { error } = await customerService.updateCustomer(customer.id, {
       name: trimmedName,
       phone: editForm.phone.trim() || null,
-      notes: editForm.notes.trim() || null,
     });
     setIsSaving(false);
 
@@ -548,16 +544,6 @@ export const CustomerDetailDialog = ({
                 value={editForm.phone}
                 onChange={(e) => setEditForm((prev) => ({ ...prev, phone: e.target.value }))}
                 placeholder="Phone number"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="customer-notes">Notes</Label>
-              <Textarea
-                id="customer-notes"
-                value={editForm.notes}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
-                placeholder="Optional notes"
-                rows={4}
               />
             </div>
           </div>

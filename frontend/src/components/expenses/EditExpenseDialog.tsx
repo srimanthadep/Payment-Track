@@ -27,7 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Calendar as CalendarIcon, Edit3 } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { expensesService, Expense } from "@/services/expensesService";
-import { settingsService, ExpenseCategoryOption, PaymentMethodOption } from "@/services/settingsService";
+import { settingsService, ExpenseCategoryOption } from "@/services/settingsService";
 import { activityLogService } from "@/services/activityLogService";
 
 interface EditExpenseDialogProps {
@@ -48,24 +48,17 @@ export const EditExpenseDialog = ({
   const [calendarOpen, setCalendarOpen] = useState(false);
 
   const [categories, setCategories] = useState<ExpenseCategoryOption[]>([]);
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodOption[]>([]);
-  const [payees, setPayees] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
     amount: "",
     category: "",
     expense_date: new Date(),
-    paid_to: "",
-    payment_method: "Cash",
-    reference_number: "",
     notes: "",
   });
 
   useEffect(() => {
     const updateDropdowns = () => {
       setCategories(settingsService.getExpenseCategories());
-      setPaymentMethods(settingsService.getPaymentMethods());
-      setPayees(settingsService.getPayees());
     };
 
     updateDropdowns();
@@ -78,9 +71,6 @@ export const EditExpenseDialog = ({
         amount: expense.amount.toString(),
         category: expense.category,
         expense_date: new Date(expense.expense_date),
-        paid_to: expense.paid_to || "",
-        payment_method: expense.payment_method || "Cash",
-        reference_number: expense.reference_number || "",
         notes: expense.notes || "",
       });
     }
@@ -102,19 +92,12 @@ export const EditExpenseDialog = ({
 
     setIsLoading(true);
 
-    if (formData.paid_to && formData.paid_to.trim()) {
-      settingsService.addPayee(formData.paid_to.trim());
-    }
-
     const { error } = await expensesService.updateExpense(
       expense.id,
       {
         category: formData.category,
         amount: amt,
         expense_date: formData.expense_date.toISOString(),
-        paid_to: formData.paid_to.trim() || null,
-        payment_method: formData.payment_method,
-        reference_number: formData.reference_number.trim() || null,
         notes: formData.notes.trim() || null,
       },
       expense.user_id
@@ -132,13 +115,12 @@ export const EditExpenseDialog = ({
       activityLogService.log(
         "expense.updated",
         "expense",
-        `Updated expense: ₹${amt.toLocaleString("en-IN")} for ${formData.category}${formData.paid_to ? " • Paid to: " + formData.paid_to.trim() : ""}`,
+        `Updated expense: ₹${amt.toLocaleString("en-IN")} for ${formData.category}`,
         {
           expense_id: expense.id,
           old_amount: expense.amount,
           new_amount: amt,
           category: formData.category,
-          paid_to: formData.paid_to.trim() || null,
         }
       );
       toast({
@@ -212,67 +194,44 @@ export const EditExpenseDialog = ({
             </div>
           </div>
 
-          {/* Date & Payment Method */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-exp-date" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Expense Date *
-              </Label>
-              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    id="edit-exp-date"
-                    type="button"
-                    variant="outline"
-                    className="w-full justify-start text-left font-medium h-10 px-3 border-input bg-background"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
-                    <span className="truncate">
-                      {isToday(formData.expense_date)
-                        ? `Today (${format(formData.expense_date, "dd MMM")})`
-                        : format(formData.expense_date, "dd MMM yyyy")}
-                    </span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 rounded-2xl shadow-xl border-border/80" align="start">
-                  <div className="p-1">
-                    <Calendar
-                      mode="single"
-                      selected={formData.expense_date}
-                      onSelect={(date) => {
-                        if (date) {
-                          setFormData({ ...formData, expense_date: date });
-                          setCalendarOpen(false);
-                        }
-                      }}
-                      initialFocus
-                      className="rounded-xl"
-                    />
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-exp-method" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Payment Method
-              </Label>
-              <Select
-                value={formData.payment_method}
-                onValueChange={(val) => setFormData({ ...formData, payment_method: val })}
-              >
-                <SelectTrigger id="edit-exp-method" className="h-10">
-                  <SelectValue placeholder="Select Method" />
-                </SelectTrigger>
-                <SelectContent>
-                  {paymentMethods.map((m) => (
-                    <SelectItem key={m.id} value={m.name}>
-                      {m.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Expense Date */}
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-exp-date" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Expense Date *
+            </Label>
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  id="edit-exp-date"
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-start text-left font-medium h-10 px-3 border-input bg-background"
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
+                  <span className="truncate">
+                    {isToday(formData.expense_date)
+                      ? `Today (${format(formData.expense_date, "dd MMM")})`
+                      : format(formData.expense_date, "dd MMM yyyy")}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 rounded-2xl shadow-xl border-border/80" align="start">
+                <div className="p-1">
+                  <Calendar
+                    mode="single"
+                    selected={formData.expense_date}
+                    onSelect={(date) => {
+                      if (date) {
+                        setFormData({ ...formData, expense_date: date });
+                        setCalendarOpen(false);
+                      }
+                    }}
+                    initialFocus
+                    className="rounded-xl"
+                  />
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Notes */}

@@ -5,8 +5,6 @@ export interface CustomerRecord {
   user_id: string;
   name: string;
   phone: string | null;
-  phone_normalized: string | null;
-  notes: string | null;
   created_at: string;
   updated_at: string;
   transaction_count?: number;
@@ -35,7 +33,6 @@ export interface CustomerProfile {
   id: string; // Customer UUID
   name: string;
   phone: string | null;
-  notes?: string | null;
   totalTransactions: number;
   totalVolume: number;
   totalCommission: number;
@@ -122,7 +119,7 @@ export const searchCustomers = (query: string, customers: CustomerRecord[]): Cus
   for (const c of customers) {
     let score = 0;
     const nameLower = (c.name || "").toLowerCase();
-    const phoneNorm = c.phone_normalized || (c.phone ? normalizePhone(c.phone) : "");
+    const phoneNorm = c.phone || "";
 
     // 1. Phone matching
     if (isPhoneQuery && phoneNorm) {
@@ -224,21 +221,19 @@ export const customerService = {
   async createCustomer(
     userId: string,
     name: string,
-    phone?: string | null,
-    notes?: string | null
+    phone?: string | null
   ): Promise<{ data: CustomerRecord | null; error: any }> {
     try {
       const trimmedName = formatCustomerName(name.trim());
-      const trimmedPhone = phone?.trim() || null;
-      const phoneNorm = normalizePhone(trimmedPhone);
+      const phoneClean = normalizePhone(phone);
 
       // If phone exists, check if customer already exists for this user
-      if (phoneNorm) {
+      if (phoneClean) {
         const { data: existing } = await supabase
           .from("customers")
           .select("*")
           .eq("user_id", userId)
-          .eq("phone_normalized", phoneNorm)
+          .eq("phone", phoneClean)
           .maybeSingle();
 
         if (existing) {
@@ -251,21 +246,19 @@ export const customerService = {
         .insert({
           user_id: userId,
           name: trimmedName,
-          phone: trimmedPhone,
-          phone_normalized: phoneNorm,
-          notes: notes || null,
+          phone: phoneClean,
         })
         .select()
         .single();
 
       if (error) {
         // Handle duplicate constraint violation
-        if (error.code === "23505" && phoneNorm) {
+        if (error.code === "23505" && phoneClean) {
           const { data: existing } = await supabase
             .from("customers")
             .select("*")
             .eq("user_id", userId)
-            .eq("phone_normalized", phoneNorm)
+            .eq("phone", phoneClean)
             .maybeSingle();
           if (existing) {
             return { data: existing as CustomerRecord, error: null };
@@ -286,7 +279,7 @@ export const customerService = {
    */
   async updateCustomer(
     customerId: string,
-    data: { name?: string; phone?: string | null; notes?: string | null }
+    data: { name?: string; phone?: string | null }
   ): Promise<{ data: CustomerRecord | null; error: any }> {
     try {
       const updatePayload: any = {
@@ -296,11 +289,7 @@ export const customerService = {
         updatePayload.name = formatCustomerName(data.name.trim());
       }
       if (data.phone !== undefined) {
-        updatePayload.phone = data.phone?.trim() || null;
-        updatePayload.phone_normalized = normalizePhone(data.phone);
-      }
-      if (data.notes !== undefined) {
-        updatePayload.notes = data.notes;
+        updatePayload.phone = normalizePhone(data.phone);
       }
 
       const { data: updated, error } = await supabase
@@ -401,7 +390,6 @@ export const customerService = {
           id: c.id,
           name: c.name,
           phone: c.phone || null,
-          notes: c.notes || null,
           totalTransactions: 0,
           totalVolume: 0,
           totalCommission: 0,

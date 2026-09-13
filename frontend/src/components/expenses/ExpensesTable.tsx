@@ -19,7 +19,6 @@ import {
   Filter,
   Receipt,
   Calendar as CalendarIcon,
-  CreditCard,
   User,
   ArrowUpDown,
 } from "lucide-react";
@@ -65,7 +64,6 @@ export const ExpensesTable = ({
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -88,12 +86,10 @@ export const ExpensesTable = ({
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         const matchesCategory = (exp.category || "").toLowerCase().includes(query);
-        const matchesPayee = (exp.paid_to || "").toLowerCase().includes(query);
         const matchesNotes = (exp.notes || "").toLowerCase().includes(query);
-        const matchesRef = (exp.reference_number || "").toLowerCase().includes(query);
         const matchesAmount = exp.amount.toString().includes(query);
 
-        if (!matchesCategory && !matchesPayee && !matchesNotes && !matchesRef && !matchesAmount) {
+        if (!matchesCategory && !matchesNotes && !matchesAmount) {
           return false;
         }
       }
@@ -103,14 +99,9 @@ export const ExpensesTable = ({
         return false;
       }
 
-      // Payment method filter
-      if (selectedPaymentMethod !== "all" && exp.payment_method !== selectedPaymentMethod) {
-        return false;
-      }
-
       return true;
     });
-  }, [expenses, searchQuery, selectedCategory, selectedPaymentMethod]);
+  }, [expenses, searchQuery, selectedCategory]);
 
   const allSelected =
     filteredExpenses.length > 0 &&
@@ -219,21 +210,6 @@ export const ExpensesTable = ({
               ))}
             </SelectContent>
           </Select>
-
-          {/* Payment Method Filter */}
-          <Select value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod}>
-            <SelectTrigger className="w-full sm:w-[140px] h-9 text-xs">
-              <SelectValue placeholder="All Methods" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Methods</SelectItem>
-              <SelectItem value="Cash">Cash</SelectItem>
-              <SelectItem value="UPI / GPay / PhonePe">UPI</SelectItem>
-              <SelectItem value="Bank Transfer / NEFT / IMPS">Bank Transfer</SelectItem>
-              <SelectItem value="Credit / Debit Card">Card</SelectItem>
-              <SelectItem value="Cheque">Cheque</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
         {/* Action Buttons */}
@@ -281,7 +257,6 @@ export const ExpensesTable = ({
                 </TableHead>
                 <TableHead className="text-xs font-semibold">Date</TableHead>
                 <TableHead className="text-xs font-semibold">Category</TableHead>
-                <TableHead className="text-xs font-semibold">Payment Mode</TableHead>
                 <TableHead className="text-xs font-semibold">Description / Notes</TableHead>
                 <TableHead className="text-xs font-semibold text-right">Amount</TableHead>
                 <TableHead className="w-20 text-center text-xs font-semibold">Actions</TableHead>
@@ -291,14 +266,14 @@ export const ExpensesTable = ({
               {isLoading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={7} className="h-14 text-center">
+                    <TableCell colSpan={6} className="h-14 text-center">
                       <div className="h-4 bg-muted/60 rounded animate-pulse w-3/4 mx-auto" />
                     </TableCell>
                   </TableRow>
                 ))
               ) : filteredExpenses.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="p-0 border-0">
+                  <TableCell colSpan={6} className="p-0 border-0">
                     <EmptyState
                       title="No Expenses Found"
                       description="No expenses logged for this period or search filter. Try clearing filters or add a new expense."
@@ -336,12 +311,6 @@ export const ExpensesTable = ({
                         >
                           {expense.category}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        <span className="inline-flex items-center gap-1">
-                          <CreditCard className="h-3 w-3" />
-                          {expense.payment_method || "Cash"}
-                        </span>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground max-w-[280px] truncate">
                         {expense.notes ? expense.notes : <span className="italic opacity-50">-</span>}
@@ -417,21 +386,15 @@ export const ExpensesTable = ({
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground pt-1">
-                    <div className="flex items-center gap-1">
-                      <CalendarIcon className="h-3 w-3" />
-                      {format(new Date(expense.expense_date), "dd MMM yyyy")}
-                    </div>
-                    <div className="flex items-center gap-1 justify-end">
-                      <CreditCard className="h-3 w-3" />
-                      {expense.payment_method || "Cash"}
-                    </div>
-                    {expense.notes && (
-                      <div className="col-span-2 text-xs text-muted-foreground bg-muted/30 rounded p-1.5 mt-1">
-                        {expense.notes}
-                      </div>
-                    )}
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground pt-1">
+                    <CalendarIcon className="h-3 w-3" />
+                    {format(new Date(expense.expense_date), "dd MMM yyyy")}
                   </div>
+                  {expense.notes && (
+                    <div className="text-xs text-muted-foreground bg-muted/30 rounded p-1.5 mt-1">
+                      {expense.notes}
+                    </div>
+                  )}
 
                   <div className="flex justify-end gap-2 pt-1">
                     <Button

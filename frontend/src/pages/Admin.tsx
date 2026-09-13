@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { AdminUsers } from "@/components/admin/AdminUsers";
 import { AdminTransactions } from "@/components/admin/AdminTransactions";
 import { AdminPortals } from "@/components/admin/AdminPortals";
-import { AdminCardTypes } from "@/components/admin/AdminCardTypes";
 import { AdminStats } from "@/components/admin/AdminStats";
 import { AdminLeaderboard } from "@/components/admin/AdminLeaderboard";
 import { useToast } from "@/hooks/use-toast";
@@ -27,36 +26,31 @@ const Admin = () => {
   const checkAdminAccess = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
       if (!user) {
         navigate("/auth");
         return;
       }
 
-      // Check if user has admin role
-      const { data: roles, error } = await supabase
-        .from("user_roles")
+      const { data: profile } = await supabase
+        .from("profiles")
         .select("role")
-        .eq("user_id", user.id)
-        .eq("role", "admin")
+        .eq("id", user.id)
         .maybeSingle();
 
-      if (error) throw error;
-
-      if (!roles) {
+      if (profile?.role !== "admin") {
         toast({
           title: "Access Denied",
-          description: "You don't have admin privileges",
+          description: "You need admin privileges to access this page",
           variant: "destructive",
         });
-        navigate("/dashboard");
+        navigate("/");
         return;
       }
 
       setIsAdmin(true);
     } catch (error) {
       console.error("Error checking admin access:", error);
-      navigate("/dashboard");
+      navigate("/");
     } finally {
       setLoading(false);
     }
@@ -65,14 +59,19 @@ const Admin = () => {
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="flex items-center justify-center h-full">
-          <p className="text-muted-foreground">Loading...</p>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center space-y-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            <p className="text-sm text-muted-foreground">Checking permissions...</p>
+          </div>
         </div>
       </DashboardLayout>
     );
   }
 
-  if (!isAdmin) return null;
+  if (!isAdmin) {
+    return null;
+  }
 
   return (
     <DashboardLayout>
@@ -85,12 +84,11 @@ const Admin = () => {
         <AdminStats />
 
         <Tabs defaultValue="overview" className="space-y-3 sm:space-y-4">
-          <TabsList className="grid grid-cols-5 w-full">
+          <TabsList className="grid grid-cols-4 w-full">
             <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
             <TabsTrigger value="users" className="text-xs sm:text-sm">Users</TabsTrigger>
             <TabsTrigger value="transactions" className="text-xs sm:text-sm">Transactions</TabsTrigger>
             <TabsTrigger value="portals" className="text-xs sm:text-sm">Portals</TabsTrigger>
-            <TabsTrigger value="card-types" className="text-xs sm:text-sm">Card Types</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
@@ -156,17 +154,6 @@ const Admin = () => {
               </CardHeader>
               <CardContent>
                 <AdminPortals />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="card-types">
-            <Card>
-              <CardHeader>
-                <CardTitle>Card Type Management</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <AdminCardTypes />
               </CardContent>
             </Card>
           </TabsContent>

@@ -107,18 +107,14 @@ async function handleRegisterUser(req, res) {
       return res.status(500).json({ error: "User creation failed: missing id" });
     }
 
-    // 2. Assign role
+    // 2. Upsert profile with role
     const roleToAssign = make_admin ? "admin" : "user";
-    await supabase
-      .from("user_roles")
-      .upsert({ user_id: newUserId, role: roleToAssign }, { onConflict: "user_id" });
-
-    // 3. Upsert profile
     await supabase.from("profiles").upsert({
       id: newUserId,
       email: userEmail,
       full_name: displayName,
       business_name: business_name || "My Business",
+      role: roleToAssign,
     });
 
     return res.status(200).json({

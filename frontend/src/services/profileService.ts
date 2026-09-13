@@ -106,7 +106,7 @@ class ProfileService {
 
       const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
 
-      // 6. Update user metadata in Supabase Auth
+      // 6. Update user metadata in Supabase Auth & public.profiles table
       const { error: updateError } = await supabase.auth.updateUser({
         data: {
           avatar_url: publicUrl,
@@ -121,6 +121,9 @@ class ProfileService {
           error: `Image uploaded, but failed to save to user profile: ${updateError.message}`,
         };
       }
+
+      // Sync avatar_url to public.profiles so it's accessible across admin and leaderboard views
+      await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", user.id);
 
       // 7. Dispatch event for instant reactive UI updates across the entire app
       this.notifyProfileUpdated();
@@ -161,6 +164,9 @@ class ProfileService {
       if (updateError) {
         return { success: false, error: updateError.message };
       }
+
+      // Sync avatar_url removal to public.profiles table
+      await supabase.from("profiles").update({ avatar_url: null }).eq("id", user.id);
 
       this.notifyProfileUpdated();
       return { success: true, error: null };

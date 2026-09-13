@@ -50,7 +50,6 @@ import {
   settingsService,
   AppSettings,
   ExpenseCategoryOption,
-  PaymentMethodOption,
   CardTypeOption,
   RecipientOption,
   TransactionTypeOption,
@@ -78,10 +77,6 @@ const Settings = () => {
   const [editingCategory, setEditingCategory] = useState<ExpenseCategoryOption | null>(null);
   const [categoryName, setCategoryName] = useState("");
   const [categoryColor, setCategoryColor] = useState(COLOR_PRESETS[0].class);
-
-  const [paymentMethodModalOpen, setPaymentMethodModalOpen] = useState(false);
-  const [editingPaymentMethod, setEditingPaymentMethod] = useState<PaymentMethodOption | null>(null);
-  const [paymentMethodName, setPaymentMethodName] = useState("");
 
   const [payeeInput, setPayeeInput] = useState("");
 
@@ -129,23 +124,6 @@ const Settings = () => {
     setCategoryModalOpen(false);
     setEditingCategory(null);
     setCategoryName("");
-  };
-
-  // --- Payment Method Handlers ---
-  const handleSavePaymentMethod = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!paymentMethodName.trim()) return;
-
-    if (editingPaymentMethod) {
-      settingsService.updatePaymentMethod(editingPaymentMethod.id, paymentMethodName.trim());
-      toast({ title: "Updated", description: "Payment method updated" });
-    } else {
-      settingsService.addPaymentMethod(paymentMethodName.trim());
-      toast({ title: "Added", description: `Payment method "${paymentMethodName}" added` });
-    }
-    setPaymentMethodModalOpen(false);
-    setEditingPaymentMethod(null);
-    setPaymentMethodName("");
   };
 
   // --- Payee Handlers ---
@@ -377,78 +355,6 @@ const Settings = () => {
                             }
                             settingsService.deleteExpenseCategory(cat.id);
                             toast({ title: "Deleted", description: `"${cat.name}" removed` });
-                          }}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 2. Expense Payment Methods */}
-            <Card className="border shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
-                <div>
-                  <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                    <CreditCard className="h-4 w-4 text-primary" />
-                    Payment Methods Dropdown
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    Payment modes used to pay expenses (Cash, UPI, Bank Transfer, etc.)
-                  </CardDescription>
-                </div>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setEditingPaymentMethod(null);
-                    setPaymentMethodName("");
-                    setPaymentMethodModalOpen(true);
-                  }}
-                  className="h-8 text-xs gap-1"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add Method
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {settings.expensePaymentMethods.map((m) => (
-                    <div
-                      key={m.id}
-                      className="flex items-center justify-between p-3 rounded-xl border bg-card hover:bg-muted/30 transition-colors"
-                    >
-                      <span className="text-sm font-medium">{m.name}</span>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                          onClick={() => {
-                            setEditingPaymentMethod(m);
-                            setPaymentMethodName(m.name);
-                            setPaymentMethodModalOpen(true);
-                          }}
-                        >
-                          <Edit2 className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-destructive/70 hover:text-destructive"
-                          onClick={() => {
-                            if (settings.expensePaymentMethods.length <= 1) {
-                              toast({
-                                title: "Cannot Delete",
-                                description: "At least 1 payment method required",
-                                variant: "destructive",
-                              });
-                              return;
-                            }
-                            settingsService.deletePaymentMethod(m.id);
-                            toast({ title: "Deleted", description: `"${m.name}" removed` });
                           }}
                         >
                           <Trash2 className="h-3 w-3" />
@@ -818,37 +724,6 @@ const Settings = () => {
               </Button>
               <Button type="submit" size="sm">
                 Save Category
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Payment Method Modal */}
-      <Dialog open={paymentMethodModalOpen} onOpenChange={setPaymentMethodModalOpen}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>{editingPaymentMethod ? "Edit Method" : "Add Payment Method"}</DialogTitle>
-            <DialogDescription>Add a new expense payment method</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSavePaymentMethod} className="space-y-4 pt-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="pm-name" className="text-xs font-semibold">Method Name *</Label>
-              <Input
-                id="pm-name"
-                placeholder="e.g. Petrol Card, PhonePe Scanner..."
-                value={paymentMethodName}
-                onChange={(e) => setPaymentMethodName(e.target.value)}
-                required
-                autoFocus
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-2 border-t">
-              <Button type="button" variant="outline" size="sm" onClick={() => setPaymentMethodModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" size="sm">
-                Save Method
               </Button>
             </div>
           </form>

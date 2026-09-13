@@ -9,17 +9,17 @@
         { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
         { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "profiles.id", "nullable": false },
         { "name": "portal_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "portals.id", "nullable": false },
-        { "name": "amount", "type": "numeric", "nullable": false },
+        { "name": "amount", "type": "numeric", "nullable": false, "description": "Total amount in ₹ (amount >= 0)" },
         { "name": "commission", "type": "numeric", "nullable": true },
         { "name": "site_fee", "type": "numeric", "nullable": true },
         { "name": "profit", "type": "numeric", "nullable": true, "description": "Net profit = commission - site_fee" },
-        { "name": "transaction_type", "type": "text", "nullable": false, "examples": ["withdrawal", "repayment"] },
+        { "name": "transaction_type", "type": "text", "nullable": false, "examples": ["withdrawal", "repayment", "cash"] },
         { "name": "card_type", "type": "text", "nullable": true, "examples": ["Visa", "Mastercard", "Amex"] },
         { "name": "transaction_date", "type": "timestamptz", "nullable": false },
         { "name": "customer_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "customers.id", "nullable": true },
         { "name": "customer_name", "type": "text", "nullable": true },
         { "name": "customer_phone", "type": "text", "nullable": true },
-        { "name": "reference_number", "type": "text", "nullable": true },
+        { "name": "username", "type": "text", "nullable": true },
         { "name": "notes", "type": "text", "nullable": true },
         { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
         { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
@@ -32,9 +32,7 @@
         { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
         { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "profiles.id", "nullable": false },
         { "name": "name", "type": "text", "nullable": false },
-        { "name": "phone", "type": "text", "nullable": true },
-        { "name": "phone_normalized", "type": "text", "nullable": true },
-        { "name": "notes", "type": "text", "nullable": true },
+        { "name": "phone", "type": "text", "nullable": true, "description": "Normalized 10-digit customer phone number" },
         { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
         { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
       ]
@@ -48,12 +46,56 @@
         { "name": "category", "type": "text", "nullable": false },
         { "name": "amount", "type": "numeric", "nullable": false },
         { "name": "expense_date", "type": "timestamptz", "nullable": false, "default": "now()" },
-        { "name": "paid_to", "type": "text", "nullable": true },
-        { "name": "payment_method", "type": "text", "nullable": true },
-        { "name": "reference_number", "type": "text", "nullable": true },
         { "name": "notes", "type": "text", "nullable": true },
         { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
         { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
+      ]
+    },
+    {
+      "name": "dues",
+      "description": "Money lent / borrower dues tracking with repayment ledger and status calculation",
+      "columns": [
+        { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
+        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "profiles.id", "nullable": false },
+        { "name": "customer_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "customers.id", "nullable": true },
+        { "name": "borrower_name", "type": "text", "nullable": false },
+        { "name": "borrower_contact", "type": "text", "nullable": true },
+        { "name": "principal_amount", "type": "numeric", "nullable": false, "default": 0 },
+        { "name": "amount_paid", "type": "numeric", "nullable": false, "default": 0 },
+        { "name": "date_given", "type": "timestamptz", "nullable": false, "default": "now()" },
+        { "name": "expected_return_date", "type": "timestamptz", "nullable": true },
+        { "name": "notes", "type": "text", "nullable": true },
+        { "name": "payments", "type": "jsonb", "nullable": false, "default": "[]" },
+        { "name": "status", "type": "text", "nullable": false, "default": "outstanding", "examples": ["outstanding", "partially_paid", "paid", "overdue"] },
+        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
+        { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
+      ]
+    },
+    {
+      "name": "goals",
+      "description": "Financial targets and performance tracking",
+      "columns": [
+        { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
+        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "profiles.id", "nullable": false },
+        { "name": "goal_type", "type": "text", "nullable": false },
+        { "name": "target_amount", "type": "numeric", "nullable": false },
+        { "name": "period_start", "type": "timestamptz", "nullable": false },
+        { "name": "period_end", "type": "timestamptz", "nullable": false },
+        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
+        { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
+      ]
+    },
+    {
+      "name": "activity_logs",
+      "description": "System and user action audit trail",
+      "columns": [
+        { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
+        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "profiles.id", "nullable": false },
+        { "name": "action", "type": "text", "nullable": false },
+        { "name": "category", "type": "text", "nullable": false },
+        { "name": "description", "type": "text", "nullable": false },
+        { "name": "metadata", "type": "jsonb", "nullable": true },
+        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" }
       ]
     },
     {
@@ -70,18 +112,6 @@
       ]
     },
     {
-      "name": "portal_rates",
-      "description": "Card-specific commission rates configured per portal",
-      "columns": [
-        { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
-        { "name": "portal_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "portals.id", "nullable": false },
-        { "name": "card_type", "type": "text", "nullable": false },
-        { "name": "rate_percent", "type": "numeric", "nullable": false },
-        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
-        { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
-      ]
-    },
-    {
       "name": "profiles",
       "description": "User profile metadata synced with Supabase Auth",
       "columns": [
@@ -89,18 +119,10 @@
         { "name": "email", "type": "text", "nullable": true },
         { "name": "full_name", "type": "text", "nullable": true },
         { "name": "business_name", "type": "text", "nullable": true },
+        { "name": "avatar_url", "type": "text", "nullable": true },
+        { "name": "role", "type": "app_role", "nullable": false, "enum": ["admin", "user"], "default": "'user'::app_role" },
         { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
         { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
-      ]
-    },
-    {
-      "name": "user_roles",
-      "description": "User role management (admin / user)",
-      "columns": [
-        { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
-        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "auth.users.id", "nullable": false },
-        { "name": "role", "type": "app_role", "nullable": false, "enum": ["admin", "user"] },
-        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" }
       ]
     },
     {
@@ -110,36 +132,6 @@
         { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
         { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "auth.users.id", "nullable": false },
         { "name": "settings", "type": "jsonb", "nullable": false },
-        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
-        { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
-      ]
-    },
-    {
-      "name": "card_types",
-      "description": "Global card types registry with standard rates",
-      "columns": [
-        { "name": "id", "type": "integer", "is_primary_key": true, "nullable": false },
-        { "name": "name", "type": "text", "nullable": false },
-        { "name": "percentage", "type": "numeric", "nullable": false },
-        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
-        { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
-      ]
-    },
-    {
-      "name": "dues",
-      "description": "Money lent / borrower dues tracking with repayment ledger and status calculation",
-      "columns": [
-        { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
-        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "profiles.id", "nullable": false },
-        { "name": "borrower_name", "type": "text", "nullable": false },
-        { "name": "borrower_contact", "type": "text", "nullable": true },
-        { "name": "principal_amount", "type": "numeric", "nullable": false, "default": 0 },
-        { "name": "date_given", "type": "timestamptz", "nullable": false, "default": "now()" },
-        { "name": "expected_return_date", "type": "timestamptz", "nullable": true },
-        { "name": "notes", "type": "text", "nullable": true },
-        { "name": "payments", "type": "jsonb", "nullable": false, "default": "[]" },
-        { "name": "amount_paid", "type": "numeric", "nullable": false, "default": 0 },
-        { "name": "status", "type": "text", "nullable": false, "default": "outstanding", "examples": ["outstanding", "partially_paid", "paid", "overdue"] },
         { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
         { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
       ]

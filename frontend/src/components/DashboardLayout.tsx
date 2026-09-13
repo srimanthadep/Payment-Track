@@ -63,14 +63,13 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
   const checkAdminRole = async (userId: string) => {
     try {
-      const { data: roles } = await supabase
-        .from("user_roles")
+      const { data: profile } = await supabase
+        .from("profiles")
         .select("role")
-        .eq("user_id", userId)
-        .eq("role", "admin")
+        .eq("id", userId)
         .maybeSingle();
 
-      setIsAdmin(!!roles);
+      setIsAdmin(profile?.role === "admin");
     } catch {
       setIsAdmin(false);
     }

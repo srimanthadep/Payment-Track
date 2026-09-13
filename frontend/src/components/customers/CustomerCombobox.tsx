@@ -127,7 +127,7 @@ export const CustomerCombobox: React.FC<CustomerComboboxProps> = ({
     let matchedId = selectedId;
     if (norm && !matchedId) {
       const matchByPhone = customers.find(
-        (c) => (c.phone_normalized || normalizePhone(c.phone)) === norm
+        (c) => (c.phone ? normalizePhone(c.phone) : "") === norm
       );
       if (matchByPhone) {
         matchedId = matchByPhone.id;

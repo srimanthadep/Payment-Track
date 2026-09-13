@@ -54,14 +54,12 @@ serve(async (req: Request) => {
       throw new Error("User creation failed: missing id");
     }
 
-    // Optionally assign admin role
+    // Update profile with provided fields and role
+    const profileUpdate: { full_name?: string; email?: string; role?: "admin" | "user" } = { full_name, email };
     if (make_admin) {
-      const { error: roleErr } = await admin.from("user_roles").insert({ user_id: newUserId, role: "admin" });
-      if (roleErr) throw roleErr;
+      profileUpdate.role = "admin";
     }
-
-    // Update profile with provided fields if not covered by trigger
-    await admin.from("profiles").update({ full_name, email }).eq("id", newUserId);
+    await admin.from("profiles").update(profileUpdate).eq("id", newUserId);
 
     return new Response(JSON.stringify({ id: newUserId }), {
       status: 200,

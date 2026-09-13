@@ -12,9 +12,12 @@ import { AddUserDialog } from "@/components/admin/AddUserDialog";
 
 interface UserWithRole {
   id: string;
-  email: string;
-  full_name: string;
+  email: string | null;
+  full_name: string | null;
+  business_name: string | null;
+  avatar_url: string | null;
   created_at: string;
+  role: "admin" | "user";
   is_admin: boolean;
 }
 
@@ -39,27 +42,15 @@ export const AdminUsers = () => {
     try {
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
-        .select("*")
+        .select("id, full_name, email, business_name, avatar_url, role, created_at")
         .order("created_at", { ascending: false });
 
       if (profilesError) throw profilesError;
 
-      // Get roles for each user
-      const usersWithRoles = await Promise.all(
-        (profiles || []).map(async (profile) => {
-          const { data: roles } = await supabase
-            .from("user_roles")
-            .select("role")
-            .eq("user_id", profile.id)
-            .eq("role", "admin")
-            .maybeSingle();
-
-          return {
-            ...profile,
-            is_admin: !!roles,
-          } as UserWithRole;
-        })
-      );
+      const usersWithRoles: UserWithRole[] = (profiles || []).map((profile) => ({
+        ...profile,
+        is_admin: profile.role === "admin",
+      }));
 
       setUsers(usersWithRoles);
     } catch (error) {
@@ -76,19 +67,13 @@ export const AdminUsers = () => {
 
   const toggleAdminRole = async (userId: string, isCurrentlyAdmin: boolean) => {
     try {
-      if (isCurrentlyAdmin) {
-        // Remove admin role
-        await supabase
-          .from("user_roles")
-          .delete()
-          .eq("user_id", userId)
-          .eq("role", "admin");
-      } else {
-        // Add admin role
-        await supabase
-          .from("user_roles")
-          .insert({ user_id: userId, role: "admin" });
-      }
+      const newRole = isCurrentlyAdmin ? "user" : "admin";
+      const { error } = await supabase
+        .from("profiles")
+        .update({ role: newRole })
+        .eq("id", userId);
+
+      if (error) throw error;
 
       toast({
         title: "Success",
@@ -96,11 +81,11 @@ export const AdminUsers = () => {
       });
 
       fetchUsers();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error toggling admin role:", error);
       toast({
         title: "Error",
-        description: "Failed to update role",
+        description: error?.message || "Failed to update role",
         variant: "destructive",
       });
     }
@@ -110,7 +95,7 @@ export const AdminUsers = () => {
     setEditing(u);
     setEditForm({
       full_name: u.full_name || "",
-      business_name: "",
+      business_name: u.business_name || "",
       email: u.email || "",
     });
   };

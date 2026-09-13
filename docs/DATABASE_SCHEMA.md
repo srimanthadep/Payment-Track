@@ -12,17 +12,21 @@ erDiagram
     PROFILES ||--o{ TRANSACTIONS : "user_id"
     PROFILES ||--o{ EXPENSES : "user_id"
     PROFILES ||--o{ APP_SETTINGS : "user_id"
-    PROFILES ||--o{ USER_ROLES : "user_id"
+    PROFILES ||--o{ DUES : "user_id"
+    PROFILES ||--o{ GOALS : "user_id"
+    PROFILES ||--o{ ACTIVITY_LOGS : "user_id"
     
     CUSTOMERS ||--o{ TRANSACTIONS : "customer_id"
+    CUSTOMERS ||--o{ DUES : "customer_id"
     PORTALS ||--o{ TRANSACTIONS : "portal_id"
-    PORTALS ||--o{ PORTAL_RATES : "portal_id"
 
     PROFILES {
         uuid id PK
         text email
         text full_name
         text business_name
+        text avatar_url
+        app_role role
         timestamp created_at
         timestamp updated_at
     }
@@ -32,8 +36,6 @@ erDiagram
         uuid user_id FK
         text name
         text phone
-        text phone_normalized
-        text notes
         timestamp created_at
         timestamp updated_at
     }
@@ -52,6 +54,7 @@ erDiagram
         timestamp transaction_date
         text customer_name
         text customer_phone
+        text username
         text notes
         timestamp created_at
         timestamp updated_at
@@ -63,12 +66,47 @@ erDiagram
         text category
         numeric amount
         timestamp expense_date
-        text paid_to
-        text payment_method
-        text reference_number
         text notes
         timestamp created_at
         timestamp updated_at
+    }
+
+    DUES {
+        uuid id PK
+        uuid user_id FK
+        uuid customer_id FK
+        text borrower_name
+        text borrower_contact
+        numeric principal_amount
+        numeric amount_paid
+        timestamp date_given
+        timestamp expected_return_date
+        text status
+        jsonb payments
+        text notes
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    GOALS {
+        uuid id PK
+        uuid user_id FK
+        text goal_type
+        numeric target_amount
+        timestamp period_start
+        timestamp period_end
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    ACTIVITY_LOGS {
+        uuid id PK
+        uuid user_id FK
+        text action
+        text category
+        text description
+        jsonb metadata
+        timestamp created_at
     }
 
     PORTALS {
@@ -81,34 +119,10 @@ erDiagram
         timestamp updated_at
     }
 
-    PORTAL_RATES {
-        uuid id PK
-        uuid portal_id FK
-        text card_type
-        numeric rate_percent
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    USER_ROLES {
-        uuid id PK
-        uuid user_id FK
-        app_role role
-        timestamp created_at
-    }
-
     APP_SETTINGS {
         uuid id PK
         uuid user_id FK
         jsonb settings
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    CARD_TYPES {
-        serial id PK
-        text name
-        numeric percentage
         timestamp created_at
         timestamp updated_at
     }
@@ -123,20 +137,21 @@ Stores credit card withdrawals, repayments, customer charges, commissions, and p
 
 | Column Name | Data Type | Nullable | Key / Ref | Description |
 |-------------|-----------|----------|-----------|-------------|
-| `id` | `uuid` | NO | **PK** (uuid_generate_v4()) | Unique transaction ID |
+| `id` | `uuid` | NO | **PK** (gen_random_uuid()) | Unique transaction ID |
 | `user_id` | `uuid` | NO | **FK** -> `auth.users.id` / `profiles.id` | User who created the transaction (Multi-tenant) |
 | `portal_id` | `uuid` | NO | **FK** -> `portals.id` | Associated portal / gateway |
-| `amount` | `numeric` | NO | - | Total transaction amount (₹) |
+| `amount` | `numeric` | NO | - | Total transaction amount (₹) (Check: `amount >= 0`) |
 | `commission` | `numeric` | YES | - | Gross commission earned (₹) |
 | `site_fee` | `numeric` | YES | - | Portal processing / site fee paid (₹) |
 | `profit` | `numeric` | YES | - | Net profit = `commission - site_fee` (₹) |
-| `transaction_type` | `text` | NO | - | Type (`withdrawal`, `repayment`, etc.) |
-| `card_type` | `text` | YES | - | Card brand / category (`Visa`, `Mastercard`, `Amex`, etc.) |
+| `transaction_type` | `text` | NO | - | Type (`withdrawal`, `repayment`, `cash`, etc.) |
+| `card_type` | `text` | YES | - | Card brand / category (`Visa`, `Mastercard`, etc.) |
 | `transaction_date` | `timestamptz` | NO | - | Date/time transaction occurred |
 | `customer_id` | `uuid` | YES | **FK** -> `customers.id` | Reference to canonical customer record |
-| `customer_name` | `text` | YES | - | Legacy/fallback customer name (e.g. for Chummi portal) |
-| `customer_phone` | `text` | YES | - | Legacy/fallback customer phone number |
-| `notes` | `text` | YES | - | User-entered transaction notes and metadata |
+| `customer_name` | `text` | YES | - | Customer name snapshot / fallback |
+| `customer_phone` | `text` | YES | - | Customer phone snapshot / fallback |
+| `username` | `text` | YES | - | Profile username snapshot |
+| `notes` | `text` | YES | - | User-entered transaction notes |
 | `created_at` | `timestamptz` | NO | - | Record creation timestamp |
 | `updated_at` | `timestamptz` | NO | - | Record update timestamp |
 
@@ -150,11 +165,9 @@ Dedicated canonical customer records for customer tracking, repeat customer auto
 | `id` | `uuid` | NO | **PK** (gen_random_uuid()) | Unique customer ID |
 | `user_id` | `uuid` | NO | **FK** -> `auth.users.id` | User/merchant who owns this customer record (Multi-tenant) |
 | `name` | `text` | NO | - | Customer full name |
-| `phone` | `text` | YES | - | Formatted customer phone number for display |
-| `phone_normalized` | `text` | YES | - | Digits-only normalized phone number for search & deduplication |
-| `notes` | `text` | YES | - | Notes, preferences, or customer history remarks |
+| `phone` | `text` | YES | - | Normalized 10-digit customer phone number (Unique per user) |
 | `created_at` | `timestamptz` | NO | - | Customer record creation timestamp |
-| `updated_at` | `timestamptz` | NO | - | Customer record last update timestamp |
+| `updated_at` | `timestamptz` | NO | - | Customer record last update timestamp (Trigger-managed) |
 
 ---
 
@@ -163,26 +176,76 @@ Stores business operating costs, worker salaries, rent, petrol, and overheads.
 
 | Column Name | Data Type | Nullable | Key / Ref | Description |
 |-------------|-----------|----------|-----------|-------------|
-| `id` | `uuid` | NO | **PK** (uuid_generate_v4()) | Unique expense ID |
+| `id` | `uuid` | NO | **PK** (gen_random_uuid()) | Unique expense ID |
 | `user_id` | `uuid` | NO | **FK** -> `auth.users.id` / `profiles.id` | Owner of the expense record |
 | `category` | `text` | NO | - | Category (`Worker Salary`, `Petrol`, `Rent`, `Current Bills`, etc.) |
 | `amount` | `numeric` | NO | - | Expense amount in ₹ |
 | `expense_date` | `timestamptz` | NO | - | Date expense was incurred |
-| `paid_to` | `text` | YES | - | Name of recipient / vendor / employee |
-| `payment_method` | `text` | YES | - | Mode of payment (`Cash`, `UPI`, `Bank Transfer`) |
-| `reference_number` | `text` | YES | - | Transaction / UPI reference ID |
 | `notes` | `text` | YES | - | Additional remarks |
 | `created_at` | `timestamptz` | NO | - | Timestamp created |
 | `updated_at` | `timestamptz` | NO | - | Timestamp updated |
 
 ---
 
-### 4. `portals`
+### 4. `dues`
+Money lent / borrower dues tracking with repayment ledger and status calculation.
+
+| Column Name | Data Type | Nullable | Key / Ref | Description |
+|-------------|-----------|----------|-----------|-------------|
+| `id` | `uuid` | NO | **PK** (gen_random_uuid()) | Unique dues ID |
+| `user_id` | `uuid` | NO | **FK** -> `auth.users.id` / `profiles.id` | Record owner |
+| `customer_id` | `uuid` | YES | **FK** -> `customers.id` | Associated customer |
+| `borrower_name` | `text` | NO | - | Borrower full name |
+| `borrower_contact` | `text` | YES | - | Borrower phone or contact info |
+| `principal_amount` | `numeric` | NO | - | Total amount lent (₹) (Check: `>= 0`) |
+| `amount_paid` | `numeric` | NO | - | Total amount recovered (₹) (Check: `>= 0`) |
+| `date_given` | `timestamptz` | NO | - | Date loan / credit was given |
+| `expected_return_date` | `timestamptz` | YES | - | Target date for full repayment |
+| `status` | `text` | NO | - | Status (`outstanding`, `partially_paid`, `paid`, `overdue`) |
+| `payments` | `jsonb` | NO | - | Array of partial payment logs |
+| `notes` | `text` | YES | - | Notes / remarks |
+| `created_at` | `timestamptz` | NO | - | Timestamp created |
+| `updated_at` | `timestamptz` | NO | - | Timestamp updated |
+
+---
+
+### 5. `goals`
+Financial performance targets (monthly, quarterly, yearly).
+
+| Column Name | Data Type | Nullable | Key / Ref | Description |
+|-------------|-----------|----------|-----------|-------------|
+| `id` | `uuid` | NO | **PK** (gen_random_uuid()) | Goal ID |
+| `user_id` | `uuid` | NO | **FK** -> `auth.users.id` / `profiles.id` | User owner |
+| `goal_type` | `text` | NO | - | Goal scope (`monthly`, `quarterly`, `yearly`) |
+| `target_amount` | `numeric` | NO | - | Target amount in ₹ (Check: `> 0`) |
+| `period_start` | `timestamptz` | NO | - | Goal period start date |
+| `period_end` | `timestamptz` | NO | - | Goal period end date (Check: `>= period_start`) |
+| `created_at` | `timestamptz` | NO | - | Timestamp created |
+| `updated_at` | `timestamptz` | NO | - | Timestamp updated (Trigger-managed) |
+
+---
+
+### 6. `activity_logs`
+Audit log recording user actions, mutations, and system events.
+
+| Column Name | Data Type | Nullable | Key / Ref | Description |
+|-------------|-----------|----------|-----------|-------------|
+| `id` | `uuid` | NO | **PK** (gen_random_uuid()) | Log entry ID |
+| `user_id` | `uuid` | NO | **FK** -> `auth.users.id` / `profiles.id` | Acting user |
+| `action` | `text` | NO | - | Action identifier (e.g. `CREATE_TRANSACTION`) |
+| `category` | `text` | NO | - | Category (e.g. `transaction`, `expense`, `customer`) |
+| `description` | `text` | NO | - | Human-readable action description |
+| `metadata` | `jsonb` | YES | - | Structured details (record IDs, changed fields) |
+| `created_at` | `timestamptz` | NO | - | Timestamp created |
+
+---
+
+### 7. `portals`
 Stores external gateways and portals through which transactions are processed.
 
 | Column Name | Data Type | Nullable | Key / Ref | Description |
 |-------------|-----------|----------|-----------|-------------|
-| `id` | `uuid` | NO | **PK** (uuid_generate_v4()) | Portal unique identifier |
+| `id` | `uuid` | NO | **PK** (gen_random_uuid()) | Portal unique identifier |
 | `name` | `text` | NO | - | Portal name (`Upender`, `Chummi`, etc.) |
 | `default_commission_rate`| `numeric` | YES | - | Standard commission percentage |
 | `default_site_fee` | `numeric` | YES | - | Standard site fee percentage or fixed fee |
@@ -192,21 +255,7 @@ Stores external gateways and portals through which transactions are processed.
 
 ---
 
-### 5. `portal_rates`
-Card-specific commission rates configured per portal.
-
-| Column Name | Data Type | Nullable | Key / Ref | Description |
-|-------------|-----------|----------|-----------|-------------|
-| `id` | `uuid` | NO | **PK** (uuid_generate_v4()) | Unique rate ID |
-| `portal_id` | `uuid` | NO | **FK** -> `portals.id` | Associated portal |
-| `card_type` | `text` | NO | - | Card type name |
-| `rate_percent` | `numeric` | NO | - | Commission rate percentage |
-| `created_at` | `timestamptz` | NO | - | Timestamp created |
-| `updated_at` | `timestamptz` | NO | - | Timestamp updated |
-
----
-
-### 6. `profiles`
+### 8. `profiles`
 User profiles synced with Supabase Auth (`auth.users`).
 
 | Column Name | Data Type | Nullable | Key / Ref | Description |
@@ -215,46 +264,23 @@ User profiles synced with Supabase Auth (`auth.users`).
 | `email` | `text` | YES | - | User login email address |
 | `full_name` | `text` | YES | - | User display name |
 | `business_name` | `text` | YES | - | Company or shop name |
+| `avatar_url` | `text` | YES | - | Public URL of user avatar image |
+| `role` | `app_role` (`admin` \| `user`)| NO | - | User role (default: `'user'`) |
 | `created_at` | `timestamptz` | NO | - | Profile creation date |
 | `updated_at` | `timestamptz` | NO | - | Profile last update date |
 
 ---
 
-### 7. `user_roles`
-Role-based access control (RBAC).
-
-| Column Name | Data Type | Nullable | Key / Ref | Description |
-|-------------|-----------|----------|-----------|-------------|
-| `id` | `uuid` | NO | **PK** | Unique role assignment ID |
-| `user_id` | `uuid` | NO | **FK** -> `auth.users.id` | User UUID |
-| `role` | `app_role` (`admin` \| `user`)| NO | - | Assigned role |
-| `created_at` | `timestamptz` | NO | - | Timestamp assigned |
-
----
-
-### 8. `app_settings`
-User custom settings, dropdown configurations, and UI preferences.
+### 9. `app_settings`
+User custom settings, dropdown configurations (including card types with custom rates), and UI preferences.
 
 | Column Name | Data Type | Nullable | Key / Ref | Description |
 |-------------|-----------|----------|-----------|-------------|
 | `id` | `uuid` | NO | **PK** | Settings ID |
 | `user_id` | `uuid` | NO | **FK** -> `auth.users.id` | User owner |
-| `settings` | `jsonb` | NO | - | JSON object containing customized dropdown options |
+| `settings` | `jsonb` | NO | - | JSON object containing customized dropdown options (`transactionCardTypes`, etc.) |
 | `created_at` | `timestamptz` | NO | - | Timestamp created |
-| `updated_at` | `timestamptz` | NO | - | Timestamp updated |
-
----
-
-### 9. `card_types`
-Global card types registry.
-
-| Column Name | Data Type | Nullable | Key / Ref | Description |
-|-------------|-----------|----------|-----------|-------------|
-| `id` | `serial` | NO | **PK** | Unique ID |
-| `name` | `text` | NO | - | Card brand / name |
-| `percentage` | `numeric` | NO | - | Default commission percentage |
-| `created_at` | `timestamptz` | NO | - | Timestamp created |
-| `updated_at` | `timestamptz` | NO | - | Timestamp updated |
+| `updated_at` | `timestamptz` | NO | - | Timestamp updated (Trigger-managed) |
 
 ---
 
