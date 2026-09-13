@@ -114,7 +114,7 @@ const Analytics = ({ defaultTab }: AnalyticsProps = {}) => {
   const [isLoading, setIsLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [period, setPeriod] = useState<AnalyticsPeriod>("daily");
+  const [period, setPeriod] = useState<AnalyticsPeriod>("monthly");
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
 
   // Current month aggregates dedicated for high-accuracy predictions

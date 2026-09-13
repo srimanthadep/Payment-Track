@@ -126,22 +126,6 @@
       ]
     },
     {
-      "name": "scraping_configs",
-      "description": "Automated scraping rules and portal configurations",
-      "columns": [
-        { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
-        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "auth.users.id", "nullable": false },
-        { "name": "portal_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "portals.id", "nullable": true },
-        { "name": "name", "type": "text", "nullable": false },
-        { "name": "url", "type": "text", "nullable": false },
-        { "name": "extraction_rules", "type": "jsonb", "nullable": false },
-        { "name": "is_active", "type": "boolean", "nullable": true, "default": true },
-        { "name": "last_scraped_at", "type": "timestamptz", "nullable": true },
-        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
-        { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
-      ]
-    },
-    {
       "name": "dues",
       "description": "Money lent / borrower dues tracking with repayment ledger and status calculation",
       "columns": [

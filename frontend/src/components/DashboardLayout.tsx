@@ -8,7 +8,6 @@ import {
   Receipt, 
   LogOut, 
   Shield, 
-  Globe, 
   Wallet, 
   Settings as SettingsIcon,
   Menu,
@@ -150,7 +149,6 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     { name: "Goals", href: "/goals", icon: Target },
     { name: "Activity Logs", href: "/activity-logs", icon: ScrollText },
     { name: "Settings", href: "/settings", icon: SettingsIcon },
-    { name: "Web Scraping", href: "/scraping", icon: Globe },
   ];
 
   const navItems = isAdmin

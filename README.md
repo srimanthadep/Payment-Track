@@ -63,11 +63,6 @@ Payment-Track is a comprehensive payment transaction tracking system built with 
 - **Portal Configuration**: Set commission rates and fees per portal
 - **Active/Inactive Toggle**: Enable or disable portals as needed
 
-### 🔍 Web Scraping
-- **Automated Scraping**: Configure rules to scrape transaction data from websites
-- **Pattern Matching**: Flexible regex-based extraction
-- **Error Handling**: Robust error handling and logging
-
 ### 🎨 User Interface
 - **Responsive Design**: Mobile-first approach, works on all devices
 - **Dark Mode**: Built-in dark mode support
@@ -188,7 +183,6 @@ supabase login
 supabase link --project-ref YOUR_PROJECT_REF
 
 # Deploy functions
-supabase functions deploy scrape-website
 supabase functions deploy admin-create-user
 ```
 

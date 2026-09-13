@@ -27,7 +27,7 @@ const Transactions = () => {
   const [portalsRefreshKey, setPortalsRefreshKey] = useState(0);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [period, setPeriod] = useState<TransactionPeriod>("all");
+  const [period, setPeriod] = useState<TransactionPeriod>("daily");
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
 
   const dateRange = useMemo<{ from: Date | null; to: Date | null }>(() => {

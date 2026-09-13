@@ -13,12 +13,10 @@ erDiagram
     PROFILES ||--o{ EXPENSES : "user_id"
     PROFILES ||--o{ APP_SETTINGS : "user_id"
     PROFILES ||--o{ USER_ROLES : "user_id"
-    PROFILES ||--o{ SCRAPING_CONFIGS : "user_id"
     
     CUSTOMERS ||--o{ TRANSACTIONS : "customer_id"
     PORTALS ||--o{ TRANSACTIONS : "portal_id"
     PORTALS ||--o{ PORTAL_RATES : "portal_id"
-    PORTALS ||--o{ SCRAPING_CONFIGS : "portal_id"
 
     PROFILES {
         uuid id PK
@@ -111,19 +109,6 @@ erDiagram
         serial id PK
         text name
         numeric percentage
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    SCRAPING_CONFIGS {
-        uuid id PK
-        uuid user_id FK
-        uuid portal_id FK
-        text name
-        text url
-        jsonb extraction_rules
-        boolean is_active
-        timestamp last_scraped_at
         timestamp created_at
         timestamp updated_at
     }
@@ -268,24 +253,6 @@ Global card types registry.
 | `id` | `serial` | NO | **PK** | Unique ID |
 | `name` | `text` | NO | - | Card brand / name |
 | `percentage` | `numeric` | NO | - | Default commission percentage |
-| `created_at` | `timestamptz` | NO | - | Timestamp created |
-| `updated_at` | `timestamptz` | NO | - | Timestamp updated |
-
----
-
-### 10. `scraping_configs`
-Automated portal scraping rules and credentials.
-
-| Column Name | Data Type | Nullable | Key / Ref | Description |
-|-------------|-----------|----------|-----------|-------------|
-| `id` | `uuid` | NO | **PK** | Scraping config ID |
-| `user_id` | `uuid` | NO | **FK** -> `auth.users.id` | Owner |
-| `portal_id` | `uuid` | YES | **FK** -> `portals.id` | Associated portal |
-| `name` | `text` | NO | - | Scraper name |
-| `url` | `text` | NO | - | Target portal login URL |
-| `extraction_rules` | `jsonb` | NO | - | Rules for parsing tables |
-| `is_active` | `boolean` | YES | - | Is scraper enabled |
-| `last_scraped_at` | `timestamptz` | YES | - | Last execution timestamp |
 | `created_at` | `timestamptz` | NO | - | Timestamp created |
 | `updated_at` | `timestamptz` | NO | - | Timestamp updated |
 

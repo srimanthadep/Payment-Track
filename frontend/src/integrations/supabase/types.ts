@@ -242,53 +242,6 @@ export type Database = {
         }
         Relationships: []
       }
-      scraping_configs: {
-        Row: {
-          created_at: string
-          extraction_rules: Json
-          id: string
-          is_active: boolean | null
-          last_scraped_at: string | null
-          name: string
-          portal_id: string | null
-          updated_at: string
-          url: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          extraction_rules?: Json
-          id?: string
-          is_active?: boolean | null
-          last_scraped_at?: string | null
-          name: string
-          portal_id?: string | null
-          updated_at?: string
-          url: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          extraction_rules?: Json
-          id?: string
-          is_active?: boolean | null
-          last_scraped_at?: string | null
-          name?: string
-          portal_id?: string | null
-          updated_at?: string
-          url?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "scraping_configs_portal_id_fkey"
-            columns: ["portal_id"]
-            isOneToOne: false
-            referencedRelation: "portals"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       transactions: {
         Row: {
           amount: number

@@ -11,7 +11,6 @@ import Transactions from "./pages/Transactions";
 import Expenses from "./pages/Expenses";
 import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
-import Scraping from "./pages/Scraping";
 import Analytics from "./pages/Analytics";
 import Goals from "./pages/Goals";
 import ActivityLogs from "./pages/ActivityLogs";
@@ -64,7 +63,6 @@ const App = () => {
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/admin" element={<Admin />} />
-            <Route path="/scraping" element={<Scraping />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/analytics/predictions" element={<Analytics defaultTab="predictions" />} />
             <Route path="/goals" element={<Goals />} />

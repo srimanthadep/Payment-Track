@@ -27,7 +27,7 @@ const Expenses = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<ExpenseCategoryOption[]>([]);
-  const [period, setPeriod] = useState<ExpensePeriod>("daily");
+  const [period, setPeriod] = useState<ExpensePeriod>("monthly");
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);

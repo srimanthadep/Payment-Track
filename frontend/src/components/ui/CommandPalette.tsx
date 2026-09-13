@@ -12,7 +12,6 @@ import {
   BarChart3,
   Settings,
   Target,
-  Globe,
   ArrowRight,
   Clock,
   IndianRupee,
@@ -103,14 +102,6 @@ const PAGES: SearchResult[] = [
     subtitle: "App configuration and profile",
     icon: <Settings className="h-4 w-4" />,
     href: "/settings",
-  },
-  {
-    id: "page-scraping",
-    type: "page",
-    title: "Web Scraping",
-    subtitle: "Portal scraping configuration",
-    icon: <Globe className="h-4 w-4" />,
-    href: "/scraping",
   },
 ];
 
