@@ -47,6 +47,54 @@ export type Database = {
         }
         Relationships: []
       }
+      dues: {
+        Row: {
+          id: string
+          user_id: string
+          borrower_name: string
+          borrower_contact: string | null
+          principal_amount: number
+          date_given: string
+          expected_return_date: string | null
+          notes: string | null
+          payments: Json
+          amount_paid: number
+          status: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          borrower_name: string
+          borrower_contact?: string | null
+          principal_amount: number
+          date_given?: string
+          expected_return_date?: string | null
+          notes?: string | null
+          payments?: Json
+          amount_paid?: number
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          borrower_name?: string
+          borrower_contact?: string | null
+          principal_amount?: number
+          date_given?: string
+          expected_return_date?: string | null
+          notes?: string | null
+          payments?: Json
+          amount_paid?: number
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       expenses: {
         Row: {
           id: string

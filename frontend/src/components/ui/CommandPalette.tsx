@@ -17,6 +17,7 @@ import {
   Clock,
   IndianRupee,
   Users,
+  HandCoins,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
@@ -70,6 +71,14 @@ const PAGES: SearchResult[] = [
     subtitle: "Customer CRM and transaction history",
     icon: <Users className="h-4 w-4" />,
     href: "/customers",
+  },
+  {
+    id: "page-dues",
+    type: "page",
+    title: "Dues",
+    subtitle: "Track loans given and repayments",
+    icon: <HandCoins className="h-4 w-4" />,
+    href: "/dues",
   },
   {
     id: "page-analytics",
