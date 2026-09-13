@@ -16,7 +16,6 @@
         { "name": "transaction_type", "type": "text", "nullable": false, "examples": ["withdrawal", "repayment"] },
         { "name": "card_type", "type": "text", "nullable": true, "examples": ["Visa", "Mastercard", "Amex"] },
         { "name": "transaction_date", "type": "timestamptz", "nullable": false },
-        { "name": "status", "type": "text", "nullable": true, "examples": ["completed", "pending", "cancelled"] },
         { "name": "customer_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "customers.id", "nullable": true },
         { "name": "customer_name", "type": "text", "nullable": true },
         { "name": "customer_phone", "type": "text", "nullable": true },
@@ -138,6 +137,25 @@
         { "name": "extraction_rules", "type": "jsonb", "nullable": false },
         { "name": "is_active", "type": "boolean", "nullable": true, "default": true },
         { "name": "last_scraped_at", "type": "timestamptz", "nullable": true },
+        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
+        { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
+      ]
+    },
+    {
+      "name": "dues",
+      "description": "Money lent / borrower dues tracking with repayment ledger and status calculation",
+      "columns": [
+        { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
+        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "profiles.id", "nullable": false },
+        { "name": "borrower_name", "type": "text", "nullable": false },
+        { "name": "borrower_contact", "type": "text", "nullable": true },
+        { "name": "principal_amount", "type": "numeric", "nullable": false, "default": 0 },
+        { "name": "date_given", "type": "timestamptz", "nullable": false, "default": "now()" },
+        { "name": "expected_return_date", "type": "timestamptz", "nullable": true },
+        { "name": "notes", "type": "text", "nullable": true },
+        { "name": "payments", "type": "jsonb", "nullable": false, "default": "[]" },
+        { "name": "amount_paid", "type": "numeric", "nullable": false, "default": 0 },
+        { "name": "status", "type": "text", "nullable": false, "default": "outstanding", "examples": ["outstanding", "partially_paid", "paid", "overdue"] },
         { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
         { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
       ]

@@ -343,6 +343,43 @@ export const useDues = (userId?: string) => {
     [dues, updateDue]
   );
 
+  const deleteDue = useCallback(
+    async (id: string) => {
+      if (!userId) return { success: false, error: "No user session" };
+
+      const target = dues.find((due) => due.id === id);
+      const previousDues = dues;
+
+      // Optimistic delete
+      setDues((prev) => prev.filter((due) => due.id !== id));
+      setError(null);
+
+      const { error: deleteError } = await supabase
+        .from("dues")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", userId);
+
+      if (deleteError) {
+        setDues(previousDues);
+        setError(deleteError.message);
+        return { success: false, error: deleteError.message };
+      }
+
+      if (target) {
+        activityLogService.log(
+          "due.deleted",
+          "transaction",
+          `Deleted due record for ${target.borrower_name} (₹${target.principal_amount.toLocaleString("en-IN")})`,
+          { due_id: id, borrower_name: target.borrower_name, principal_amount: target.principal_amount }
+        );
+      }
+
+      return { success: true, error: null };
+    },
+    [userId, dues]
+  );
+
   return {
     dues,
     isLoading,
@@ -351,5 +388,7 @@ export const useDues = (userId?: string) => {
     createDue,
     updateDue,
     addPayment,
+    deleteDue,
   };
 };
+

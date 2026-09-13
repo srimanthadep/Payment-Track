@@ -24,7 +24,7 @@ export interface CustomerTransaction {
   transaction_type: string;
   card_type: string | null;
   transaction_date: string;
-  status: string;
+  status?: string;
   customer_id?: string | null;
   customer_name: string | null;
   customer_phone: string | null;
@@ -379,7 +379,6 @@ export const customerService = {
           site_fee,
           profit,
           transaction_date,
-          status,
           card_type,
           notes,
           customer_id,
@@ -447,7 +446,6 @@ export const customerService = {
           transaction_type: t.transaction_type || "withdrawal",
           card_type: t.card_type,
           transaction_date: t.transaction_date,
-          status: t.status || "completed",
           customer_id: t.customer_id,
           customer_name: rawName || null,
           customer_phone: rawPhone || null,

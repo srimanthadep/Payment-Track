@@ -52,7 +52,6 @@ erDiagram
         text transaction_type
         text card_type
         timestamp transaction_date
-        text status
         text customer_name
         text customer_phone
         text notes
@@ -149,7 +148,6 @@ Stores credit card withdrawals, repayments, customer charges, commissions, and p
 | `transaction_type` | `text` | NO | - | Type (`withdrawal`, `repayment`, etc.) |
 | `card_type` | `text` | YES | - | Card brand / category (`Visa`, `Mastercard`, `Amex`, etc.) |
 | `transaction_date` | `timestamptz` | NO | - | Date/time transaction occurred |
-| `status` | `text` | YES | - | State (`completed`, `pending`, `cancelled`) |
 | `customer_id` | `uuid` | YES | **FK** -> `customers.id` | Reference to canonical customer record |
 | `customer_name` | `text` | YES | - | Legacy/fallback customer name (e.g. for Chummi portal) |
 | `customer_phone` | `text` | YES | - | Legacy/fallback customer phone number |

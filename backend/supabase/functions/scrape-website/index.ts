@@ -169,8 +169,7 @@ serve(async (req) => {
             site_fee: siteFee,
             transaction_type: (extractedData.type || 'withdrawal').toLowerCase(),
             reference_number: extractedData.reference || `SCRAPED-${Date.now()}`,
-            notes: `Auto-scraped from ${config.name} on ${new Date().toISOString()}`,
-            status: 'completed'
+            notes: `Auto-scraped from ${config.name} on ${new Date().toISOString()}`
           })
           .select()
           .single();

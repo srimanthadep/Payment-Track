@@ -334,7 +334,6 @@ export const AddTransactionDialog = ({
       commission: commissionAmount,
       site_fee: siteFeeAmount,
       transaction_date: formData.transaction_date.toISOString(),
-      status: "completed",
       customer_id: customerId,
       customer_name: customerName,
       customer_phone: customerPhone,

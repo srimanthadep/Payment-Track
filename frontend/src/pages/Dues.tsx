@@ -27,7 +27,7 @@ const Dues = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
 
-  const { dues, isLoading, error, createDue, updateDue, addPayment, fetchDues } = useDues(
+  const { dues, isLoading, error, createDue, updateDue, addPayment, deleteDue, fetchDues } = useDues(
     user?.id
   );
 
@@ -188,7 +188,13 @@ const Dues = () => {
             </CardContent>
           </Card>
 
-          <DuesTable dues={dues} isLoading={isLoading} onUpdateDue={updateDue} onAddPayment={addPayment} />
+          <DuesTable
+            dues={dues}
+            isLoading={isLoading}
+            onUpdateDue={updateDue}
+            onAddPayment={addPayment}
+            onDeleteDue={deleteDue}
+          />
         </motion.div>
       </PullToRefresh>
 

@@ -59,7 +59,7 @@ export const ProfitChart = ({ userId, filters }: ProfitChartProps) => {
 
         let query = supabase
           .from("transactions")
-          .select("transaction_date, commission, site_fee, profit, portal_id, status, transaction_type, card_type, amount")
+          .select("transaction_date, commission, site_fee, profit, portal_id, transaction_type, card_type, amount")
           .eq("user_id", userId)
           .gte("transaction_date", startDate.toISOString());
 
@@ -80,9 +80,6 @@ export const ProfitChart = ({ userId, filters }: ProfitChartProps) => {
           if (filters) {
             if (filters.portals && filters.portals.length > 0) {
               filtered = filtered.filter((t: any) => filters.portals.includes(t.portal_id));
-            }
-            if (filters.status && filters.status.length > 0) {
-              filtered = filtered.filter((t: any) => filters.status.includes(t.status));
             }
             if (filters.transactionType && filters.transactionType.length > 0) {
               const types = filters.transactionType.map((x: string) => x.toLowerCase());

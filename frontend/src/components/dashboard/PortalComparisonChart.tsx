@@ -47,7 +47,7 @@ export const PortalComparisonChart = ({
     try {
       let query = supabase
         .from("transactions")
-        .select("amount, commission, site_fee, profit, transaction_date, portal_id, status, transaction_type, card_type, portals(name)")
+        .select("amount, commission, site_fee, profit, transaction_date, portal_id, transaction_type, card_type, portals(name)")
         .eq("user_id", userId);
 
       // Apply date filter based on selectedDate and period
@@ -110,9 +110,6 @@ export const PortalComparisonChart = ({
       if (filters) {
         if (filters.portals && filters.portals.length > 0) {
           filtered = filtered.filter((t: any) => filters.portals.includes(t.portal_id));
-        }
-        if (filters.status && filters.status.length > 0) {
-          filtered = filtered.filter((t: any) => filters.status.includes(t.status));
         }
         if (filters.transactionType && filters.transactionType.length > 0) {
           const types = filters.transactionType.map((x: string) => x.toLowerCase());

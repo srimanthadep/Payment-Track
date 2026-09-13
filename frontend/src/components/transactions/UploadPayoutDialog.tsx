@@ -24,7 +24,6 @@ type ParsedRow = {
   site_fee?: number; // website commission/charges
   transaction_date?: string; // ISO or parseable
   reference_number?: string;
-  status?: string; // pending | completed | failed
 };
 
 export const UploadPayoutDialog = ({ userId, open, onOpenChange }: UploadPayoutDialogProps) => {
@@ -132,7 +131,6 @@ export const UploadPayoutDialog = ({ userId, open, onOpenChange }: UploadPayoutD
       site_fee: toNum(siteFeeRaw) ?? 0,
       transaction_date: parseDate(dateRaw),
       reference_number: String(get(["reference", "reference_number", "ref"]) ?? "").trim() || undefined,
-      status: statusRaw === "pending" || statusRaw === "failed" ? statusRaw : "completed",
     };
   };
 
@@ -187,7 +185,6 @@ export const UploadPayoutDialog = ({ userId, open, onOpenChange }: UploadPayoutD
           site_fee: row.site_fee ?? 0,
           transaction_date: row.transaction_date || new Date().toISOString(),
           reference_number: row.reference_number || null,
-          status: row.status || "completed",
         });
       }
       if (batch.length === 0) {
@@ -228,7 +225,7 @@ export const UploadPayoutDialog = ({ userId, open, onOpenChange }: UploadPayoutD
               onChange={handleFileChange}
               className="mt-2"
             />
-            <p className="text-xs text-muted-foreground mt-2">Expected headers include: portal/site, type, amount, commission, site_fee, date, reference, status. We auto-detect common names.</p>
+            <p className="text-xs text-muted-foreground mt-2">Expected headers include: portal/site, type, amount, commission, site_fee, date, reference. We auto-detect common names.</p>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

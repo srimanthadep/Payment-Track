@@ -15,8 +15,18 @@ import { Due } from "@/hooks/useDues";
 import { EditableCell } from "./EditableCell";
 import { AddPaymentDialog } from "./AddPaymentDialog";
 import { format } from "date-fns";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Trash2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface DuesTableProps {
   dues: Due[];
@@ -26,6 +36,7 @@ interface DuesTableProps {
     dueId: string,
     input: { amount: number; date: string; method: string; notes?: string }
   ) => Promise<{ success: boolean; error: string | null }>;
+  onDeleteDue: (id: string) => Promise<{ success: boolean; error: string | null }>;
 }
 
 const formatCurrency = (amount: number) =>
@@ -57,10 +68,12 @@ const toIsoFromDateInput = (value: string) => {
   return parsed.toISOString();
 };
 
-export const DuesTable = ({ dues, isLoading, onUpdateDue, onAddPayment }: DuesTableProps) => {
+export const DuesTable = ({ dues, isLoading, onUpdateDue, onAddPayment, onDeleteDue }: DuesTableProps) => {
   const { toast } = useToast();
   const [query, setQuery] = useState("");
   const [activeDue, setActiveDue] = useState<Due | null>(null);
+  const [dueToDelete, setDueToDelete] = useState<Due | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const filteredDues = useMemo(() => {
     if (!query.trim()) return dues;
@@ -129,6 +142,26 @@ export const DuesTable = ({ dues, isLoading, onUpdateDue, onAddPayment }: DuesTa
     }
     toast({ title: "Payment added", description: `Payment recorded for ${activeDue.borrower_name}.` });
     setActiveDue(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!dueToDelete) return;
+    setIsDeleting(true);
+    const res = await onDeleteDue(dueToDelete.id);
+    setIsDeleting(false);
+    if (res.success) {
+      toast({
+        title: "Due Deleted",
+        description: `Due record for ${dueToDelete.borrower_name} has been deleted.`,
+      });
+      setDueToDelete(null);
+    } else {
+      toast({
+        title: "Error",
+        description: res.error || "Failed to delete due record.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -248,16 +281,27 @@ export const DuesTable = ({ dues, isLoading, onUpdateDue, onAddPayment }: DuesTa
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="text-center">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8 text-xs gap-1"
-                          onClick={() => setActiveDue(due)}
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                          Payment
-                        </Button>
+                      <TableCell className="text-center whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs gap-1"
+                            onClick={() => setActiveDue(due)}
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            Payment
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                            onClick={() => setDueToDelete(due)}
+                            title="Delete Due"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -347,15 +391,26 @@ export const DuesTable = ({ dues, isLoading, onUpdateDue, onAddPayment }: DuesTa
                     )}
                   </div>
 
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 text-xs gap-1"
-                    onClick={() => setActiveDue(due)}
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Add Payment
-                  </Button>
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs gap-1 flex-1"
+                      onClick={() => setActiveDue(due)}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add Payment
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 px-2.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20 gap-1"
+                      onClick={() => setDueToDelete(due)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
+                    </Button>
+                  </div>
                 </div>
               );
             })
@@ -369,6 +424,39 @@ export const DuesTable = ({ dues, isLoading, onUpdateDue, onAddPayment }: DuesTa
         onOpenChange={(open) => !open && setActiveDue(null)}
         onSubmit={handleAddPayment}
       />
+
+      <AlertDialog open={!!dueToDelete} onOpenChange={(open) => !open && !isDeleting && setDueToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Due Record?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the due record for{" "}
+              <span className="font-semibold text-foreground">{dueToDelete?.borrower_name}</span>{" "}
+              (Principal: {dueToDelete && formatCurrency(dueToDelete.principal_amount)})? This will permanently remove this due and all associated payments.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteConfirm();
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Due"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

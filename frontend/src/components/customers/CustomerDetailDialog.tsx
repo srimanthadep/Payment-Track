@@ -113,7 +113,6 @@ export const CustomerDetailDialog = ({
       site_fee: t.site_fee,
       profit: t.profit,
       reference_number: "",
-      status: t.status,
     }));
 
     const sanitizedName = customer.name.replace(/[^a-zA-Z0-9_-]/g, "_");

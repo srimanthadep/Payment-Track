@@ -76,7 +76,6 @@ interface Transaction {
   profit: number;
   transaction_date: string;
   reference_number?: string | null;
-  status: string;
   card_type: string | null;
   customer_id?: string | null;
   customer_name?: string | null;
@@ -105,13 +104,12 @@ export const TransactionsTable = ({
   const [filters, setFilters] = useState<FilterState>({
     dateRange: { from: null, to: null },
     portals: [],
-    status: [],
     transactionType: [],
     cardTypes: [],
     amountRange: { min: null, max: null },
   });
   const [sortConfig, setSortConfig] = useState<{
-    key: "date" | "portal" | "type" | "card_type" | "amount" | "commission" | "site_fee" | "profit" | "status";
+    key: "date" | "portal" | "type" | "card_type" | "amount" | "commission" | "site_fee" | "profit";
     direction: "asc" | "desc";
   }>({ key: "date", direction: "desc" });
 
@@ -158,7 +156,6 @@ export const TransactionsTable = ({
           site_fee,
           profit,
           transaction_date,
-          status,
           card_type,
           customer_id,
           customer_name,
@@ -292,10 +289,6 @@ export const TransactionsTable = ({
       filtered = filtered.filter((t) => filters.portals.includes(t.portal_id));
     }
 
-    // Status filter
-    if (filters.status.length > 0) {
-      filtered = filtered.filter((t) => filters.status.includes(t.status));
-    }
 
     // Transaction type filter
     if (filters.transactionType.length > 0) {
@@ -365,9 +358,6 @@ export const TransactionsTable = ({
           break;
         case "type":
           comparison = (a.transaction_type || "").localeCompare(b.transaction_type || "");
-          break;
-        case "status":
-          comparison = (a.status || "").localeCompare(b.status || "");
           break;
         default:
           comparison = new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime();
@@ -486,7 +476,6 @@ export const TransactionsTable = ({
         site_fee,
         profit,
         transaction_date,
-        status,
         card_type,
         notes,
         portals (
@@ -537,7 +526,6 @@ export const TransactionsTable = ({
           site_fee,
           profit,
           transaction_date,
-          status,
           card_type,
           notes,
           portals (
@@ -854,18 +842,6 @@ export const TransactionsTable = ({
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <Badge
-                        variant={
-                          transaction.status === "completed"
-                            ? "default"
-                            : transaction.status === "pending"
-                            ? "secondary"
-                            : "destructive"
-                        }
-                        className="text-[10px] px-1.5 py-0"
-                      >
-                        {transaction.status}
-                      </Badge>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -1064,19 +1040,6 @@ export const TransactionsTable = ({
                   )}
                 </div>
               </TableHead>
-              <TableHead
-                className="hidden md:table-cell cursor-pointer select-none hover:text-foreground"
-                onClick={() => handleSort("status")}
-              >
-                <div className="flex items-center gap-1">
-                  <span>Status</span>
-                  {sortConfig.key === "status" ? (
-                    sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
-                  ) : (
-                    <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
-                  )}
-                </div>
-              </TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -1150,19 +1113,6 @@ export const TransactionsTable = ({
                             : transaction.commission - transaction.site_fee
                         )}
                       </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                    <Badge
-                      variant={
-                        transaction.status === "completed"
-                          ? "default"
-                          : transaction.status === "pending"
-                          ? "secondary"
-                          : "destructive"
-                      }
-                    >
-                      {transaction.status}
-                    </Badge>
-                  </TableCell>
                   <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button
@@ -1219,7 +1169,6 @@ export const TransactionsTable = ({
                 <TableCell className="text-right font-bold text-success hidden sm:table-cell text-sm">
                   {formatCurrency(totals.profit)}
                 </TableCell>
-                <TableCell className="hidden md:table-cell" />
                 <TableCell className="text-right" />
               </TableRow>
             </TableFooter>

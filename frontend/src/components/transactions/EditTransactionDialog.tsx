@@ -47,7 +47,7 @@ interface EditTransactionDialogProps {
     commission: number;
     site_fee: number;
     reference_number: string | null;
-    status: string;
+    status?: string;
     transaction_date: string;
     card_type: string | null;
     customer_id?: string | null;
@@ -102,7 +102,6 @@ export const EditTransactionDialog = ({
     amount: "",
     commission: "",
     site_fee: "",
-    status: "completed",
     customer_name: "",
     customer_phone: "",
     transaction_date: new Date(),
@@ -179,7 +178,6 @@ export const EditTransactionDialog = ({
           transaction.site_fee && transaction.site_fee > 0
             ? transaction.site_fee.toString()
             : "",
-        status: transaction.status,
         customer_name: custName,
         customer_phone: custPhone,
         transaction_date: transaction.transaction_date
@@ -349,7 +347,6 @@ export const EditTransactionDialog = ({
       amount: parseFloat(formData.amount),
       commission: parseFloat(formData.commission || "0"),
       site_fee: formData.site_fee ? parseFloat(formData.site_fee) : 0,
-      status: formData.status,
       transaction_date: formData.transaction_date.toISOString(),
       customer_id: customerId,
       customer_name: customerName,
@@ -626,47 +623,25 @@ export const EditTransactionDialog = ({
             </div>
           )}
 
-          {/* 5. Portal & Status */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-portal">Portal</Label>
-              <Select
-                value={formData.portal_id}
-                onValueChange={handlePortalChange}
-                required
-              >
-                <SelectTrigger id="edit-portal">
-                  <SelectValue placeholder="Select portal" />
-                </SelectTrigger>
-                <SelectContent>
-                  {portals.map((portal) => (
-                    <SelectItem key={portal.id} value={portal.id}>
-                      {portal.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-status">Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, status: value })
-                }
-                required
-              >
-                <SelectTrigger id="edit-status">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="failed">Failed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          {/* 5. Portal */}
+          <div className="space-y-2">
+            <Label htmlFor="edit-portal">Portal</Label>
+            <Select
+              value={formData.portal_id}
+              onValueChange={handlePortalChange}
+              required
+            >
+              <SelectTrigger id="edit-portal">
+                <SelectValue placeholder="Select portal" />
+              </SelectTrigger>
+              <SelectContent>
+                {portals.map((portal) => (
+                  <SelectItem key={portal.id} value={portal.id}>
+                    {portal.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Conditional Customer Info for Chummi Portal */}

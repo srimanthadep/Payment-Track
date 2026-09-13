@@ -126,7 +126,7 @@ export const StatsCards = ({
         let query = supabase
           .from("transactions")
           .select(
-            "transaction_type, amount, commission, site_fee, transaction_date, card_type, notes, portal_id, status, portals(name)"
+            "transaction_type, amount, commission, site_fee, transaction_date, card_type, notes, portal_id, portals(name)"
           )
           .eq("user_id", userId);
 
@@ -186,7 +186,7 @@ export const StatsCards = ({
         if (error) {
           const fallbackRes = await supabase
             .from("transactions")
-            .select("transaction_type, amount, commission, site_fee, transaction_date, card_type, notes, portal_id, status")
+            .select("transaction_type, amount, commission, site_fee, transaction_date, card_type, notes, portal_id")
             .eq("user_id", userId);
           if (!fallbackRes.error && fallbackRes.data) {
             transactions = fallbackRes.data as any;
@@ -205,9 +205,6 @@ export const StatsCards = ({
               transactions = transactions.filter((t: any) =>
                 filters.portals.includes(t.portal_id)
               );
-            }
-            if (filters.status && filters.status.length > 0) {
-              transactions = transactions.filter((t: any) => filters.status.includes(t.status));
             }
             if (filters.transactionType && filters.transactionType.length > 0) {
               const types = filters.transactionType.map((x: string) => x.toLowerCase());

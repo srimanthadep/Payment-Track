@@ -11,7 +11,7 @@ export interface ExportTransaction {
   site_fee: number;
   profit?: number;
   reference_number?: string | null;
-  status: string;
+  status?: string;
 }
 
 const formatDate = (dateStr: string): string => {
@@ -54,7 +54,6 @@ export const exportTransactionsToCSV = (
     "Site Fee",
     "Profit",
     "Reference",
-    "Status",
   ];
 
   const rows = transactions.map((t, index) => {
@@ -74,7 +73,6 @@ export const exportTransactionsToCSV = (
       escapeCSV(Number(t.site_fee || 0).toFixed(2)),
       escapeCSV(profit.toFixed(2)),
       escapeCSV(t.reference_number || ""),
-      escapeCSV(t.status || "Completed"),
     ];
   });
 
@@ -141,7 +139,6 @@ export const exportTransactionsToExcel = (
       "Site Fee": Number(t.site_fee || 0),
       Profit: profit,
       Reference: t.reference_number || "",
-      Status: t.status || "Completed",
     };
   });
 
@@ -165,7 +162,6 @@ export const exportTransactionsToExcel = (
     "Site Fee": totalFee,
     Profit: totalProfit,
     Reference: "",
-    Status: "",
   });
 
   // Create worksheet
@@ -183,7 +179,6 @@ export const exportTransactionsToExcel = (
     { wch: 12 },  // Site Fee
     { wch: 14 },  // Profit
     { wch: 16 },  // Reference
-    { wch: 12 },  // Status
   ];
 
   // Create workbook

@@ -19,7 +19,6 @@ interface Transaction {
   commission: number;
   transaction_date: string;
   portal_id: string;
-  status: string;
   card_type: string | null;
   portals: {
     name: string;
@@ -39,7 +38,6 @@ export const RecentTransactions = ({ userId, filters }: RecentTransactionsProps)
         // Fetch more rows when filters are active so enough survive filtering
         const hasActiveFilters = filters && (
           filters.portals.length > 0 ||
-          filters.status.length > 0 ||
           filters.transactionType.length > 0 ||
           (filters.cardTypes && filters.cardTypes.length > 0) ||
           filters.amountRange.min !== null ||
@@ -57,7 +55,6 @@ export const RecentTransactions = ({ userId, filters }: RecentTransactionsProps)
             commission,
             transaction_date,
             portal_id,
-            status,
             card_type,
             portals (
               name
@@ -79,9 +76,6 @@ export const RecentTransactions = ({ userId, filters }: RecentTransactionsProps)
           if (filters) {
             if (filters.portals && filters.portals.length > 0) {
               result = result.filter((t) => filters.portals.includes(t.portal_id));
-            }
-            if (filters.status && filters.status.length > 0) {
-              result = result.filter((t) => filters.status.includes(t.status));
             }
             if (filters.transactionType && filters.transactionType.length > 0) {
               const types = filters.transactionType.map((x) => x.toLowerCase());

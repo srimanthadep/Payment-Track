@@ -21,7 +21,7 @@ interface TransactionWithUser {
   id: string;
   amount: number;
   transaction_type: string;
-  status: string;
+  status?: string;
   transaction_date: string;
   reference_number: string;
   commission: number;
@@ -218,7 +218,6 @@ export const AdminTransactions = () => {
       "Site Fee",
       "Profit",
       "Reference",
-      "Status",
     ];
 
     const csvData = filteredTransactions.map((tx) => [
@@ -231,7 +230,6 @@ export const AdminTransactions = () => {
       tx.site_fee || 0,
       tx.profit || 0,
       tx.reference_number || "",
-      tx.status,
     ]);
 
     const csvContent = [
@@ -288,14 +286,13 @@ export const AdminTransactions = () => {
               <TableHead className="text-xs sm:text-sm text-right hidden sm:table-cell">Site Fee</TableHead>
               <TableHead className="text-xs sm:text-sm text-right hidden sm:table-cell">Profit</TableHead>
               <TableHead className="text-xs sm:text-sm hidden lg:table-cell">Reference</TableHead>
-              <TableHead className="text-xs sm:text-sm hidden md:table-cell">Status</TableHead>
               <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredTransactions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center py-8">
+                <TableCell colSpan={10} className="text-center py-8">
                   <p className="text-sm text-muted-foreground">No transactions found</p>
                 </TableCell>
               </TableRow>
@@ -341,11 +338,6 @@ export const AdminTransactions = () => {
                   </TableCell>
                   <TableCell className="font-mono text-xs sm:text-sm hidden lg:table-cell">
                     {tx.reference_number || "-"}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <Badge variant={tx.status === "completed" ? "default" : "secondary"} className="text-[10px] sm:text-xs">
-                      {tx.status}
-                    </Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     <Button

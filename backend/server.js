@@ -230,7 +230,6 @@ async function handleScrapeWebsite(req, res) {
             transaction_type: (extractedData.type || "withdrawal").toLowerCase() === "repayment" ? "Repayment" : "Withdrawal",
             reference_number: extractedData.reference || `SCRAPED-${Date.now()}`,
             notes: `Auto-scraped from ${config.name} on ${new Date().toISOString()}`,
-            status: "completed",
           })
           .select()
           .single();

@@ -12,7 +12,7 @@ export interface PDFTransaction {
   profit?: number;
   transaction_date: string;
   reference_number?: string | null;
-  status: string;
+  status?: string;
   card_type?: string | null;
   portals?: {
     name: string;
@@ -847,7 +847,6 @@ export const exportToPDF = async ({
       formatINR(Number(t.commission || 0)),
       formatINR(Number(t.site_fee || 0)),
       formatINR(Number(profitVal)),
-      statusFormatted,
     ];
   });
 
@@ -863,13 +862,12 @@ export const exportToPDF = async ({
       formatINR(totalCommission),
       formatINR(totalSiteFee),
       formatINR(totalProfit),
-      "",
     ],
   ];
 
   // Render Itemized Table using autoTable
   autoTable(doc, {
-    head: [["S.No", "Date & Time", "Portal", "Type", "Card", "Amount (Rs)", "Comm (Rs)", "Fee (Rs)", "Profit (Rs)", "Status"]],
+    head: [["S.No", "Date & Time", "Portal", "Type", "Card", "Amount (Rs)", "Comm (Rs)", "Fee (Rs)", "Profit (Rs)"]],
     body: tableData,
     foot: tableFoot,
     showFoot: "lastPage",
@@ -907,14 +905,13 @@ export const exportToPDF = async ({
     columnStyles: {
       0: { halign: "center", cellWidth: 9 },  // S.No
       1: { halign: "left", cellWidth: 25 },    // Date & Time
-      2: { halign: "left", cellWidth: 17 },    // Portal
-      3: { halign: "left", cellWidth: 20 },    // Type
-      4: { halign: "left", cellWidth: 18 },    // Card
-      5: { halign: "right", cellWidth: 23 },   // Amount
-      6: { halign: "right", cellWidth: 18, textColor: [22, 163, 74] }, // Comm
-      7: { halign: "right", cellWidth: 16, textColor: [220, 38, 38] }, // Fee
-      8: { halign: "right", cellWidth: 20, fontStyle: "bold", textColor: [22, 163, 74] }, // Profit
-      9: { halign: "center", cellWidth: 20 },  // Status
+      2: { halign: "left", cellWidth: 20 },    // Portal
+      3: { halign: "left", cellWidth: 22 },    // Type
+      4: { halign: "left", cellWidth: 20 },    // Card
+      5: { halign: "right", cellWidth: 26 },   // Amount
+      6: { halign: "right", cellWidth: 20, textColor: [22, 163, 74] }, // Comm
+      7: { halign: "right", cellWidth: 18, textColor: [220, 38, 38] }, // Fee
+      8: { halign: "right", cellWidth: 22, fontStyle: "bold", textColor: [22, 163, 74] }, // Profit
     },
     margin: { left: margin, right: margin, bottom: 14 },
     didDrawPage: () => {

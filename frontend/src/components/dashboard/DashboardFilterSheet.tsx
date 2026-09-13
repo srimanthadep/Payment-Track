@@ -40,7 +40,6 @@ interface DashboardFilterSheetProps {
 const EMPTY_FILTERS: FilterState = {
   dateRange: { from: null, to: null },
   portals: [],
-  status: [],
   transactionType: [],
   cardTypes: [],
   amountRange: { min: null, max: null },

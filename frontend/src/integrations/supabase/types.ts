@@ -304,7 +304,6 @@ export type Database = {
           profit: number | null
           reference_number?: string | null
           site_fee: number | null
-          status: string | null
           transaction_date: string
           transaction_type: string
           updated_at: string
@@ -324,7 +323,6 @@ export type Database = {
           profit?: number | null
           reference_number?: string | null
           site_fee?: number | null
-          status?: string | null
           transaction_date?: string
           transaction_type: string
           updated_at?: string
@@ -344,7 +342,6 @@ export type Database = {
           profit?: number | null
           reference_number?: string | null
           site_fee?: number | null
-          status?: string | null
           transaction_date?: string
           transaction_type?: string
           updated_at?: string

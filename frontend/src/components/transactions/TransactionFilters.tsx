@@ -24,7 +24,7 @@ interface TransactionFiltersProps {
 export interface FilterState {
   dateRange: { from: Date | null; to: Date | null };
   portals: string[];
-  status: string[];
+  status?: string[];
   transactionType: string[];
   cardTypes: string[];
   amountRange: { min: number | null; max: number | null };
@@ -44,7 +44,6 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
   const [filters, setFilters] = useState<FilterState>({
     dateRange: { from: null, to: null },
     portals: [],
-    status: [],
     transactionType: [],
     cardTypes: [],
     amountRange: { min: null, max: null },
@@ -65,12 +64,6 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
     updateFilters({ portals: updated });
   };
 
-  const toggleStatus = (status: string) => {
-    const updated = filters.status.includes(status)
-      ? filters.status.filter((s) => s !== status)
-      : [...filters.status, status];
-    updateFilters({ status: updated });
-  };
 
   const toggleTransactionType = (type: string) => {
     const updated = filters.transactionType.includes(type)
@@ -126,7 +119,6 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
     const cleared: FilterState = {
       dateRange: { from: null, to: null },
       portals: [],
-      status: [],
       transactionType: [],
       cardTypes: [],
       amountRange: { min: null, max: null },
@@ -139,7 +131,6 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
     filters.dateRange.from ||
     filters.dateRange.to ||
     filters.portals.length > 0 ||
-    filters.status.length > 0 ||
     filters.transactionType.length > 0 ||
     (filters.cardTypes && filters.cardTypes.length > 0) ||
     filters.amountRange.min !== null ||
@@ -289,42 +280,6 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
                       className="rounded accent-primary"
                     />
                     <span className="text-xs font-medium">{portal.name}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
-
-        {/* Status Filter */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn(
-                "h-9 text-xs sm:text-sm w-full sm:w-auto font-medium transition-colors",
-                filters.status.length > 0
-                  ? "bg-primary/10 border-primary/30 text-primary"
-                  : "bg-background hover:bg-accent/50"
-              )}
-            >
-              <CheckCircle2 className="mr-1.5 h-3.5 w-3.5 text-primary flex-shrink-0" />
-              <span>Status</span> {filters.status.length > 0 && `(${filters.status.length})`}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-48 p-3 rounded-xl shadow-lg border-border/80" align="start">
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Select Status</Label>
-              <div className="space-y-1">
-                {["completed", "pending", "failed"].map((status) => (
-                  <label key={status} className="flex items-center space-x-2 cursor-pointer p-1.5 hover:bg-muted/70 rounded-md transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={filters.status.includes(status)}
-                      onChange={() => toggleStatus(status)}
-                      className="rounded accent-primary"
-                    />
-                    <span className="text-xs capitalize font-medium">{status}</span>
                   </label>
                 ))}
               </div>

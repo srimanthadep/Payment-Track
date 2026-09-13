@@ -200,7 +200,7 @@ const Dashboard = () => {
     startOfDay.setHours(0, 0, 0, 0);
     supabase
       .from("transactions")
-      .select("amount, profit, commission, site_fee, transaction_date, portal_id, status, transaction_type, card_type")
+      .select("amount, profit, commission, site_fee, transaction_date, portal_id, transaction_type, card_type")
       .eq("user_id", user.id)
       .gte("transaction_date", thirtyDaysAgo.toISOString())
       .then(({ data }) => {
