@@ -6,11 +6,13 @@ import { motion } from "framer-motion";
 interface CustomerStatsCardsProps {
   stats: CustomerSummaryStats;
   filteredCount: number;
+  isStaff?: boolean;
 }
 
 export const CustomerStatsCards = ({
   stats,
   filteredCount,
+  isStaff = false,
 }: CustomerStatsCardsProps) => {
   const formatCurrency = (amount: number) => {
     return `₹${amount.toLocaleString("en-IN", {
@@ -19,7 +21,7 @@ export const CustomerStatsCards = ({
     })}`;
   };
 
-  const cards = [
+  const allCards = [
     {
       title: "Total Customers",
       value: stats.totalCustomers.toString(),
@@ -45,6 +47,7 @@ export const CustomerStatsCards = ({
       subtitle: "Gross profit generated",
       icon: TrendingUp,
       gradient: "from-purple-500 to-violet-600",
+      staffHidden: true,
     },
     {
       title: "Avg Customer Value",
@@ -58,8 +61,10 @@ export const CustomerStatsCards = ({
     },
   ];
 
+  const cards = isStaff ? allCards.filter((c) => !c.staffHidden) : allCards;
+
   return (
-    <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+    <div className={`grid gap-3 sm:gap-4 ${isStaff ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2 lg:grid-cols-4"}`}>
       {cards.map((card, index) => {
         const Icon = card.icon;
         return (

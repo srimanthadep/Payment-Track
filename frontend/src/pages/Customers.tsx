@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { FloatingActionButton } from "@/components/ui/FloatingActionButton";
 import { Button } from "@/components/ui/button";
-import { Users, Plus, RefreshCw } from "lucide-react";
+import { Users, Plus, RefreshCw, UserPlus } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   customerService,
@@ -17,9 +17,13 @@ import { CustomerStatsCards } from "@/components/customers/CustomerStatsCards";
 import { CustomersTable } from "@/components/customers/CustomersTable";
 import { CustomerDetailDialog } from "@/components/customers/CustomerDetailDialog";
 import { AddTransactionDialog } from "@/components/transactions/AddTransactionDialog";
+import { AddCustomerDialog } from "@/components/customers/AddCustomerDialog";
+import { useRole } from "@/hooks/useRole";
 
 const Customers = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { isStaff, effectiveUserId } = useRole();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -27,7 +31,25 @@ const Customers = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerProfile | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isAddTxnOpen, setIsAddTxnOpen] = useState(false);
+  const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Check URL query param for ?add=true to trigger Add Customer dialog
+  useEffect(() => {
+    if (searchParams.get("add") === "true") {
+      setIsAddCustomerOpen(true);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("add");
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
+  // Listen for global open-add-customer event (e.g. from C shortcut)
+  useEffect(() => {
+    const handleOpenAdd = () => setIsAddCustomerOpen(true);
+    window.addEventListener("open-add-customer", handleOpenAdd);
+    return () => window.removeEventListener("open-add-customer", handleOpenAdd);
+  }, []);
 
   // Check auth session
   useEffect(() => {
@@ -52,24 +74,26 @@ const Customers = () => {
   }, [navigate]);
 
   // Fetch customers
+  const targetUserId = effectiveUserId || user?.id;
+
   const fetchCustomers = useCallback(async () => {
-    if (!user) return;
+    if (!targetUserId) return;
     setIsLoading(true);
-    const { data } = await customerService.getCustomers(user.id);
+    const { data } = await customerService.getCustomers(targetUserId);
     setCustomers(data || []);
     setIsLoading(false);
     setIsRefreshing(false);
-  }, [user]);
+  }, [targetUserId]);
 
   useEffect(() => {
-    if (user) {
+    if (targetUserId) {
       fetchCustomers();
     }
-  }, [user, refreshKey, fetchCustomers]);
+  }, [targetUserId, refreshKey, fetchCustomers]);
 
   // Realtime subscription for live updates when transactions or customers change
   useEffect(() => {
-    if (!user) return;
+    if (!targetUserId) return;
 
     const channel = supabase
       .channel("customers-realtime-feed")
@@ -79,7 +103,7 @@ const Customers = () => {
           event: "*",
           schema: "public",
           table: "transactions",
-          filter: `user_id=eq.${user.id}`,
+          filter: `user_id=eq.${targetUserId}`,
         },
         () => {
           fetchCustomers();
@@ -91,7 +115,7 @@ const Customers = () => {
           event: "*",
           schema: "public",
           table: "customers",
-          filter: `user_id=eq.${user.id}`,
+          filter: `user_id=eq.${targetUserId}`,
         },
         () => {
           fetchCustomers();
@@ -103,7 +127,7 @@ const Customers = () => {
           event: "*",
           schema: "public",
           table: "dues",
-          filter: `user_id=eq.${user.id}`,
+          filter: `user_id=eq.${targetUserId}`,
         },
         () => {
           fetchCustomers();
@@ -114,7 +138,7 @@ const Customers = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, fetchCustomers]);
+  }, [targetUserId, fetchCustomers]);
 
   // Keep selectedCustomer updated if background refresh happens
   useEffect(() => {
@@ -182,6 +206,16 @@ const Customers = () => {
 
               <Button
                 size="sm"
+                className="h-9 text-xs gap-1.5 shadow-xs bg-primary text-primary-foreground hover:bg-primary/90"
+                onClick={() => setIsAddCustomerOpen(true)}
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                <span>Add Customer</span>
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
                 className="h-9 text-xs gap-1.5 shadow-xs"
                 onClick={() => setIsAddTxnOpen(true)}
               >
@@ -195,6 +229,7 @@ const Customers = () => {
           <CustomerStatsCards
             stats={stats}
             filteredCount={customers.length}
+            isStaff={isStaff}
           />
 
           {/* Main Customers Table & Card List */}
@@ -203,6 +238,7 @@ const Customers = () => {
             isLoading={isLoading}
             onSelectCustomer={handleSelectCustomer}
             onAddTransactionClick={() => setIsAddTxnOpen(true)}
+            isStaff={isStaff}
           />
         </motion.div>
       </PullToRefresh>
@@ -214,29 +250,47 @@ const Customers = () => {
       />
 
       {/* Customer Detail Dialog */}
-      <CustomerDetailDialog
-        customer={selectedCustomer}
-        open={isDetailOpen}
-        onOpenChange={setIsDetailOpen}
-        userId={user.id}
-        onCustomerUpdated={() => {
-          setRefreshKey((k) => k + 1);
-        }}
-        onCustomerDeleted={() => {
-          setSelectedCustomer(null);
-          setRefreshKey((k) => k + 1);
-        }}
-      />
+      {targetUserId && (
+        <CustomerDetailDialog
+          customer={selectedCustomer}
+          open={isDetailOpen}
+          onOpenChange={setIsDetailOpen}
+          userId={targetUserId}
+          isStaff={isStaff}
+          onCustomerUpdated={() => {
+            setRefreshKey((k) => k + 1);
+          }}
+          onCustomerDeleted={() => {
+            setSelectedCustomer(null);
+            setRefreshKey((k) => k + 1);
+          }}
+        />
+      )}
+
+      {/* Add Customer Dialog (Standalone 2-input) */}
+      {targetUserId && (
+        <AddCustomerDialog
+          open={isAddCustomerOpen}
+          onOpenChange={setIsAddCustomerOpen}
+          userId={targetUserId}
+          onSuccess={() => {
+            setRefreshKey((k) => k + 1);
+          }}
+        />
+      )}
 
       {/* Add Transaction Dialog */}
-      <AddTransactionDialog
-        userId={user.id}
-        open={isAddTxnOpen}
-        onOpenChange={setIsAddTxnOpen}
-        onSuccess={() => {
-          setRefreshKey((k) => k + 1);
-        }}
-      />
+      {targetUserId && (
+        <AddTransactionDialog
+          userId={targetUserId}
+          open={isAddTxnOpen}
+          onOpenChange={setIsAddTxnOpen}
+          isStaff={isStaff}
+          onSuccess={() => {
+            setRefreshKey((k) => k + 1);
+          }}
+        />
+      )}
     </DashboardLayout>
   );
 };

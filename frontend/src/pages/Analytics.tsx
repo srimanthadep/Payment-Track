@@ -29,6 +29,7 @@ import { CashFlowForecast } from "@/components/analytics/CashFlowForecast";
 import { PredictionsDetailView } from "@/components/analytics/PredictionsDetailView";
 import { calculateEnsembleForecast } from "@/utils/forecastingEngine";
 import { DateSwitch } from "@/components/transactions/DateSwitch";
+import { useRole } from "@/hooks/useRole";
 import {
   format,
   subDays,
@@ -43,6 +44,14 @@ import {
   subWeeks,
   isThisWeek,
   isThisMonth,
+  startOfYear,
+  endOfYear,
+  subYears,
+  isSameMonth,
+  isSameYear,
+  differenceInCalendarDays,
+  eachDayOfInterval,
+  eachMonthOfInterval,
 } from "date-fns";
 
 // --- Types ---
@@ -95,6 +104,14 @@ interface AnalyticsProps {
 const Analytics = ({ defaultTab }: AnalyticsProps = {}) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { isStaff, isLoading: isRoleLoading } = useRole();
+
+  useEffect(() => {
+    if (!isRoleLoading && isStaff) {
+      navigate("/transactions", { replace: true });
+    }
+  }, [isStaff, isRoleLoading, navigate]);
+
   const activeView =
     searchParams.get("tab") === "predictions" || defaultTab === "predictions"
       ? "predictions"

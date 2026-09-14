@@ -19,11 +19,19 @@ import { useToast } from "@/hooks/use-toast";
 import { profileService, UserProfile } from "@/services/profileService";
 import { FilterState } from "@/components/transactions/TransactionFilters";
 import { getCardTypeDisplayName } from "@/utils/commissionCalculator";
+import { useRole } from "@/hooks/useRole";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isStaff, isLoading: isRoleLoading } = useRole();
   const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    if (!isRoleLoading && isStaff) {
+      navigate("/transactions", { replace: true });
+    }
+  }, [isStaff, isRoleLoading, navigate]);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);

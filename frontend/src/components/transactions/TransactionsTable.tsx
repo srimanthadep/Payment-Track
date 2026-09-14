@@ -41,6 +41,7 @@ interface TransactionsTableProps {
   selectedDate?: Date | null;
   dateRange?: { from: Date | null; to: Date | null };
   onPortalFilterSummaryChange?: (summary: { portalNames: string[]; totalAmount: number; count: number } | null) => void;
+  isStaff?: boolean;
 }
 
 const extractCustomerInfo = (t: { notes?: string | null; customer_name?: string | null; customer_phone?: string | null } | string | null | undefined) => {
@@ -91,6 +92,7 @@ export const TransactionsTable = ({
   selectedDate,
   dateRange,
   onPortalFilterSummaryChange,
+  isStaff = false,
 }: TransactionsTableProps) => {
   const { toast } = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -704,49 +706,55 @@ export const TransactionsTable = ({
             Live Sync
           </div>
         </div>
-        <div className="hidden sm:flex items-center gap-2">
-        {selectedIds.size > 0 && (
-          <Button variant="destructive" onClick={bulkDelete} className="text-xs sm:text-sm h-9 px-3">
-            <Trash2 className="mr-1.5 h-3.5 w-3.5" />Delete ({selectedIds.size})
-          </Button>
+        {!isStaff && (
+          <div className="hidden sm:flex items-center gap-2">
+            {selectedIds.size > 0 && (
+              <Button variant="destructive" onClick={bulkDelete} className="text-xs sm:text-sm h-9 px-3">
+                <Trash2 className="mr-1.5 h-3.5 w-3.5" />Delete ({selectedIds.size})
+              </Button>
+            )}
+            <Button onClick={exportToExcel} variant="outline" className="text-xs sm:text-sm h-9 px-3">
+              <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-emerald-600" />
+              Excel
+            </Button>
+            <Button onClick={exportToCSV} variant="outline" className="text-xs sm:text-sm h-9 px-3">
+              <Download className="mr-1.5 h-3.5 w-3.5 text-blue-600" />
+              CSV
+            </Button>
+            <Button onClick={handleExportPDF} variant="outline" className="text-xs sm:text-sm h-9 px-3">
+              <FileText className="mr-1.5 h-3.5 w-3.5 text-rose-600" />
+              PDF
+            </Button>
+          </div>
         )}
-        <Button onClick={exportToExcel} variant="outline" className="text-xs sm:text-sm h-9 px-3">
-          <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-emerald-600" />
-          Excel
-        </Button>
-        <Button onClick={exportToCSV} variant="outline" className="text-xs sm:text-sm h-9 px-3">
-          <Download className="mr-1.5 h-3.5 w-3.5 text-blue-600" />
-          CSV
-        </Button>
-        <Button onClick={handleExportPDF} variant="outline" className="text-xs sm:text-sm h-9 px-3">
-          <FileText className="mr-1.5 h-3.5 w-3.5 text-rose-600" />
-          PDF
-        </Button>
-        </div>
       </div>
 
       {/* Mobile: Export buttons and filters in integrated grid */}
       <div className="w-full">
-        <div className="grid grid-cols-3 gap-2 sm:hidden mb-2">
-          <Button onClick={exportToExcel} variant="outline" className="h-9 text-xs px-2">
-            <FileSpreadsheet className="mr-1 h-3 w-3 text-emerald-600" />
-            Excel
-          </Button>
-          <Button onClick={exportToCSV} variant="outline" className="h-9 text-xs px-2">
-            <Download className="mr-1 h-3 w-3 text-blue-600" />
-            CSV
-          </Button>
-          <Button onClick={handleExportPDF} variant="outline" className="h-9 text-xs px-2">
-            <FileText className="mr-1 h-3 w-3 text-rose-600" />
-            PDF
-          </Button>
-        </div>
-        {selectedIds.size > 0 && (
-          <div className="sm:hidden mb-2">
-            <Button variant="destructive" onClick={bulkDelete} className="w-full text-xs h-9">
-              <Trash2 className="mr-1.5 h-3.5 w-3.5" />Delete ({selectedIds.size})
-            </Button>
-          </div>
+        {!isStaff && (
+          <>
+            <div className="grid grid-cols-3 gap-2 sm:hidden mb-2">
+              <Button onClick={exportToExcel} variant="outline" className="h-9 text-xs px-2">
+                <FileSpreadsheet className="mr-1 h-3 w-3 text-emerald-600" />
+                Excel
+              </Button>
+              <Button onClick={exportToCSV} variant="outline" className="h-9 text-xs px-2">
+                <Download className="mr-1 h-3 w-3 text-blue-600" />
+                CSV
+              </Button>
+              <Button onClick={handleExportPDF} variant="outline" className="h-9 text-xs px-2">
+                <FileText className="mr-1 h-3 w-3 text-rose-600" />
+                PDF
+              </Button>
+            </div>
+            {selectedIds.size > 0 && (
+              <div className="sm:hidden mb-2">
+                <Button variant="destructive" onClick={bulkDelete} className="w-full text-xs h-9">
+                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />Delete ({selectedIds.size})
+                </Button>
+              </div>
+            )}
+          </>
         )}
         <TransactionFilters portals={portals} onFiltersChange={setFilters} />
 
@@ -817,7 +825,9 @@ export const TransactionsTable = ({
                 >
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <Checkbox checked={selectedIds.has(transaction.id)} onCheckedChange={() => toggleSelect(transaction.id)} className="flex-shrink-0" />
+                      {!isStaff && (
+                        <Checkbox checked={selectedIds.has(transaction.id)} onCheckedChange={() => toggleSelect(transaction.id)} className="flex-shrink-0" />
+                      )}
                       <div className="min-w-0 flex-1">
                         {(() => {
                           const { date, time } = formatDateTimeParts(transaction.transaction_date);
@@ -841,24 +851,26 @@ export const TransactionsTable = ({
                         })()}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEditClick(transaction)}
-                        className="h-6 w-6 p-0"
-                      >
-                        <Edit className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteClick(transaction.id)}
-                        className="text-destructive hover:text-destructive h-6 w-6 p-0"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
+                    {!isStaff && (
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEditClick(transaction)}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteClick(transaction.id)}
+                          className="text-destructive hover:text-destructive h-6 w-6 p-0"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs">
@@ -876,20 +888,24 @@ export const TransactionsTable = ({
                       <span className="text-[10px] text-muted-foreground whitespace-nowrap">Amount</span>
                       <span className="font-semibold text-right">{formatCurrency(transaction.amount)}</span>
                     </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">Commission</span>
-                      <span className="text-success font-medium text-right">{formatCurrency(transaction.commission)}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 col-span-2">
-                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">Profit</span>
-                      <span className="text-success font-semibold text-right">
-                        {formatCurrency(
-                          transaction.profit !== undefined
-                            ? transaction.profit
-                            : transaction.commission - transaction.site_fee
-                        )}
-                      </span>
-                    </div>
+                    {!isStaff && (
+                      <>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">Commission</span>
+                          <span className="text-success font-medium text-right">{formatCurrency(transaction.commission)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 col-span-2">
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">Profit</span>
+                          <span className="text-success font-semibold text-right">
+                            {formatCurrency(
+                              transaction.profit !== undefined
+                                ? transaction.profit
+                                : transaction.commission - transaction.site_fee
+                            )}
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </motion.div>
               ))}
@@ -902,20 +918,22 @@ export const TransactionsTable = ({
                   <span className="text-muted-foreground">Total ({totals.count} {totals.count === 1 ? "txn" : "txns"})</span>
                   <span className="text-sm font-bold text-foreground">{formatCurrency(totals.amount)}</span>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-xs pt-2 border-t border-border/50">
-                  <div>
-                    <div className="text-[10px] text-muted-foreground">Commission</div>
-                    <div className="font-semibold text-success">{formatCurrency(totals.commission)}</div>
+                {!isStaff && (
+                  <div className="grid grid-cols-3 gap-2 text-xs pt-2 border-t border-border/50">
+                    <div>
+                      <div className="text-[10px] text-muted-foreground">Commission</div>
+                      <div className="font-semibold text-success">{formatCurrency(totals.commission)}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-muted-foreground">Site Fee</div>
+                      <div className="font-semibold text-destructive">{formatCurrency(totals.siteFee)}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[10px] text-muted-foreground">Net Profit</div>
+                      <div className="font-bold text-success">{formatCurrency(totals.profit)}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-[10px] text-muted-foreground">Site Fee</div>
-                    <div className="font-semibold text-destructive">{formatCurrency(totals.siteFee)}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-[10px] text-muted-foreground">Net Profit</div>
-                    <div className="font-bold text-success">{formatCurrency(totals.profit)}</div>
-                  </div>
-                </div>
+                )}
               </div>
             )}
             {hasMore && (
@@ -935,7 +953,7 @@ export const TransactionsTable = ({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[40px]"><Checkbox checked={selectAll} onCheckedChange={toggleSelectAll} /></TableHead>
+              {!isStaff && <TableHead className="w-[40px]"><Checkbox checked={selectAll} onCheckedChange={toggleSelectAll} /></TableHead>}
               <TableHead
                 className="whitespace-nowrap cursor-pointer select-none hover:text-foreground"
                 onClick={() => handleSort("date")}
@@ -976,7 +994,7 @@ export const TransactionsTable = ({
                 </div>
               </TableHead>
               <TableHead
-                className="hidden md:table-cell cursor-pointer select-none hover:text-foreground"
+                className={`${isStaff ? "" : "hidden md:table-cell"} cursor-pointer select-none hover:text-foreground`}
                 onClick={() => handleSort("card_type")}
               >
                 <div className="flex items-center gap-1">
@@ -1001,52 +1019,56 @@ export const TransactionsTable = ({
                   )}
                 </div>
               </TableHead>
-              <TableHead
-                className="text-right cursor-pointer select-none hover:text-foreground"
-                onClick={() => handleSort("commission")}
-              >
-                <div className="flex items-center justify-end gap-1">
-                  <span>Commission</span>
-                  {sortConfig.key === "commission" ? (
-                    sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
-                  ) : (
-                    <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
-                  )}
-                </div>
-              </TableHead>
-              <TableHead
-                className="text-right hidden sm:table-cell cursor-pointer select-none hover:text-foreground"
-                onClick={() => handleSort("site_fee")}
-              >
-                <div className="flex items-center justify-end gap-1">
-                  <span>Site Fee</span>
-                  {sortConfig.key === "site_fee" ? (
-                    sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
-                  ) : (
-                    <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
-                  )}
-                </div>
-              </TableHead>
-              <TableHead
-                className="text-right hidden sm:table-cell cursor-pointer select-none hover:text-foreground"
-                onClick={() => handleSort("profit")}
-              >
-                <div className="flex items-center justify-end gap-1">
-                  <span>Profit</span>
-                  {sortConfig.key === "profit" ? (
-                    sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
-                  ) : (
-                    <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
-                  )}
-                </div>
-              </TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              {!isStaff && (
+                <>
+                  <TableHead
+                    className="text-right cursor-pointer select-none hover:text-foreground"
+                    onClick={() => handleSort("commission")}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Commission</span>
+                      {sortConfig.key === "commission" ? (
+                        sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                      ) : (
+                        <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
+                      )}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-right hidden sm:table-cell cursor-pointer select-none hover:text-foreground"
+                    onClick={() => handleSort("site_fee")}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Site Fee</span>
+                      {sortConfig.key === "site_fee" ? (
+                        sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                      ) : (
+                        <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
+                      )}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-right hidden sm:table-cell cursor-pointer select-none hover:text-foreground"
+                    onClick={() => handleSort("profit")}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Profit</span>
+                      {sortConfig.key === "profit" ? (
+                        sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                      ) : (
+                        <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
+                      )}
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
               {filteredTransactions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="p-0 border-0">
+                <TableCell colSpan={isStaff ? 5 : 10} className="p-0 border-0">
                   <EmptyState
                     title="No Transactions Found"
                     description="No transactions match the selected date or active filters. Try clearing search filters or changing the period tab."
@@ -1058,7 +1080,7 @@ export const TransactionsTable = ({
                 <>
                   {displayedTransactions.map((transaction) => (
                 <TableRow key={transaction.id}>
-                      <TableCell><Checkbox checked={selectedIds.has(transaction.id)} onCheckedChange={() => toggleSelect(transaction.id)} /></TableCell>
+                      {!isStaff && <TableCell><Checkbox checked={selectedIds.has(transaction.id)} onCheckedChange={() => toggleSelect(transaction.id)} /></TableCell>}
                   <TableCell className="whitespace-nowrap">
                     {(() => {
                       const { date, time } = formatDateTimeParts(transaction.transaction_date);
@@ -1094,18 +1116,20 @@ export const TransactionsTable = ({
                         : "-"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell text-xs">
+                  <TableCell className={`${isStaff ? "" : "hidden md:table-cell"} text-xs`}>
                     {transaction.card_type ? getCardTypeDisplayName(transaction.card_type as CardType) : "-"}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right font-semibold">
                     {formatCurrency(transaction.amount)}
                   </TableCell>
-                  <TableCell className="text-right text-success">
-                    {formatCurrency(transaction.commission)}
-                  </TableCell>
+                  {!isStaff && (
+                    <>
+                      <TableCell className="text-right text-success">
+                        {formatCurrency(transaction.commission)}
+                      </TableCell>
                       <TableCell className="text-right text-destructive hidden sm:table-cell">
-                    {formatCurrency(transaction.site_fee)}
-                  </TableCell>
+                        {formatCurrency(transaction.site_fee)}
+                      </TableCell>
                       <TableCell className="text-right font-semibold text-success hidden sm:table-cell">
                         {formatCurrency(
                           transaction.profit !== undefined
@@ -1113,7 +1137,7 @@ export const TransactionsTable = ({
                             : transaction.commission - transaction.site_fee
                         )}
                       </TableCell>
-                  <TableCell className="text-right">
+                      <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button
                             variant="ghost"
@@ -1122,21 +1146,23 @@ export const TransactionsTable = ({
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteClick(transaction.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteClick(transaction.id)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </TableCell>
+                    </>
+                  )}
                     </TableRow>
                   ))}
                   {hasMore && (
                     <TableRow>
-                      <TableCell colSpan={10} ref={loadMoreRef} className="text-center py-4">
+                      <TableCell colSpan={isStaff ? 5 : 10} ref={loadMoreRef} className="text-center py-4">
                         {isLoading && <div className="text-sm text-muted-foreground">Loading more...</div>}
                   </TableCell>
                 </TableRow>
@@ -1146,31 +1172,47 @@ export const TransactionsTable = ({
           </TableBody>
           {filteredTransactions.length > 0 && (
             <TableFooter className="bg-muted/50 font-semibold border-t-2 border-border/80">
-              <TableRow className="hover:bg-transparent">
-                <TableCell><div className="w-[40px]" /></TableCell>
-                <TableCell colSpan={3} className="font-bold text-foreground">
-                  <div className="flex items-center gap-2">
-                    <span>Total</span>
-                    <Badge variant="outline" className="text-[11px] font-normal px-2 py-0">
-                      {totals.count} {totals.count === 1 ? "transaction" : "transactions"}
-                    </Badge>
-                  </div>
-                </TableCell>
-                <TableCell className="hidden md:table-cell" />
-                <TableCell className="text-right font-bold text-foreground text-sm">
-                  {formatCurrency(totals.amount)}
-                </TableCell>
-                <TableCell className="text-right font-bold text-success text-sm">
-                  {formatCurrency(totals.commission)}
-                </TableCell>
-                <TableCell className="text-right font-bold text-destructive hidden sm:table-cell text-sm">
-                  {formatCurrency(totals.siteFee)}
-                </TableCell>
-                <TableCell className="text-right font-bold text-success hidden sm:table-cell text-sm">
-                  {formatCurrency(totals.profit)}
-                </TableCell>
-                <TableCell className="text-right" />
-              </TableRow>
+              {isStaff ? (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={4} className="font-bold text-foreground">
+                    <div className="flex items-center gap-2">
+                      <span>Total</span>
+                      <Badge variant="outline" className="text-[11px] font-normal px-2 py-0">
+                        {totals.count} {totals.count === 1 ? "transaction" : "transactions"}
+                      </Badge>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right font-bold text-foreground text-sm">
+                    {formatCurrency(totals.amount)}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell><div className="w-[40px]" /></TableCell>
+                  <TableCell colSpan={3} className="font-bold text-foreground">
+                    <div className="flex items-center gap-2">
+                      <span>Total</span>
+                      <Badge variant="outline" className="text-[11px] font-normal px-2 py-0">
+                        {totals.count} {totals.count === 1 ? "transaction" : "transactions"}
+                      </Badge>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell" />
+                  <TableCell className="text-right font-bold text-foreground text-sm">
+                    {formatCurrency(totals.amount)}
+                  </TableCell>
+                  <TableCell className="text-right font-bold text-success text-sm">
+                    {formatCurrency(totals.commission)}
+                  </TableCell>
+                  <TableCell className="text-right font-bold text-destructive hidden sm:table-cell text-sm">
+                    {formatCurrency(totals.siteFee)}
+                  </TableCell>
+                  <TableCell className="text-right font-bold text-success hidden sm:table-cell text-sm">
+                    {formatCurrency(totals.profit)}
+                  </TableCell>
+                  <TableCell className="text-right" />
+                </TableRow>
+              )}
             </TableFooter>
           )}
         </Table>
@@ -1178,7 +1220,7 @@ export const TransactionsTable = ({
       </div>
 
       {/* Mobile sticky bulk actions */}
-      {selectedIds.size > 0 && (
+      {!isStaff && selectedIds.size > 0 && (
         <div className="sm:hidden fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-2.5">
           <div className="flex items-center justify-between gap-2">
             <div className="text-xs font-medium">Selected: {selectedIds.size}</div>

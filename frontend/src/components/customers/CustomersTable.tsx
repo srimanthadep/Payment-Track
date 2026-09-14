@@ -33,6 +33,7 @@ interface CustomersTableProps {
   isLoading: boolean;
   onSelectCustomer: (customer: CustomerProfile) => void;
   onAddTransactionClick?: () => void;
+  isStaff?: boolean;
 }
 
 type SortField = "volume" | "profit" | "transactions" | "date" | "name";
@@ -43,6 +44,7 @@ export const CustomersTable = ({
   isLoading,
   onSelectCustomer,
   onAddTransactionClick,
+  isStaff = false,
 }: CustomersTableProps) => {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
@@ -142,18 +144,20 @@ export const CustomersTable = ({
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-xs h-9 gap-1.5 shadow-xs flex-1 sm:flex-initial"
-            onClick={handleExportCSV}
-            disabled={filteredCustomers.length === 0}
-          >
-            <Download className="h-3.5 w-3.5" />
-            Export
-          </Button>
-        </div>
+        {!isStaff && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs h-9 gap-1.5 shadow-xs flex-1 sm:flex-initial"
+              onClick={handleExportCSV}
+              disabled={filteredCustomers.length === 0}
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Loading Skeleton */}
@@ -227,15 +231,17 @@ export const CustomersTable = ({
                       <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
                     </div>
                   </TableHead>
-                  <TableHead
-                    className="text-xs font-semibold text-right cursor-pointer select-none"
-                    onClick={() => handleSort("profit")}
-                  >
-                    <div className="flex items-center justify-end gap-1.5">
-                      <span>Profit Earned</span>
-                      <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
-                    </div>
-                  </TableHead>
+                  {!isStaff && (
+                    <TableHead
+                      className="text-xs font-semibold text-right cursor-pointer select-none"
+                      onClick={() => handleSort("profit")}
+                    >
+                      <div className="flex items-center justify-end gap-1.5">
+                        <span>Profit Earned</span>
+                        <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
+                      </div>
+                    </TableHead>
+                  )}
                   <TableHead className="text-xs font-semibold text-right">
                     Avg Ticket
                   </TableHead>
@@ -311,11 +317,13 @@ export const CustomersTable = ({
                       </TableCell>
 
                       {/* Profit */}
-                      <TableCell className="text-right font-semibold text-emerald-600 dark:text-emerald-400">
-                        ₹{customer.totalProfit.toLocaleString("en-IN", {
-                          minimumFractionDigits: 0,
-                        })}
-                      </TableCell>
+                      {!isStaff && (
+                        <TableCell className="text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                          ₹{customer.totalProfit.toLocaleString("en-IN", {
+                            minimumFractionDigits: 0,
+                          })}
+                        </TableCell>
+                      )}
 
                       {/* Avg Ticket */}
                       <TableCell className="text-right text-xs text-muted-foreground">
@@ -405,7 +413,7 @@ export const CustomersTable = ({
                     </Badge>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 pt-1 text-xs border-t border-border/60">
+                  <div className={`grid ${isStaff ? "grid-cols-1" : "grid-cols-2"} gap-2 pt-1 text-xs border-t border-border/60`}>
                     <div>
                       <span className="text-[10px] text-muted-foreground block">
                         Total Volume
@@ -415,14 +423,16 @@ export const CustomersTable = ({
                       </span>
                     </div>
 
-                    <div className="text-right">
-                      <span className="text-[10px] text-muted-foreground block">
-                        Total Profit
-                      </span>
-                      <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400">
-                        ₹{customer.totalProfit.toLocaleString("en-IN")}
-                      </span>
-                    </div>
+                    {!isStaff && (
+                      <div className="text-right">
+                        <span className="text-[10px] text-muted-foreground block">
+                          Total Profit
+                        </span>
+                        <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400">
+                          ₹{customer.totalProfit.toLocaleString("en-IN")}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1 border-t border-border/40">

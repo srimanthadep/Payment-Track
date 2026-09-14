@@ -7,18 +7,36 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Enable CORS
-const allowedOrigins = process.env.FRONTEND_URL
-  ? process.env.FRONTEND_URL.split(",").map((url) => url.trim())
-  : "*";
-
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin) return callback(null, true);
+
+      const allowedEnv = process.env.FRONTEND_URL;
+      if (!allowedEnv || allowedEnv === "*" || allowedEnv.trim() === "") {
+        return callback(null, true);
+      }
+
+      const allowedList = allowedEnv.split(",").map((u) => u.trim());
+      if (
+        allowedList.includes("*") ||
+        allowedList.includes(origin) ||
+        origin.startsWith("http://localhost:") ||
+        origin.startsWith("http://127.0.0.1:")
+      ) {
+        return callback(null, true);
+      }
+
+      return callback(null, true);
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "apikey", "x-client-info"],
   })
 );
+
+app.options("*", cors());
 
 app.use(express.json());
 
@@ -63,7 +81,7 @@ async function handleRegisterUser(req, res) {
       });
     }
 
-    const { email, password, full_name, business_name, make_admin, username } = req.body;
+    const { email, password, full_name, business_name, make_admin, make_staff, role, username } = req.body;
 
     // Support both direct email and username (map to @paymenttrack.com)
     let userEmail = email ? email.trim().toLowerCase() : "";
@@ -107,14 +125,30 @@ async function handleRegisterUser(req, res) {
       return res.status(500).json({ error: "User creation failed: missing id" });
     }
 
-    // 2. Upsert profile with role
-    const roleToAssign = make_admin ? "admin" : "user";
+    // 2. Upsert profile with role and owner_id
+    let roleToAssign = "user";
+    let ownerIdToAssign = null;
+    if (role === "admin" || make_admin) {
+      roleToAssign = "admin";
+    } else if (role === "staff" || make_staff) {
+      roleToAssign = "staff";
+      const { data: adminUser } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("role", "admin")
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      ownerIdToAssign = adminUser?.id || "98cab8fb-b582-493f-91a0-b8f3954a1366";
+    }
+
     await supabase.from("profiles").upsert({
       id: newUserId,
       email: userEmail,
       full_name: displayName,
       business_name: business_name || "My Business",
       role: roleToAssign,
+      owner_id: ownerIdToAssign,
     });
 
     return res.status(200).json({

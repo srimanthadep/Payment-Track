@@ -15,12 +15,14 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Upload, Layers } from "lucide-react";
 import { motion } from "framer-motion";
 import { subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
+import { useRole } from "@/hooks/useRole";
 
 export type TransactionPeriod = "daily" | "weekly" | "monthly" | "all";
 
 const Transactions = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { isStaff, effectiveUserId } = useRole();
   const [user, setUser] = useState<User | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [managePortalsOpen, setManagePortalsOpen] = useState(false);
@@ -218,9 +220,9 @@ const Transactions = () => {
           </div>
 
           {/* Action Buttons Row */}
-          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
-              className="w-full sm:w-auto text-sm h-9 hidden sm:flex items-center gap-2 shadow-xs"
+              className="text-sm h-9 flex items-center gap-2 shadow-xs"
               onClick={() => setIsDialogOpen(true)}
             >
               <Plus className="h-3.5 w-3.5" />
@@ -229,45 +231,55 @@ const Transactions = () => {
                 N
               </kbd>
             </Button>
-            <Button
-              className="w-full sm:w-auto text-xs sm:text-sm h-9 flex items-center justify-center gap-1.5"
-              variant="secondary"
-              onClick={() => setUploadOpen(true)}
-            >
-              <Upload className="h-3.5 w-3.5" />
-              Import Payouts
-            </Button>
-            <Button
-              className="w-full sm:w-auto text-xs sm:text-sm h-9 flex items-center justify-center gap-1.5"
-              variant="outline"
-              onClick={() => setManagePortalsOpen(true)}
-            >
-              <Layers className="h-3.5 w-3.5" />
-              Manage Portals
-            </Button>
+            {!isStaff && (
+              <>
+                <Button
+                  className="w-full sm:w-auto text-xs sm:text-sm h-9 flex items-center justify-center gap-1.5"
+                  variant="secondary"
+                  onClick={() => setUploadOpen(true)}
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  Import Payouts
+                </Button>
+                <Button
+                  className="w-full sm:w-auto text-xs sm:text-sm h-9 flex items-center justify-center gap-1.5"
+                  variant="outline"
+                  onClick={() => setManagePortalsOpen(true)}
+                >
+                  <Layers className="h-3.5 w-3.5" />
+                  Manage Portals
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Transactions Table with Period / Date Filter applied */}
-          <TransactionsTable
-            userId={user.id}
-            selectedDate={period === "daily" ? selectedDate : null}
-            dateRange={dateRange}
-            onPortalFilterSummaryChange={setPortalSummary}
-            key={`tx-table-${refreshKey}`}
-          />
+          {user && (
+            <TransactionsTable
+              userId={effectiveUserId || user.id}
+              selectedDate={period === "daily" ? selectedDate : null}
+              dateRange={dateRange}
+              onPortalFilterSummaryChange={setPortalSummary}
+              isStaff={isStaff}
+              key={`tx-table-${refreshKey}-${effectiveUserId || user.id}`}
+            />
+          )}
 
-          <AddTransactionDialog
-            userId={user.id}
-            open={isDialogOpen}
-            onOpenChange={setIsDialogOpen}
-            portalsRefreshKey={portalsRefreshKey}
-            onSuccess={(addedDate) => {
-              setRefreshKey((k) => k + 1);
-              if (addedDate) {
-                setSelectedDate(addedDate);
-              }
-            }}
-          />
+          {user && (
+            <AddTransactionDialog
+              userId={effectiveUserId || user.id}
+              open={isDialogOpen}
+              onOpenChange={setIsDialogOpen}
+              portalsRefreshKey={portalsRefreshKey}
+              isStaff={isStaff}
+              onSuccess={(addedDate) => {
+                setRefreshKey((k) => k + 1);
+                if (addedDate) {
+                  setSelectedDate(addedDate);
+                }
+              }}
+            />
+          )}
 
           <ManagePortalsDialog
             open={managePortalsOpen}

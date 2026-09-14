@@ -19,6 +19,7 @@ import {
   ScrollText,
   Users,
   HandCoins,
+  Keyboard,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,8 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { CommandPalette } from "@/components/ui/CommandPalette";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { useRole } from "@/hooks/useRole";
+import { KeyboardShortcutsDialog } from "@/components/ui/KeyboardShortcutsDialog";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -40,44 +43,29 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const { role, isAdmin, isStaff } = useRole();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   useEffect(() => {
     profileService.getUserProfile().then((p) => {
       setUserProfile(p);
-      if (p?.id) {
-        checkAdminRole(p.id);
-      }
     });
     return profileService.subscribe(() => {
       profileService.getUserProfile().then((p) => {
         setUserProfile(p);
-        if (p?.id) {
-          checkAdminRole(p.id);
-        }
       });
     });
   }, []);
 
-  const checkAdminRole = async (userId: string) => {
-    try {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", userId)
-        .maybeSingle();
-
-      setIsAdmin(profile?.role === "admin");
-    } catch {
-      setIsAdmin(false);
-    }
-  };
-
   // Global shortcuts:
   // 1. Ctrl+K / Cmd+K for command palette search
-  // 2. 'N' key to open Add Transaction dialog
+  // 2. 'N' key to open Add Transaction dialog (all roles)
+  // 3. 'E' key to open Expenses / Add Expense (all roles)
+  // 4. 'D' key to open Dashboard (owner/admin only)
+  // 5. 'C' key to open Add Customer (owner/admin only)
+  // 6. '?' key to open Shortcuts dialog (owner/admin only)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // 1. Search shortcut
@@ -87,39 +75,88 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         return;
       }
 
-      // 2. 'n' / 'N' shortcut for Add Transaction
-      if (e.key.toLowerCase() === "n" && !e.ctrlKey && !e.altKey && !e.metaKey) {
-        const target = e.target as HTMLElement | null;
-        if (
-          target &&
-          (target.tagName === "INPUT" ||
-            target.tagName === "TEXTAREA" ||
-            target.tagName === "SELECT" ||
-            target.isContentEditable ||
-            target.closest("input, textarea, select, [contenteditable='true']") ||
-            target.closest("[role='dialog']") ||
-            target.closest(".monaco-editor"))
-        ) {
-          return;
-        }
+      // Input field or modal protection
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable ||
+          target.closest("input, textarea, select, [contenteditable='true']") ||
+          target.closest("[role='dialog']") ||
+          target.closest(".monaco-editor"))
+      ) {
+        return;
+      }
 
-        // Do not open if another modal dialog or alert is already active
-        const hasOpenDialog = document.querySelector("[role='dialog'], [role='alertdialog']");
-        if (hasOpenDialog) {
-          return;
-        }
+      // Do not trigger if modal dialog is open
+      const hasOpenDialog = document.querySelector("[role='dialog'], [role='alertdialog']");
+      if (hasOpenDialog) {
+        return;
+      }
 
+      if (e.ctrlKey || e.altKey || e.metaKey) {
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+
+      // 2. 'n' / 'N' shortcut for Add Transaction (Staff + Owner)
+      if (key === "n") {
         e.preventDefault();
         if (location.pathname === "/transactions") {
           window.dispatchEvent(new CustomEvent("open-add-transaction"));
         } else {
           navigate("/transactions?add=true");
         }
+        return;
+      }
+
+      // 3. 'e' / 'E' shortcut for Expenses (Staff + Owner)
+      if (key === "e") {
+        e.preventDefault();
+        if (location.pathname === "/expenses") {
+          window.dispatchEvent(new CustomEvent("open-add-expense"));
+        } else {
+          navigate("/expenses?add=true");
+        }
+        return;
+      }
+
+      // Staff users are restricted to 'N' and 'E' shortcuts only
+      if (isStaff) {
+        return;
+      }
+
+      // 4. 'd' / 'D' shortcut for Dashboard (Owner/Admin only)
+      if (key === "d") {
+        e.preventDefault();
+        navigate("/dashboard");
+        return;
+      }
+
+      // 5. 'c' / 'C' shortcut for Add Customer (Owner/Admin only)
+      if (key === "c") {
+        e.preventDefault();
+        if (location.pathname === "/customers") {
+          window.dispatchEvent(new CustomEvent("open-add-customer"));
+        } else {
+          navigate("/customers?add=true");
+        }
+        return;
+      }
+
+      // 6. '?' shortcut for Shortcuts Help Dialog (Owner/Admin only)
+      if (e.key === "?") {
+        e.preventDefault();
+        setShortcutsOpen(true);
+        return;
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [location.pathname, navigate]);
+  }, [location.pathname, navigate, isStaff]);
 
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();
@@ -133,10 +170,16 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     } else {
       activityLogService.log("auth.logout", "auth", "Logged out successfully");
       setUserProfile(null);
-      setIsAdmin(false);
       navigate("/auth");
     }
   };
+
+  // Staff can ONLY access Transactions, Expenses, and Customers
+  const staffNavItems = [
+    { name: "Transactions", href: "/transactions", icon: Receipt },
+    { name: "Expenses", href: "/expenses", icon: Wallet },
+    { name: "Customers", href: "/customers", icon: Users },
+  ];
 
   const baseNavItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -150,17 +193,21 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     { name: "Settings", href: "/settings", icon: SettingsIcon },
   ];
 
-  const navItems = isAdmin
+  const navItems = isStaff
+    ? staffNavItems
+    : isAdmin
     ? [...baseNavItems, { name: "Admin", href: "/admin", icon: Shield }]
     : baseNavItems;
 
-  const mobileBottomNavItems = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Transactions", href: "/transactions", icon: Receipt },
-    { name: "Expenses", href: "/expenses", icon: Wallet },
-    { name: "Analytics", href: "/analytics", icon: BarChart3 },
-    { name: "Settings", href: "/settings", icon: SettingsIcon },
-  ];
+  const mobileBottomNavItems = isStaff
+    ? staffNavItems
+    : [
+        { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+        { name: "Transactions", href: "/transactions", icon: Receipt },
+        { name: "Expenses", href: "/expenses", icon: Wallet },
+        { name: "Analytics", href: "/analytics", icon: BarChart3 },
+        { name: "Settings", href: "/settings", icon: SettingsIcon },
+      ];
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -354,10 +401,24 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           </div>
             
           {/* Bottom Actions */}
-            <div className="pt-4 border-t border-border/70 space-y-2">
+            <div className="pt-4 border-t border-border/70 space-y-1.5">
+              {!isStaff && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start h-8 px-3 text-xs text-muted-foreground hover:text-foreground gap-2.5 rounded-xl"
+                  onClick={() => setShortcutsOpen(true)}
+                  title="Keyboard Shortcuts (?)"
+                >
+                  <Keyboard className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>Shortcuts</span>
+                  <kbd className="ml-auto text-[10px] font-mono border border-border/70 rounded px-1.5 py-0.2 bg-muted/60">?</kbd>
+                </Button>
+              )}
+
               <Button 
                 variant="ghost" 
-                className="w-full justify-start h-10 rounded-xl text-xs font-medium text-destructive hover:text-destructive hover:bg-destructive/10"
+                className="w-full justify-start h-9 rounded-xl text-xs font-medium text-destructive hover:text-destructive hover:bg-destructive/10"
                 onClick={handleSignOut}
               >
                 <LogOut className="mr-3 h-4 w-4" />
@@ -425,6 +486,13 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         open={searchOpen}
         onOpenChange={setSearchOpen}
         userId={userProfile?.id}
+      />
+
+      {/* Keyboard Shortcuts Dialog */}
+      <KeyboardShortcutsDialog
+        open={shortcutsOpen}
+        onOpenChange={setShortcutsOpen}
+        isStaff={isStaff}
       />
     </div>
   );

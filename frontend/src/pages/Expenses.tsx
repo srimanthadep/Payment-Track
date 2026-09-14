@@ -18,11 +18,13 @@ import { AddExpenseDialog } from "@/components/expenses/AddExpenseDialog";
 import { ExpenseStatsCards } from "@/components/expenses/ExpenseStatsCards";
 import { ExpenseCategoryChart } from "@/components/expenses/ExpenseCategoryChart";
 import { ExpensesTable } from "@/components/expenses/ExpensesTable";
+import { useRole } from "@/hooks/useRole";
 
 export type ExpensePeriod = "daily" | "weekly" | "monthly" | "all";
 
 const Expenses = () => {
   const navigate = useNavigate();
+  const { effectiveUserId } = useRole();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -64,23 +66,25 @@ const Expenses = () => {
   }, []);
 
   // Fetch expenses
+  const targetUserId = effectiveUserId || user?.id;
+
   const fetchExpenses = useCallback(async () => {
-    if (!user) return;
+    if (!targetUserId) return;
     setIsLoading(true);
-    const { data } = await expensesService.getExpenses(user.id);
+    const { data } = await expensesService.getExpenses(targetUserId);
     setExpenses(data || []);
     setIsLoading(false);
-  }, [user]);
+  }, [targetUserId]);
 
   useEffect(() => {
-    if (user) {
+    if (targetUserId) {
       fetchExpenses();
     }
-  }, [user, refreshKey, fetchExpenses]);
+  }, [targetUserId, refreshKey, fetchExpenses]);
 
   // Realtime subscription for expenses table
   useEffect(() => {
-    if (!user) return;
+    if (!targetUserId) return;
 
     const channel = supabase
       .channel("expenses-live-feed")
@@ -90,7 +94,7 @@ const Expenses = () => {
           event: "*",
           schema: "public",
           table: "expenses",
-          filter: `user_id=eq.${user.id}`,
+          filter: `user_id=eq.${targetUserId}`,
         },
         () => {
           fetchExpenses();
@@ -101,7 +105,7 @@ const Expenses = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, fetchExpenses]);
+  }, [targetUserId, fetchExpenses]);
 
   // Filtered by Period / Date
   const dateFilteredExpenses = useMemo(() => {
@@ -315,12 +319,14 @@ const Expenses = () => {
       />
 
       {/* Add Expense Dialog */}
-      <AddExpenseDialog
-        userId={user.id}
-        open={isAddDialogOpen}
-        onOpenChange={setIsAddDialogOpen}
-        onSuccess={fetchExpenses}
-      />
+      {targetUserId && (
+        <AddExpenseDialog
+          userId={targetUserId}
+          open={isAddDialogOpen}
+          onOpenChange={setIsAddDialogOpen}
+          onSuccess={fetchExpenses}
+        />
+      )}
     </DashboardLayout>
   );
 };

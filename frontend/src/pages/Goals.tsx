@@ -60,6 +60,7 @@ import {
   GOAL_TYPE_LABELS,
 } from "@/services/goalsService";
 import { activityLogService } from "@/services/activityLogService";
+import { useRole } from "@/hooks/useRole";
 import {
   startOfMonth,
   endOfMonth,
@@ -84,6 +85,14 @@ interface GoalProgress {
 const Goals = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isStaff, isLoading: isRoleLoading } = useRole();
+
+  useEffect(() => {
+    if (!isRoleLoading && isStaff) {
+      navigate("/transactions", { replace: true });
+    }
+  }, [isStaff, isRoleLoading, navigate]);
+
   const [user, setUser] = useState<User | null>(null);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [progress, setProgress] = useState<Record<string, GoalProgress>>({});

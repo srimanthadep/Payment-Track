@@ -44,6 +44,7 @@ interface AddTransactionDialogProps {
   onOpenChange: (open: boolean) => void;
   portalsRefreshKey?: number;
   onSuccess?: (addedDate?: Date) => void;
+  isStaff?: boolean;
   initialData?: {
     amount?: string | number;
     transaction_type?: "withdrawal" | "repayment" | "";
@@ -63,6 +64,7 @@ export const AddTransactionDialog = ({
   onOpenChange,
   onSuccess,
   initialData,
+  isStaff = false,
 }: AddTransactionDialogProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -651,8 +653,8 @@ export const AddTransactionDialog = ({
             </div>
           </div>
 
-          {/* 6. Auto display profit when commission percentage is entered */}
-          {hasEnteredCommission && (
+          {/* 6. Auto display profit when commission percentage is entered (hidden for staff) */}
+          {!isStaff && hasEnteredCommission && (
             <div className="rounded-lg border bg-muted/40 p-3 space-y-1.5">
               <div className="flex justify-between items-center text-sm font-medium">
                 <span className="text-muted-foreground">Estimated Profit</span>

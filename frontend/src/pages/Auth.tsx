@@ -46,6 +46,23 @@ const Auth = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showSignUpPassword, setShowSignUpPassword] = useState(false);
 
+  const getRedirectPathForUser = async (userId: string): Promise<string> => {
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (profile?.role === "staff") {
+        return "/transactions";
+      }
+    } catch (e) {
+      console.error("Error checking user role for redirect:", e);
+    }
+    return "/dashboard";
+  };
+
   useEffect(() => {
     // Check if user has an active, unexpired session
     const verifySession = async () => {
@@ -65,8 +82,9 @@ const Auth = () => {
           return;
         }
 
-        // Valid active session
-        navigate("/dashboard", { replace: true });
+        // Valid active session - redirect to role-specific route
+        const target = await getRedirectPathForUser(session.user.id);
+        navigate(target, { replace: true });
       } catch {
         await supabase.auth.signOut().catch(() => {});
       }
@@ -136,7 +154,13 @@ const Auth = () => {
           variant: "destructive",
         });
       } else {
-        console.log("[Auth] Sign in success, navigating to dashboard...");
+        const userId = res?.data?.user?.id;
+        let target = "/dashboard";
+        if (userId) {
+          target = await getRedirectPathForUser(userId);
+        }
+
+        console.log("[Auth] Sign in success, navigating to:", target);
         toast({
           title: "Welcome Back!",
           description: "Signing into your workspace...",
@@ -144,7 +168,7 @@ const Auth = () => {
         activityLogService.log("auth.login", "auth", `Logged in successfully`, {
           identifier: signInIdentifier,
         });
-        navigate("/dashboard", { replace: true });
+        navigate(target, { replace: true });
       }
     } catch (err: any) {
       console.error("[Auth] Exception during sign in:", err);

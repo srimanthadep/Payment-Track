@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useRole } from "@/hooks/useRole";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -69,7 +71,16 @@ const COLOR_PRESETS = [
 ];
 
 const Settings = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
+  const { isStaff, isLoading: isRoleLoading } = useRole();
+
+  useEffect(() => {
+    if (!isRoleLoading && isStaff) {
+      navigate("/transactions", { replace: true });
+    }
+  }, [isStaff, isRoleLoading, navigate]);
+
   const [settings, setSettings] = useState<AppSettings>(settingsService.getSettings());
 
   // Expense Modals

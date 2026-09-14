@@ -14,6 +14,7 @@ import { AddDueDialog } from "@/components/dues/AddDueDialog";
 import { DuesStatsCards } from "@/components/dues/DuesStatsCards";
 import { DuesTable } from "@/components/dues/DuesTable";
 import { Due, useDues } from "@/hooks/useDues";
+import { useRole } from "@/hooks/useRole";
 
 const formatCurrency = (amount: number) =>
   `₹${Number(amount || 0).toLocaleString("en-IN", {
@@ -24,6 +25,14 @@ const formatCurrency = (amount: number) =>
 const Dues = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isStaff, isLoading: isRoleLoading } = useRole();
+
+  useEffect(() => {
+    if (!isRoleLoading && isStaff) {
+      navigate("/transactions", { replace: true });
+    }
+  }, [isStaff, isRoleLoading, navigate]);
+
   const [user, setUser] = useState<User | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
 

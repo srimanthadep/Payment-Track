@@ -8,6 +8,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { AddUserDialog } from "@/components/admin/AddUserDialog";
 
 interface UserWithRole {
@@ -17,7 +24,7 @@ interface UserWithRole {
   business_name: string | null;
   avatar_url: string | null;
   created_at: string;
-  role: "admin" | "user";
+  role: "admin" | "user" | "staff";
   is_admin: boolean;
 }
 
@@ -28,7 +35,12 @@ export const AdminUsers = () => {
 
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<UserWithRole | null>(null);
-  const [editForm, setEditForm] = useState({ full_name: "", business_name: "", email: "" });
+  const [editForm, setEditForm] = useState<{
+    full_name: string;
+    business_name: string;
+    email: string;
+    role: "admin" | "user" | "staff";
+  }>({ full_name: "", business_name: "", email: "", role: "user" });
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [addOpen, setAddOpen] = useState(false);
@@ -68,6 +80,7 @@ export const AdminUsers = () => {
 
       const usersWithRoles: UserWithRole[] = (profiles || []).map((profile) => ({
         ...profile,
+        role: (profile.role as "admin" | "user" | "staff") || "user",
         is_admin: profile.role === "admin",
       }));
 
@@ -116,19 +129,28 @@ export const AdminUsers = () => {
       full_name: u.full_name || "",
       business_name: u.business_name || "",
       email: u.email || "",
+      role: u.role || "user",
     });
   };
 
   const saveEdit = async () => {
     if (!editing) return;
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentAdminId = session?.user?.id || "98cab8fb-b582-493f-91a0-b8f3954a1366";
+      const updatePayload: any = {
+        full_name: editForm.full_name,
+        business_name: editForm.business_name,
+        email: editForm.email,
+        role: editForm.role,
+      };
+      if (editForm.role === "staff") {
+        updatePayload.owner_id = currentAdminId;
+      }
+
       const { error } = await supabase
         .from("profiles")
-        .update({
-          full_name: editForm.full_name,
-          business_name: editForm.business_name,
-          email: editForm.email,
-        })
+        .update(updatePayload)
         .eq("id", editing.id);
       if (error) throw error;
       toast({ title: "Saved", description: "User profile updated" });
@@ -199,8 +221,10 @@ export const AdminUsers = () => {
                   </TableCell>
                   <TableCell className="text-xs sm:text-sm hidden sm:table-cell">{user.full_name || "-"}</TableCell>
                   <TableCell>
-                    {user.is_admin ? (
+                    {user.role === "admin" ? (
                       <Badge className="text-[10px] sm:text-xs">Admin</Badge>
+                    ) : user.role === "staff" ? (
+                      <Badge variant="outline" className="text-[10px] sm:text-xs border-amber-500/30 text-amber-500 bg-amber-500/10">Staff</Badge>
                     ) : (
                       <Badge variant="secondary" className="text-[10px] sm:text-xs">User</Badge>
                     )}
@@ -215,6 +239,7 @@ export const AdminUsers = () => {
                         size="icon"
                         onClick={() => toggleAdminRole(user.id, user.is_admin)}
                         className="h-7 w-7"
+                        title={user.is_admin ? "Demote to user" : "Promote to admin"}
                       >
                         {user.is_admin ? (
                           <ShieldOff className="h-3.5 w-3.5" />
@@ -241,6 +266,22 @@ export const AdminUsers = () => {
             <div className="space-y-1"><Label>Full name</Label><Input value={editForm.full_name} onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })} /></div>
             <div className="space-y-1"><Label>Business name</Label><Input value={editForm.business_name} onChange={(e) => setEditForm({ ...editForm, business_name: e.target.value })} /></div>
             <div className="space-y-1"><Label>Email (profile)</Label><Input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} /></div>
+            <div className="space-y-1">
+              <Label>Role</Label>
+              <Select
+                value={editForm.role}
+                onValueChange={(val: "admin" | "user" | "staff") => setEditForm({ ...editForm, role: val })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">User (Standard)</SelectItem>
+                  <SelectItem value="staff">Staff (Restricted)</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>

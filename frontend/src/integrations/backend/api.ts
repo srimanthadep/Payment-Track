@@ -1,36 +1,40 @@
 import { supabase } from "@/integrations/supabase/client";
 
-const BACKEND_URL =
-  import.meta.env.VITE_BACKEND_URL ||
-  (typeof window !== "undefined" && window.location.hostname === "localhost"
-    ? "http://localhost:5000"
-    : "");
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
 
 export async function invokeBackendApi<T = any>(
   endpoint: string,
   payload: any
 ): Promise<{ data: T | null; error: Error | null }> {
-  // If backend URL is available, call Express API
-  if (BACKEND_URL) {
-    try {
-      const cleanBase = BACKEND_URL.replace(/\/+$/, "");
-      const cleanEndpoint = endpoint.replace(/^\/+/, "").replace(/^api\//, "");
-      const res = await fetch(`${cleanBase}/api/${cleanEndpoint}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+  const cleanEndpoint = endpoint.replace(/^\/+/, "").replace(/^api\//, "");
+  
+  // 1. Try local/relative proxy or direct backend URL
+  try {
+    const targetUrl = BACKEND_URL
+      ? `${BACKEND_URL.replace(/\/+$/, "")}/api/${cleanEndpoint}`
+      : `/api/${cleanEndpoint}`;
 
+    const res = await fetch(targetUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || `HTTP error ${res.status}`);
-      }
       return { data, error: null };
-    } catch (err: any) {
-      console.warn(`Backend call failed, trying fallback:`, err);
     }
+
+    // If server returned an application error, return it directly
+    const errorData = await res.json().catch(() => null);
+    return {
+      data: null,
+      error: new Error(errorData?.error || `Request failed with status ${res.status}`),
+    };
+  } catch (err: any) {
+    console.warn(`Local backend unreachable, trying fallback:`, err);
   }
 
   // Fallback to Supabase Functions

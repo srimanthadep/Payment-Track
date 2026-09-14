@@ -19,7 +19,7 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { email, password, full_name, make_admin } = await req.json();
+    const { email, password, full_name, make_admin, make_staff, role } = await req.json();
 
     if (!email || !password) {
       return new Response(JSON.stringify({ error: "email and password are required" }), {
@@ -55,10 +55,18 @@ serve(async (req: Request) => {
     }
 
     // Update profile with provided fields and role
-    const profileUpdate: { full_name?: string; email?: string; role?: "admin" | "user" } = { full_name, email };
-    if (make_admin) {
-      profileUpdate.role = "admin";
+    let roleToAssign: "admin" | "user" | "staff" = "user";
+    if (role === "admin" || make_admin) {
+      roleToAssign = "admin";
+    } else if (role === "staff" || make_staff) {
+      roleToAssign = "staff";
     }
+
+    const profileUpdate: { full_name?: string; email?: string; role?: "admin" | "user" | "staff" } = {
+      full_name,
+      email,
+      role: roleToAssign,
+    };
     await admin.from("profiles").update(profileUpdate).eq("id", newUserId);
 
     return new Response(JSON.stringify({ id: newUserId }), {

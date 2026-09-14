@@ -61,6 +61,7 @@ interface CustomerDetailDialogProps {
   userId: string;
   onCustomerUpdated?: () => void;
   onCustomerDeleted?: () => void;
+  isStaff?: boolean;
 }
 
 export const CustomerDetailDialog = ({
@@ -70,6 +71,7 @@ export const CustomerDetailDialog = ({
   userId,
   onCustomerUpdated,
   onCustomerDeleted,
+  isStaff = false,
 }: CustomerDetailDialogProps) => {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
@@ -296,15 +298,17 @@ export const CustomerDetailDialog = ({
                   </Button>
                 </>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-xs h-8 gap-1.5 shadow-xs"
-                onClick={handleExportStatement}
-              >
-                <Download className="h-3.5 w-3.5" />
-                Export History
-              </Button>
+              {!isStaff && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs h-8 gap-1.5 shadow-xs"
+                  onClick={handleExportStatement}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Export History
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -312,7 +316,7 @@ export const CustomerDetailDialog = ({
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
           {/* Quick Metrics */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className={`grid grid-cols-2 ${isStaff ? "sm:grid-cols-3" : "sm:grid-cols-4"} gap-3`}>
             <Card className="bg-card/50 border-border/70 shadow-xs">
               <CardContent className="p-3.5">
                 <div className="flex items-center justify-between">
@@ -327,19 +331,21 @@ export const CustomerDetailDialog = ({
               </CardContent>
             </Card>
 
-            <Card className="bg-card/50 border-border/70 shadow-xs">
-              <CardContent className="p-3.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                    Total Profit
-                  </span>
-                  <TrendingUp className="h-3.5 w-3.5 text-purple-500" />
-                </div>
-                <div className="text-base sm:text-lg font-bold mt-1 text-emerald-600 dark:text-emerald-400">
-                  ₹{customer.totalProfit.toLocaleString("en-IN", { minimumFractionDigits: 0 })}
-                </div>
-              </CardContent>
-            </Card>
+            {!isStaff && (
+              <Card className="bg-card/50 border-border/70 shadow-xs">
+                <CardContent className="p-3.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                      Total Profit
+                    </span>
+                    <TrendingUp className="h-3.5 w-3.5 text-purple-500" />
+                  </div>
+                  <div className="text-base sm:text-lg font-bold mt-1 text-emerald-600 dark:text-emerald-400">
+                    ₹{customer.totalProfit.toLocaleString("en-IN", { minimumFractionDigits: 0 })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <Card className="bg-card/50 border-border/70 shadow-xs">
               <CardContent className="p-3.5">
@@ -399,8 +405,8 @@ export const CustomerDetailDialog = ({
                   <TableHead className="text-xs font-semibold">Type</TableHead>
                   <TableHead className="text-xs font-semibold">Card</TableHead>
                   <TableHead className="text-xs font-semibold text-right">Amount</TableHead>
-                  <TableHead className="text-xs font-semibold text-right">Commission</TableHead>
-                  <TableHead className="text-xs font-semibold text-right">Profit</TableHead>
+                  {!isStaff && <TableHead className="text-xs font-semibold text-right">Commission</TableHead>}
+                  {!isStaff && <TableHead className="text-xs font-semibold text-right">Profit</TableHead>}
                   <TableHead className="text-xs font-semibold">Notes</TableHead>
                 </TableRow>
               </TableHeader>
@@ -439,12 +445,16 @@ export const CustomerDetailDialog = ({
                       <TableCell className="text-xs py-2.5 text-right font-bold">
                         ₹{t.amount.toLocaleString("en-IN")}
                       </TableCell>
-                      <TableCell className="text-xs py-2.5 text-right text-muted-foreground">
-                        ₹{t.commission.toLocaleString("en-IN")}
-                      </TableCell>
-                      <TableCell className="text-xs py-2.5 text-right font-semibold text-emerald-600 dark:text-emerald-400">
-                        ₹{t.profit.toLocaleString("en-IN")}
-                      </TableCell>
+                      {!isStaff && (
+                        <TableCell className="text-xs py-2.5 text-right text-muted-foreground">
+                          ₹{t.commission.toLocaleString("en-IN")}
+                        </TableCell>
+                      )}
+                      {!isStaff && (
+                        <TableCell className="text-xs py-2.5 text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                          ₹{t.profit.toLocaleString("en-IN")}
+                        </TableCell>
+                      )}
                       <TableCell className="text-xs py-2.5 text-muted-foreground max-w-[160px] truncate" title={t.notes || ""}>
                         {t.notes || "—"}
                       </TableCell>
@@ -493,12 +503,14 @@ export const CustomerDetailDialog = ({
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between text-muted-foreground">
-                    <span>Profit:</span>
-                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                      ₹{t.profit.toLocaleString("en-IN")}
-                    </span>
-                  </div>
+                  {!isStaff && (
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span>Profit:</span>
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                        ₹{t.profit.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                  )}
 
                   {t.notes && (
                     <div className="text-[11px] text-muted-foreground/80 pt-1 border-t border-border/50 truncate">
