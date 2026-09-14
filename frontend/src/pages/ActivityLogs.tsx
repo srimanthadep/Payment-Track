@@ -454,10 +454,16 @@ const ActivityLogs = () => {
     pageSize: 50,
   });
 
-  // Auth Guard
+  const [user, setUser] = useState<any>(null);
+
+  // Auth Guard & User state
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) navigate("/auth");
+      if (!user) {
+        navigate("/auth");
+      } else {
+        setUser(user);
+      }
     });
   }, [navigate]);
 
@@ -479,6 +485,50 @@ const ActivityLogs = () => {
     fetchLogs(filters, 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Realtime subscription for activity_logs
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel("activity-logs-realtime-feed")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "activity_logs",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const newLog = payload.new as ActivityLog;
+          setLogs((prev) => {
+            if (prev.some((l) => l.id === newLog.id)) return prev;
+            return [newLog, ...prev];
+          });
+          setTotal((prev) => prev + 1);
+          fetchStats();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "activity_logs",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchLogs(filters, page);
+          fetchStats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, filters, page, fetchLogs, fetchStats]);
 
   const applyFilters = (newFilters: ActivityLogFilters) => {
     setFilters(newFilters);

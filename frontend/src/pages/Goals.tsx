@@ -151,6 +151,55 @@ const Goals = () => {
     fetchGoals();
   }, [fetchGoals]);
 
+  // Realtime subscription for goals, transactions, and expenses
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel("goals-realtime-feed")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "goals",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchGoals();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "transactions",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchGoals();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "expenses",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchGoals();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, fetchGoals]);
+
   const getPeriodDates = (periodType: string): { start: string; end: string } => {
     const now = new Date();
     switch (periodType) {

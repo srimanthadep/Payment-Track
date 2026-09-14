@@ -30,6 +30,36 @@ export const AdminLeaderboard = () => {
 
   useEffect(() => {
     fetchLeaderboard();
+
+    const channel = supabase
+      .channel("admin-leaderboard-live")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "transactions",
+        },
+        () => {
+          fetchLeaderboard();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "profiles",
+        },
+        () => {
+          fetchLeaderboard();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [period]);
 
   const fetchLeaderboard = async () => {

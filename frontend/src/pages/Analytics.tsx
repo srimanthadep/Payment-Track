@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
@@ -187,46 +187,84 @@ const Analytics = ({ defaultTab }: AnalyticsProps = {}) => {
   }, [navigate]);
 
   // Fetch data
+  const fetchAll = useCallback(async (showLoader = true) => {
+    if (!user) return;
+    if (showLoader) setIsLoading(true);
+    try {
+      const { data: txData, error: txError } = await supabase
+        .from("transactions")
+        .select(`
+          id,
+          transaction_type,
+          amount,
+          commission,
+          site_fee,
+          profit,
+          card_type,
+          transaction_date,
+          portal_id,
+          portals (
+            name
+          )
+        `)
+        .eq("user_id", user.id)
+        .order("transaction_date", { ascending: true });
+
+      if (txError) {
+        console.warn("Transactions query warning:", txError.message);
+      }
+      setTransactions(Array.isArray(txData) ? (txData as any) : []);
+
+      const res = await expensesService.getExpenses(user.id);
+      const expList = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? (res as any) : [];
+      setExpenses(expList);
+    } catch (err) {
+      console.error("Error loading analytics data:", err);
+    } finally {
+      if (showLoader) setIsLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchAll(true);
+  }, [fetchAll]);
+
+  // Realtime subscription for transactions and expenses
   useEffect(() => {
     if (!user) return;
-    const fetchAll = async () => {
-      setIsLoading(true);
-      try {
-        const { data: txData, error: txError } = await supabase
-          .from("transactions")
-          .select(`
-            id,
-            transaction_type,
-            amount,
-            commission,
-            site_fee,
-            profit,
-            card_type,
-            transaction_date,
-            portal_id,
-            portals (
-              name
-            )
-          `)
-          .eq("user_id", user.id)
-          .order("transaction_date", { ascending: true });
 
-        if (txError) {
-          console.warn("Transactions query warning:", txError.message);
+    const channel = supabase
+      .channel("analytics-live-feed")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "transactions",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchAll(false);
         }
-        setTransactions(Array.isArray(txData) ? (txData as any) : []);
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "expenses",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchAll(false);
+        }
+      )
+      .subscribe();
 
-        const res = await expensesService.getExpenses(user.id);
-        const expList = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? (res as any) : [];
-        setExpenses(expList);
-      } catch (err) {
-        console.error("Error loading analytics data:", err);
-      } finally {
-        setIsLoading(false);
-      }
+    return () => {
+      supabase.removeChannel(channel);
     };
-    fetchAll();
-  }, [user]);
+  }, [user, fetchAll]);
 
   // Computed analytics
   const analytics = useMemo(() => {

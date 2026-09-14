@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, CheckCheck, Trash2, Sparkles, TrendingUp, AlertTriangle, Info, Target } from "lucide-react";
+import { Bell, CheckCheck, Trash2, Sparkles, TrendingUp, AlertTriangle, Info, Target, Wallet } from "lucide-react";
 import { format } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export interface AppNotification {
   id: string;
@@ -17,8 +19,24 @@ export interface AppNotification {
 const NOTIFICATIONS_STORAGE_KEY = "payment_track_notifications";
 
 export const NotificationCenter = () => {
+  const { toast } = useToast();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [open, setOpen] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserId(user.id);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     try {
@@ -52,6 +70,116 @@ export const NotificationCenter = () => {
       // ignore
     }
   }, []);
+
+  // Realtime subscription for live notifications
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`notifications-live-${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "transactions",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const tx = payload.new as any;
+          const amountStr = Number(tx.amount || 0).toLocaleString("en-IN");
+          const profitStr = Number(tx.profit || 0).toLocaleString("en-IN");
+          const newNotif: AppNotification = {
+            id: `tx-${tx.id}-${Date.now()}`,
+            title: `New ${tx.transaction_type === "payout" ? "Payout" : "Payment"} Recorded`,
+            description: `₹${amountStr} (${tx.card_type || "Card"}) • Profit: ₹${profitStr}`,
+            timestamp: new Date().toISOString(),
+            type: "success",
+            read: false,
+          };
+
+          setNotifications((prev) => {
+            const updated = [newNotif, ...prev.slice(0, 49)];
+            localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(updated));
+            return updated;
+          });
+
+          toast({
+            title: newNotif.title,
+            description: newNotif.description,
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "dues",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const due = payload.new as any;
+          const amountStr = Number(due.amount || 0).toLocaleString("en-IN");
+          const newNotif: AppNotification = {
+            id: `due-${due.id}-${Date.now()}`,
+            title: "New Due Recorded",
+            description: `${due.customer_name || "Customer"}: ₹${amountStr} (${due.status || "unpaid"})`,
+            timestamp: new Date().toISOString(),
+            type: "warning",
+            read: false,
+          };
+
+          setNotifications((prev) => {
+            const updated = [newNotif, ...prev.slice(0, 49)];
+            localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(updated));
+            return updated;
+          });
+
+          toast({
+            title: newNotif.title,
+            description: newNotif.description,
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "expenses",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const exp = payload.new as any;
+          const amountStr = Number(exp.amount || 0).toLocaleString("en-IN");
+          const newNotif: AppNotification = {
+            id: `exp-${exp.id}-${Date.now()}`,
+            title: "Expense Logged",
+            description: `${exp.category || "Expense"}: ₹${amountStr}${exp.notes ? ` • ${exp.notes}` : ""}`,
+            timestamp: new Date().toISOString(),
+            type: "info",
+            read: false,
+          };
+
+          setNotifications((prev) => {
+            const updated = [newNotif, ...prev.slice(0, 49)];
+            localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(updated));
+            return updated;
+          });
+
+          toast({
+            title: newNotif.title,
+            description: newNotif.description,
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, toast]);
 
   const saveNotifications = (items: AppNotification[]) => {
     setNotifications(items);

@@ -97,6 +97,18 @@ const Customers = () => {
           fetchCustomers();
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "dues",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchCustomers();
+        }
+      )
       .subscribe();
 
     return () => {

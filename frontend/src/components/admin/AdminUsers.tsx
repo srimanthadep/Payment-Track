@@ -35,6 +35,25 @@ export const AdminUsers = () => {
 
   useEffect(() => {
     fetchUsers();
+
+    const channel = supabase
+      .channel("admin-users-live")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "profiles",
+        },
+        () => {
+          fetchUsers();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
