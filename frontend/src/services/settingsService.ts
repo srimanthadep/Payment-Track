@@ -1,5 +1,5 @@
-// Central reactive settings store for dropdown options across Expenses and Transactions with Supabase Database persistence
 import { supabase } from "@/integrations/supabase/client";
+import { RealtimeChannel } from "@supabase/supabase-js";
 import { themeService } from "@/services/themeService";
 
 export interface ExpenseCategoryOption {
@@ -78,6 +78,7 @@ const listeners: Set<SettingsListener> = new Set();
 class SettingsService {
   private settings: AppSettings;
   private currentUserId: string | null = null;
+  private realtimeChannel: RealtimeChannel | null = null;
 
   constructor() {
     this.settings = this.getDefaultSettings();
@@ -127,6 +128,46 @@ class SettingsService {
     return this.getDefaultSettings();
   }
 
+  private subscribeToRealtime(userId: string): void {
+    this.unsubscribeFromRealtime();
+
+    this.realtimeChannel = supabase
+      .channel(`profile-settings-sync-${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "profiles",
+          filter: `id=eq.${userId}`,
+        },
+        (payload: any) => {
+          const newSettings = payload.new?.settings;
+          if (newSettings && typeof newSettings === "object") {
+            const newTheme = newSettings.theme || this.settings.theme || "ocean";
+            this.settings = {
+              expenseCategories: newSettings.expenseCategories || this.settings.expenseCategories,
+              transactionCardTypes: newSettings.transactionCardTypes || this.settings.transactionCardTypes,
+              transactionRecipients: newSettings.transactionRecipients || this.settings.transactionRecipients,
+              transactionTypes: newSettings.transactionTypes || this.settings.transactionTypes,
+              theme: newTheme,
+            };
+            themeService.setAccent(newTheme);
+            this.saveLocalCache();
+            this.notifyListeners();
+          }
+        }
+      )
+      .subscribe();
+  }
+
+  private unsubscribeFromRealtime(): void {
+    if (this.realtimeChannel) {
+      supabase.removeChannel(this.realtimeChannel);
+      this.realtimeChannel = null;
+    }
+  }
+
   private async initDatabaseSync() {
     // Check for user session
     const { data: { session } } = await supabase.auth.getSession();
@@ -134,6 +175,7 @@ class SettingsService {
       this.currentUserId = session.user.id;
       this.settings = this.loadLocalCache(session.user.id);
       themeService.setAccent(this.settings.theme || "ocean");
+      this.subscribeToRealtime(session.user.id);
       await this.loadFromDatabase(session.user.id);
     }
 
@@ -144,8 +186,10 @@ class SettingsService {
         this.currentUserId = userId;
         this.settings = this.loadLocalCache(userId);
         themeService.setAccent(this.settings.theme || "ocean");
+        this.subscribeToRealtime(userId);
         await this.loadFromDatabase(userId);
       } else if (!userId) {
+        this.unsubscribeFromRealtime();
         this.currentUserId = null;
         this.settings = this.getDefaultSettings();
         themeService.setAccent("ocean");
