@@ -11,7 +11,6 @@ erDiagram
     PROFILES ||--o{ CUSTOMERS : "user_id"
     PROFILES ||--o{ TRANSACTIONS : "user_id"
     PROFILES ||--o{ EXPENSES : "user_id"
-    PROFILES ||--o{ APP_SETTINGS : "user_id"
     PROFILES ||--o{ DUES : "user_id"
     PROFILES ||--o{ GOALS : "user_id"
     PROFILES ||--o{ ACTIVITY_LOGS : "user_id"
@@ -27,6 +26,7 @@ erDiagram
         text business_name
         text avatar_url
         app_role role
+        jsonb settings
         timestamp created_at
         timestamp updated_at
     }
@@ -115,14 +115,6 @@ erDiagram
         numeric default_commission_rate
         numeric default_site_fee
         boolean is_active
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    APP_SETTINGS {
-        uuid id PK
-        uuid user_id FK
-        jsonb settings
         timestamp created_at
         timestamp updated_at
     }
@@ -266,21 +258,9 @@ User profiles synced with Supabase Auth (`auth.users`).
 | `business_name` | `text` | YES | - | Company or shop name |
 | `avatar_url` | `text` | YES | - | Public URL of user avatar image |
 | `role` | `app_role` (`admin` \| `user`)| NO | - | User role (default: `'user'`) |
+| `settings` | `jsonb` | NO | - | User customized dropdown options & preferences (default: `{}`) |
 | `created_at` | `timestamptz` | NO | - | Profile creation date |
 | `updated_at` | `timestamptz` | NO | - | Profile last update date |
-
----
-
-### 9. `app_settings`
-User custom settings, dropdown configurations (including card types with custom rates), and UI preferences.
-
-| Column Name | Data Type | Nullable | Key / Ref | Description |
-|-------------|-----------|----------|-----------|-------------|
-| `id` | `uuid` | NO | **PK** | Settings ID |
-| `user_id` | `uuid` | NO | **FK** -> `auth.users.id` | User owner |
-| `settings` | `jsonb` | NO | - | JSON object containing customized dropdown options (`transactionCardTypes`, etc.) |
-| `created_at` | `timestamptz` | NO | - | Timestamp created |
-| `updated_at` | `timestamptz` | NO | - | Timestamp updated (Trigger-managed) |
 
 ---
 

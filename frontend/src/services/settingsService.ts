@@ -1,17 +1,12 @@
 // Central reactive settings store for dropdown options across Expenses and Transactions with Supabase Database persistence
 import { supabase } from "@/integrations/supabase/client";
+import { themeService } from "@/services/themeService";
 
 export interface ExpenseCategoryOption {
   id: string;
   name: string;
   color: string; // Tailwind color or hex
   description?: string;
-  isDefault?: boolean;
-}
-
-export interface PaymentMethodOption {
-  id: string;
-  name: string;
   isDefault?: boolean;
 }
 
@@ -38,11 +33,10 @@ export interface TransactionTypeOption {
 
 export interface AppSettings {
   expenseCategories: ExpenseCategoryOption[];
-  expensePaymentMethods: PaymentMethodOption[];
-  expensePayees: string[];
   transactionCardTypes: CardTypeOption[];
   transactionRecipients: RecipientOption[];
   transactionTypes: TransactionTypeOption[];
+  theme: string;
 }
 
 export const DEFAULT_EXPENSE_CATEGORIES: ExpenseCategoryOption[] = [
@@ -53,22 +47,6 @@ export const DEFAULT_EXPENSE_CATEGORIES: ExpenseCategoryOption[] = [
   { id: "shop_rent", name: "Shop Rent", color: "bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800", isDefault: true },
   { id: "shop_expenses", name: "Shop Expenses", color: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800", isDefault: true },
   { id: "others", name: "Others", color: "bg-zinc-500/15 text-zinc-700 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800", isDefault: true },
-];
-
-export const DEFAULT_PAYMENT_METHODS: PaymentMethodOption[] = [
-  { id: "cash", name: "Cash", isDefault: true },
-  { id: "upi", name: "UPI / GPay / PhonePe", isDefault: true },
-  { id: "bank_transfer", name: "Bank Transfer / NEFT / IMPS", isDefault: true },
-  { id: "card", name: "Credit / Debit Card", isDefault: true },
-  { id: "cheque", name: "Cheque", isDefault: true },
-];
-
-export const DEFAULT_PAYEES: string[] = [
-  "Upender",
-  "Chummi",
-  "Electricity Board (TSSPDCL/TG)",
-  "Shop Owner",
-  "Petrol Pump",
 ];
 
 export const DEFAULT_CARD_TYPES: CardTypeOption[] = [
@@ -109,11 +87,10 @@ class SettingsService {
   private getDefaultSettings(): AppSettings {
     return {
       expenseCategories: [...DEFAULT_EXPENSE_CATEGORIES],
-      expensePaymentMethods: [...DEFAULT_PAYMENT_METHODS],
-      expensePayees: [...DEFAULT_PAYEES],
       transactionCardTypes: [...DEFAULT_CARD_TYPES],
       transactionRecipients: [...DEFAULT_RECIPIENTS],
       transactionTypes: [...DEFAULT_TRANSACTION_TYPES],
+      theme: "ocean",
     };
   }
 
@@ -137,11 +114,10 @@ class SettingsService {
 
         return {
           expenseCategories: parsed.expenseCategories?.length ? parsed.expenseCategories : DEFAULT_EXPENSE_CATEGORIES,
-          expensePaymentMethods: parsed.expensePaymentMethods?.length ? parsed.expensePaymentMethods : DEFAULT_PAYMENT_METHODS,
-          expensePayees: parsed.expensePayees?.length ? parsed.expensePayees : DEFAULT_PAYEES,
           transactionCardTypes: cards,
           transactionRecipients: parsed.transactionRecipients?.length ? parsed.transactionRecipients : DEFAULT_RECIPIENTS,
           transactionTypes: parsed.transactionTypes?.length ? parsed.transactionTypes : DEFAULT_TRANSACTION_TYPES,
+          theme: parsed.theme || "ocean",
         };
       }
     } catch (e) {
@@ -157,6 +133,7 @@ class SettingsService {
     if (session?.user?.id) {
       this.currentUserId = session.user.id;
       this.settings = this.loadLocalCache(session.user.id);
+      themeService.setAccent(this.settings.theme || "ocean");
       await this.loadFromDatabase(session.user.id);
     }
 
@@ -166,10 +143,12 @@ class SettingsService {
       if (userId && userId !== this.currentUserId) {
         this.currentUserId = userId;
         this.settings = this.loadLocalCache(userId);
+        themeService.setAccent(this.settings.theme || "ocean");
         await this.loadFromDatabase(userId);
       } else if (!userId) {
         this.currentUserId = null;
         this.settings = this.getDefaultSettings();
+        themeService.setAccent("ocean");
         this.notifyListeners();
       }
     });
@@ -178,26 +157,27 @@ class SettingsService {
   public async loadFromDatabase(userId: string): Promise<void> {
     try {
       const { data, error } = await supabase
-        .from("app_settings")
+        .from("profiles")
         .select("settings")
-        .eq("user_id", userId)
+        .eq("id", userId)
         .maybeSingle();
 
       if (error) {
-        console.warn("Could not fetch app_settings from Supabase:", error.message);
+        console.warn("Could not fetch settings from profiles:", error.message);
         return;
       }
 
       if (data && data.settings && typeof data.settings === "object") {
         const parsed = data.settings as any;
+        const currentTheme = parsed.theme || this.settings.theme || "ocean";
         this.settings = {
           expenseCategories: parsed.expenseCategories || [...DEFAULT_EXPENSE_CATEGORIES],
-          expensePaymentMethods: parsed.expensePaymentMethods || [...DEFAULT_PAYMENT_METHODS],
-          expensePayees: parsed.expensePayees || [...DEFAULT_PAYEES],
           transactionCardTypes: parsed.transactionCardTypes || [...DEFAULT_CARD_TYPES],
           transactionRecipients: parsed.transactionRecipients || [...DEFAULT_RECIPIENTS],
           transactionTypes: parsed.transactionTypes || [...DEFAULT_TRANSACTION_TYPES],
+          theme: currentTheme,
         };
+        themeService.setAccent(currentTheme);
         this.saveLocalCache();
         this.notifyListeners();
       } else {
@@ -227,21 +207,18 @@ class SettingsService {
 
     try {
       const { error } = await supabase
-        .from("app_settings")
-        .upsert(
-          {
-            user_id: userId,
-            settings: this.settings as any,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id" }
-        );
+        .from("profiles")
+        .update({
+          settings: this.settings as any,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", userId);
 
       if (error) {
-        console.warn("Supabase app_settings upsert error:", error.message);
+        console.warn("Supabase profiles.settings update error:", error.message);
       }
     } catch (err) {
-      console.warn("Failed to persist app_settings to Supabase:", err);
+      console.warn("Failed to persist settings to profiles:", err);
     }
   }
 
@@ -262,13 +239,28 @@ class SettingsService {
 
   public subscribe(listener: SettingsListener): () => void {
     listeners.add(listener);
-    return () => {
-      listeners.delete(listener);
-    };
+    return () => listeners.delete(listener);
   }
 
   public getSettings(): AppSettings {
-    return { ...this.settings };
+    return {
+      expenseCategories: [...this.settings.expenseCategories],
+      transactionCardTypes: [...this.settings.transactionCardTypes],
+      transactionRecipients: [...this.settings.transactionRecipients],
+      transactionTypes: [...this.settings.transactionTypes],
+      theme: this.settings.theme || "ocean",
+    };
+  }
+
+  // --- Theme ---
+  public getTheme(): string {
+    return this.settings.theme || "ocean";
+  }
+
+  public setTheme(themeId: string): void {
+    this.settings.theme = themeId;
+    themeService.setAccent(themeId);
+    this.saveAndPersist();
   }
 
   // --- Expense Categories ---
@@ -276,13 +268,11 @@ class SettingsService {
     return this.settings.expenseCategories;
   }
 
-  public addExpenseCategory(category: { name: string; color?: string; description?: string }): ExpenseCategoryOption {
+  public addExpenseCategory(category: Omit<ExpenseCategoryOption, "id" | "isDefault">): ExpenseCategoryOption {
     const id = category.name.toLowerCase().replace(/[^a-z0-9]+/g, "_") + "_" + Date.now();
     const newCategory: ExpenseCategoryOption = {
+      ...category,
       id,
-      name: category.name.trim(),
-      color: category.color || "bg-primary/15 text-primary border-primary/30",
-      description: category.description,
       isDefault: false,
     };
     this.settings.expenseCategories = [...this.settings.expenseCategories, newCategory];
@@ -290,7 +280,7 @@ class SettingsService {
     return newCategory;
   }
 
-  public updateExpenseCategory(id: string, updates: Partial<ExpenseCategoryOption>): void {
+  public updateExpenseCategory(id: string, updates: Partial<Omit<ExpenseCategoryOption, "id" | "isDefault">>): void {
     this.settings.expenseCategories = this.settings.expenseCategories.map((cat) =>
       cat.id === id ? { ...cat, ...updates } : cat
     );
@@ -299,49 +289,6 @@ class SettingsService {
 
   public deleteExpenseCategory(id: string): void {
     this.settings.expenseCategories = this.settings.expenseCategories.filter((cat) => cat.id !== id);
-    this.saveAndPersist();
-  }
-
-  // --- Payment Methods ---
-  public getPaymentMethods(): PaymentMethodOption[] {
-    return this.settings.expensePaymentMethods;
-  }
-
-  public addPaymentMethod(name: string): PaymentMethodOption {
-    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "_") + "_" + Date.now();
-    const newMethod: PaymentMethodOption = { id, name: name.trim(), isDefault: false };
-    this.settings.expensePaymentMethods = [...this.settings.expensePaymentMethods, newMethod];
-    this.saveAndPersist();
-    return newMethod;
-  }
-
-  public updatePaymentMethod(id: string, name: string): void {
-    this.settings.expensePaymentMethods = this.settings.expensePaymentMethods.map((m) =>
-      m.id === id ? { ...m, name: name.trim() } : m
-    );
-    this.saveAndPersist();
-  }
-
-  public deletePaymentMethod(id: string): void {
-    this.settings.expensePaymentMethods = this.settings.expensePaymentMethods.filter((m) => m.id !== id);
-    this.saveAndPersist();
-  }
-
-  // --- Payees / Workers ---
-  public getPayees(): string[] {
-    return this.settings.expensePayees;
-  }
-
-  public addPayee(name: string): void {
-    const trimmed = name.trim();
-    if (trimmed && !this.settings.expensePayees.includes(trimmed)) {
-      this.settings.expensePayees = [...this.settings.expensePayees, trimmed];
-      this.saveAndPersist();
-    }
-  }
-
-  public deletePayee(name: string): void {
-    this.settings.expensePayees = this.settings.expensePayees.filter((p) => p !== name);
     this.saveAndPersist();
   }
 
@@ -364,9 +311,15 @@ class SettingsService {
     return newCard;
   }
 
-  public updateCardType(id: string, updates: Partial<CardTypeOption>): void {
-    this.settings.transactionCardTypes = this.settings.transactionCardTypes.map((c) =>
-      c.id === id ? { ...c, ...updates } : c
+  public updateCardType(id: string, updates: Partial<{ name: string; withdrawRate: number; repayRate: number }>): void {
+    this.settings.transactionCardTypes = this.settings.transactionCardTypes.map((card) =>
+      card.id === id
+        ? {
+            ...card,
+            ...updates,
+            name: updates.name ? updates.name.trim() : card.name,
+          }
+        : card
     );
     this.saveAndPersist();
   }
@@ -376,7 +329,7 @@ class SettingsService {
     this.saveAndPersist();
   }
 
-  // --- Transaction Recipients (Sent To) ---
+  // --- Transaction Recipients ---
   public getRecipients(): RecipientOption[] {
     return this.settings.transactionRecipients;
   }
@@ -407,8 +360,8 @@ class SettingsService {
   }
 
   public addTransactionType(name: string, label: string): TransactionTypeOption {
-    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "_");
-    const newType: TransactionTypeOption = { id, name: id, label: label.trim(), isDefault: false };
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "_") + "_" + Date.now();
+    const newType: TransactionTypeOption = { id, name: name.trim(), label: label.trim(), isDefault: false };
     this.settings.transactionTypes = [...this.settings.transactionTypes, newType];
     this.saveAndPersist();
     return newType;
@@ -423,12 +376,12 @@ class SettingsService {
   public resetToDefaults(): void {
     this.settings = {
       expenseCategories: [...DEFAULT_EXPENSE_CATEGORIES],
-      expensePaymentMethods: [...DEFAULT_PAYMENT_METHODS],
-      expensePayees: [...DEFAULT_PAYEES],
       transactionCardTypes: [...DEFAULT_CARD_TYPES],
       transactionRecipients: [...DEFAULT_RECIPIENTS],
       transactionTypes: [...DEFAULT_TRANSACTION_TYPES],
+      theme: "ocean",
     };
+    themeService.setAccent("ocean");
     this.saveAndPersist();
   }
 
@@ -442,12 +395,14 @@ class SettingsService {
       if (parsed && typeof parsed === "object") {
         this.settings = {
           expenseCategories: parsed.expenseCategories || [...DEFAULT_EXPENSE_CATEGORIES],
-          expensePaymentMethods: parsed.expensePaymentMethods || [...DEFAULT_PAYMENT_METHODS],
-          expensePayees: parsed.expensePayees || [...DEFAULT_PAYEES],
           transactionCardTypes: parsed.transactionCardTypes || [...DEFAULT_CARD_TYPES],
           transactionRecipients: parsed.transactionRecipients || [...DEFAULT_RECIPIENTS],
           transactionTypes: parsed.transactionTypes || [...DEFAULT_TRANSACTION_TYPES],
+          theme: parsed.theme || this.settings.theme || "ocean",
         };
+        if (this.settings.theme) {
+          themeService.setAccent(this.settings.theme);
+        }
         this.saveAndPersist();
         return true;
       }

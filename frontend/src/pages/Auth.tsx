@@ -13,6 +13,7 @@ import {
   LogIn, 
   Lock, 
   User, 
+  Mail,
   Building2, 
   ShieldCheck, 
   Eye, 
@@ -323,15 +324,15 @@ const Auth = () => {
                   className="space-y-4"
                 >
                   <div className="space-y-1.5">
-                    <Label htmlFor="signin-username" className="text-xs font-semibold">
-                      Username or Email
+                    <Label htmlFor="signin-email" className="text-xs font-semibold">
+                      Email Address
                     </Label>
                     <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
-                        id="signin-username"
-                        type="text"
-                        placeholder="e.g. srimanth or user@email.com"
+                        id="signin-email"
+                        type="email"
+                        placeholder="user@email.com"
                         value={signInIdentifier}
                         onChange={(e) => setSignInIdentifier(e.target.value)}
                         autoCapitalize="none"
@@ -423,7 +424,7 @@ const Auth = () => {
                       <Input
                         id="signup-fullname"
                         type="text"
-                        placeholder="e.g. Srimanth Adep"
+                        placeholder="e.g. John Doe"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
                         className="pl-9 h-10 text-sm rounded-xl"
@@ -441,7 +442,7 @@ const Auth = () => {
                       <Input
                         id="signup-businessname"
                         type="text"
-                        placeholder="e.g. Adep Enterprises"
+                        placeholder="e.g. My Business"
                         value={businessName}
                         onChange={(e) => setBusinessName(e.target.value)}
                         className="pl-9 h-10 text-sm rounded-xl"
@@ -450,15 +451,15 @@ const Auth = () => {
                   </div>
 
                   <div className="space-y-1">
-                    <Label htmlFor="signup-identifier" className="text-xs font-semibold">
-                      Choose Username or Email
+                    <Label htmlFor="signup-email" className="text-xs font-semibold">
+                      Email Address
                     </Label>
                     <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
-                        id="signup-identifier"
-                        type="text"
-                        placeholder="e.g. srimanth or srimanth@gmail.com"
+                        id="signup-email"
+                        type="email"
+                        placeholder="user@email.com"
                         value={signUpIdentifier}
                         onChange={(e) => setSignUpIdentifier(e.target.value)}
                         autoCapitalize="none"
@@ -468,7 +469,7 @@ const Auth = () => {
                       />
                     </div>
                     <p className="text-[11px] text-muted-foreground">
-                      You will use this username to sign in every time.
+                      We will use this email for signing in and account access.
                     </p>
                   </div>
 

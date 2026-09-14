@@ -121,17 +121,7 @@
         { "name": "business_name", "type": "text", "nullable": true },
         { "name": "avatar_url", "type": "text", "nullable": true },
         { "name": "role", "type": "app_role", "nullable": false, "enum": ["admin", "user"], "default": "'user'::app_role" },
-        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
-        { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
-      ]
-    },
-    {
-      "name": "app_settings",
-      "description": "User-customized dropdown preferences and options stored as JSONB",
-      "columns": [
-        { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
-        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "auth.users.id", "nullable": false },
-        { "name": "settings", "type": "jsonb", "nullable": false },
+        { "name": "settings", "type": "jsonb", "nullable": false, "default": "'{}'::jsonb" },
         { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
         { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
       ]

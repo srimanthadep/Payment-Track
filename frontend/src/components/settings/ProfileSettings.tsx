@@ -34,6 +34,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { profileService, UserProfile } from "@/services/profileService";
 import { themeService, THEME_ACCENTS, ThemeAccent } from "@/services/themeService";
+import { settingsService } from "@/services/settingsService";
 import { motion } from "framer-motion";
 
 export const ProfileSettings = () => {
@@ -68,9 +69,19 @@ export const ProfileSettings = () => {
 
   useEffect(() => {
     loadProfile();
-    return profileService.subscribe(() => {
+    const unsubProfile = profileService.subscribe(() => {
       loadProfile();
     });
+    const unsubSettings = settingsService.subscribe((s) => {
+      if (s.theme) {
+        const found = THEME_ACCENTS.find((a) => a.id === s.theme);
+        if (found) setActiveAccent(found);
+      }
+    });
+    return () => {
+      unsubProfile();
+      unsubSettings();
+    };
   }, []);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -539,11 +550,11 @@ export const ProfileSettings = () => {
                     key={accent.id}
                     type="button"
                     onClick={() => {
-                      themeService.setAccent(accent.id);
+                      settingsService.setTheme(accent.id);
                       setActiveAccent(accent);
                       toast({
                         title: "🎨 Theme Accent Updated",
-                        description: `Switched to ${accent.name}`,
+                        description: `Switched to ${accent.name} (synced across your account)`,
                       });
                     }}
                     className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all text-center ${

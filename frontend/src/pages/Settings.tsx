@@ -78,7 +78,6 @@ const Settings = () => {
   const [categoryName, setCategoryName] = useState("");
   const [categoryColor, setCategoryColor] = useState(COLOR_PRESETS[0].class);
 
-  const [payeeInput, setPayeeInput] = useState("");
 
   // Transaction Modals
   const [recipientModalOpen, setRecipientModalOpen] = useState(false);
@@ -126,14 +125,6 @@ const Settings = () => {
     setCategoryName("");
   };
 
-  // --- Payee Handlers ---
-  const handleAddPayee = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!payeeInput.trim()) return;
-    settingsService.addPayee(payeeInput.trim());
-    toast({ title: "Payee Added", description: `"${payeeInput}" added to auto-fill list` });
-    setPayeeInput("");
-  };
 
   // --- Recipient Handlers ---
   const handleSaveRecipient = (e: React.FormEvent) => {
