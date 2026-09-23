@@ -32,9 +32,10 @@ import {
 } from "@/components/transactions/TransactionFilters";
 
 interface DashboardFilterSheetProps {
-  userId: string;
+  userId?: string;
   onFiltersChange: (filters: FilterState) => void;
   filters: FilterState;
+  variant?: "default" | "header";
 }
 
 const EMPTY_FILTERS: FilterState = {
@@ -49,6 +50,7 @@ export const DashboardFilterSheet = ({
   userId,
   onFiltersChange,
   filters,
+  variant = "default",
 }: DashboardFilterSheetProps) => {
   const [open, setOpen] = useState(false);
   const [localFilters, setLocalFilters] = useState<FilterState>(filters);
@@ -137,27 +139,53 @@ export const DashboardFilterSheet = ({
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button
-          id="dashboard-filter-trigger"
-          variant="outline"
-          className={cn(
-            "h-9 text-xs sm:text-sm font-medium transition-all gap-1.5",
-            activeFilterCount > 0
-              ? "bg-primary/10 border-primary/30 text-primary hover:bg-primary/20"
-              : "bg-background hover:bg-accent/50"
-          )}
-        >
-          <SlidersHorizontal className="h-3.5 w-3.5" />
-          <span>Filters</span>
-          {activeFilterCount > 0 && (
-            <Badge
-              variant="default"
-              className="h-5 min-w-[20px] px-1.5 text-[10px] font-bold rounded-full ml-0.5"
-            >
-              {activeFilterCount}
-            </Badge>
-          )}
-        </Button>
+        {variant === "header" ? (
+          <Button
+            id="dashboard-filter-trigger-header"
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "h-9 px-2.5 rounded-xl border border-border/60 hover:bg-muted/80 text-xs font-medium gap-1.5 transition-all",
+              activeFilterCount > 0
+                ? "bg-primary/10 border-primary/30 text-primary hover:bg-primary/20"
+                : "bg-muted/30 hover:bg-muted/60"
+            )}
+            title="Open Filters"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            <span>Filters</span>
+            {activeFilterCount > 0 && (
+              <Badge
+                variant="default"
+                className="h-4.5 min-w-[18px] px-1 text-[9px] font-bold rounded-full ml-0.5"
+              >
+                {activeFilterCount}
+              </Badge>
+            )}
+          </Button>
+        ) : (
+          <Button
+            id="dashboard-filter-trigger"
+            variant="outline"
+            className={cn(
+              "h-9 text-xs sm:text-sm font-medium transition-all gap-1.5",
+              activeFilterCount > 0
+                ? "bg-primary/10 border-primary/30 text-primary hover:bg-primary/20"
+                : "bg-background hover:bg-accent/50"
+            )}
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            <span>Filters</span>
+            {activeFilterCount > 0 && (
+              <Badge
+                variant="default"
+                className="h-5 min-w-[20px] px-1.5 text-[10px] font-bold rounded-full ml-0.5"
+              >
+                {activeFilterCount}
+              </Badge>
+            )}
+          </Button>
+        )}
       </SheetTrigger>
 
       <SheetContent

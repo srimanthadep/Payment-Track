@@ -30,6 +30,7 @@ import { PredictionsDetailView } from "@/components/analytics/PredictionsDetailV
 import { calculateEnsembleForecast } from "@/utils/forecastingEngine";
 import { DateSwitch } from "@/components/transactions/DateSwitch";
 import { useRole } from "@/hooks/useRole";
+import { dateSyncService } from "@/services/dateSyncService";
 import {
   format,
   subDays,
@@ -132,7 +133,9 @@ const Analytics = ({ defaultTab }: AnalyticsProps = {}) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [period, setPeriod] = useState<AnalyticsPeriod>("monthly");
-  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(
+    () => dateSyncService.getActiveDate() || new Date()
+  );
 
   // Current month aggregates dedicated for high-accuracy predictions
   const currentMonthData = useMemo(() => {

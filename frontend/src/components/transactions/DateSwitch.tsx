@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, ChevronDown, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -24,6 +24,7 @@ import {
   isThisMonth,
   isSameMonth,
 } from "date-fns";
+import { dateSyncService } from "@/services/dateSyncService";
 
 export type DateSwitchPeriod = "daily" | "weekly" | "monthly" | "all";
 
@@ -48,6 +49,24 @@ export const DateSwitch = ({
   const [isOpen, setIsOpen] = useState(false);
   const isAllTransactions = selectedDate === null;
   const activeDate = selectedDate || new Date();
+
+  // Sync with global dateSyncService
+  const onDateChangeRef = useRef(onDateChange);
+  useEffect(() => {
+    onDateChangeRef.current = onDateChange;
+  }, [onDateChange]);
+
+  useEffect(() => {
+    dateSyncService.setActiveDate(selectedDate, period, "dateswitch");
+  }, [selectedDate, period]);
+
+  useEffect(() => {
+    return dateSyncService.subscribe((newDate, _period, source) => {
+      if (source !== "dateswitch") {
+        onDateChangeRef.current(newDate);
+      }
+    });
+  }, []);
 
   // For monthly view year selection
   const [viewYear, setViewYear] = useState<number>(activeDate.getFullYear());

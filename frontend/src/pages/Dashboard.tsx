@@ -20,6 +20,8 @@ import { profileService, UserProfile } from "@/services/profileService";
 import { FilterState } from "@/components/transactions/TransactionFilters";
 import { getCardTypeDisplayName } from "@/utils/commissionCalculator";
 import { useRole } from "@/hooks/useRole";
+import { dateSyncService } from "@/services/dateSyncService";
+import { DailyProfitTracker } from "@/components/sidebar/DailyProfitTracker";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -36,7 +38,9 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [period, setPeriod] = useState<Period>("daily");
-  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(
+    () => dateSyncService.getActiveDate() || new Date()
+  );
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [todayStats, setTodayStats] = useState({ count: 0, volume: 0 });
   const [heatmapTxns, setHeatmapTxns] = useState<any[]>([]);
@@ -259,7 +263,16 @@ const Dashboard = () => {
   if (!user) return null;
 
   return (
-    <DashboardLayout>
+    <DashboardLayout
+      headerAction={
+        <DashboardFilterSheet
+          userId={user.id}
+          filters={dashboardFilters}
+          onFiltersChange={setDashboardFilters}
+          variant="header"
+        />
+      }
+    >
       <PullToRefresh onRefresh={handleRefresh}>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -356,12 +369,19 @@ const Dashboard = () => {
                 </TabsList>
               </Tabs>
 
-              <DashboardFilterSheet
-                userId={user.id}
-                filters={dashboardFilters}
-                onFiltersChange={setDashboardFilters}
-              />
+              <div className="hidden lg:block">
+                <DashboardFilterSheet
+                  userId={user.id}
+                  filters={dashboardFilters}
+                  onFiltersChange={setDashboardFilters}
+                />
+              </div>
             </div>
+          </div>
+
+          {/* Mobile Progress Tracker (replaces Filters button on mobile screen) */}
+          <div className="lg:hidden">
+            <DailyProfitTracker />
           </div>
 
           <motion.div

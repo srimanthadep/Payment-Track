@@ -19,6 +19,7 @@ import { ExpenseStatsCards } from "@/components/expenses/ExpenseStatsCards";
 import { ExpenseCategoryChart } from "@/components/expenses/ExpenseCategoryChart";
 import { ExpensesTable } from "@/components/expenses/ExpensesTable";
 import { useRole } from "@/hooks/useRole";
+import { dateSyncService } from "@/services/dateSyncService";
 
 export type ExpensePeriod = "daily" | "weekly" | "monthly" | "all";
 
@@ -30,7 +31,9 @@ const Expenses = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<ExpenseCategoryOption[]>([]);
   const [period, setPeriod] = useState<ExpensePeriod>("monthly");
-  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(
+    () => dateSyncService.getActiveDate() || new Date()
+  );
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 

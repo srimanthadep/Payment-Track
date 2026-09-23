@@ -16,6 +16,7 @@ import { Plus, Upload, Layers } from "lucide-react";
 import { motion } from "framer-motion";
 import { subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
 import { useRole } from "@/hooks/useRole";
+import { dateSyncService } from "@/services/dateSyncService";
 
 export type TransactionPeriod = "daily" | "weekly" | "monthly" | "all";
 
@@ -30,7 +31,9 @@ const Transactions = () => {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [period, setPeriod] = useState<TransactionPeriod>("daily");
-  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(
+    () => dateSyncService.getActiveDate() || new Date()
+  );
 
   const dateRange = useMemo<{ from: Date | null; to: Date | null }>(() => {
     const now = new Date();

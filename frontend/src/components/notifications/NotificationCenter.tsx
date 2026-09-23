@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, CheckCheck, Trash2, Sparkles, TrendingUp, AlertTriangle, Info, Target, Wallet } from "lucide-react";
+import { Bell, CheckCheck, Trash2, Sparkles, TrendingUp, AlertTriangle, Info, Target, Wallet, X } from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -228,7 +228,7 @@ export const NotificationCenter = () => {
         </Button>
       </SheetTrigger>
 
-      <SheetContent side="right" className="w-full sm:max-w-[380px] p-0 flex flex-col">
+      <SheetContent side="right" className="w-full sm:max-w-[380px] p-0 flex flex-col" hideCloseButton>
         <SheetHeader className="p-4 border-b border-border/80 flex flex-row items-center justify-between">
           <div className="flex items-center gap-2">
             <SheetTitle className="text-base font-bold">Notifications</SheetTitle>
@@ -263,6 +263,17 @@ export const NotificationCenter = () => {
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
             )}
+            <SheetClose asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                title="Close"
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </Button>
+            </SheetClose>
           </div>
         </SheetHeader>
 

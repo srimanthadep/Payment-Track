@@ -15,7 +15,6 @@ import {
   Sparkles,
   BarChart3,
   Target,
-  Search,
   ScrollText,
   Users,
   HandCoins,
@@ -34,12 +33,14 @@ import { CommandPalette } from "@/components/ui/CommandPalette";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { useRole } from "@/hooks/useRole";
 import { KeyboardShortcutsDialog } from "@/components/ui/KeyboardShortcutsDialog";
+import { DailyProfitTracker } from "@/components/sidebar/DailyProfitTracker";
 
 interface DashboardLayoutProps {
   children: ReactNode;
+  headerAction?: ReactNode;
 }
 
-export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
+export const DashboardLayout = ({ children, headerAction }: DashboardLayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -239,15 +240,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           </div>
 
           <div className="flex items-center gap-1.5">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 rounded-xl border border-border/60 hover:bg-muted/80"
-              onClick={() => setSearchOpen(true)}
-              title="Search (Ctrl+K)"
-            >
-              <Search className="h-4.5 w-4.5" />
-            </Button>
+            {headerAction}
             <NotificationCenter />
             <Sheet>
               <SheetTrigger asChild>
@@ -278,7 +271,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5">
+              <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5 sleek-scrollbar">
                 <p className="text-[11px] font-semibold text-muted-foreground px-3 uppercase tracking-wider mb-2">Navigation</p>
                 {navItems.map((item) => {
                   const Icon = item.icon;
@@ -321,46 +314,41 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         {/* Desktop Sidebar */}
         <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 border-r border-border/80 bg-card/60 backdrop-blur-xl z-20 shadow-xs">
           {/* Brand header */}
-          <div
-            className="flex items-center space-x-3 p-5 border-b border-border/70 bg-gradient-to-b from-card to-card/50 cursor-pointer group"
-            onClick={() => navigate("/settings")}
-            title="Click to manage profile & settings"
-          >
-            <div className="relative">
-              <img
-                src={userProfile?.avatarUrl || "/logo-circle.png"}
-                alt="Profile"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src = "/logo-circle.png";
-                }}
-                className="h-9 w-9 rounded-full object-cover ring-2 ring-primary/25 shadow-sm group-hover:ring-primary/50 group-hover:scale-105 transition-all"
-              />
-              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-card" />
+          <div className="flex items-center justify-between px-4 py-3.5 border-b border-border/70 bg-gradient-to-b from-card to-card/50">
+            <div
+              className="flex items-center space-x-2.5 cursor-pointer group min-w-0 flex-1 mr-1"
+              onClick={() => navigate("/settings")}
+              title="Click to manage profile & settings"
+            >
+              <div className="relative shrink-0">
+                <img
+                  src={userProfile?.avatarUrl || "/logo-circle.png"}
+                  alt="Profile"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = "/logo-circle.png";
+                  }}
+                  className="h-9 w-9 rounded-full object-cover ring-2 ring-primary/25 shadow-sm group-hover:ring-primary/50 group-hover:scale-105 transition-all"
+                />
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-card" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="font-bold text-sm tracking-tight block leading-tight truncate">Payment Tracker</span>
+                <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider block truncate">
+                  {userProfile?.fullName || "Enterprise Hub"}
+                </span>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <span className="font-bold text-base tracking-tight block leading-tight truncate">Payment Tracker</span>
-              <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider block truncate">
-                {userProfile?.fullName || "Enterprise Hub"}
-              </span>
+            <div className="shrink-0">
+              <NotificationCenter />
             </div>
           </div>
           
           {/* Sidebar Nav items */}
-          <div className="flex-1 flex flex-col justify-between py-4 px-3.5 overflow-y-auto">
+          <div className="flex-1 flex flex-col justify-between py-4 px-3.5 overflow-y-auto sleek-scrollbar">
             <div className="space-y-3">
-              {/* Quick Actions Search Bar for Desktop */}
-              <div className="flex items-center gap-1.5 px-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSearchOpen(true)}
-                  className="flex-1 justify-start h-8 text-xs text-muted-foreground gap-2 border-border/70 hover:text-foreground"
-                >
-                  <Search className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span>Search...</span>
-                  <kbd className="ml-auto text-[10px] font-mono border rounded px-1 bg-muted/60">Ctrl+K</kbd>
-                </Button>
-                <NotificationCenter />
+              {/* Daily Profit Tracker for Chummi Portal */}
+              <div className="px-1">
+                <DailyProfitTracker />
               </div>
 
               <div>
