@@ -37,6 +37,7 @@ export interface AppSettings {
   transactionRecipients: RecipientOption[];
   transactionTypes: TransactionTypeOption[];
   theme: string;
+  hiddenPortals?: string[];
 }
 
 export const DEFAULT_EXPENSE_CATEGORIES: ExpenseCategoryOption[] = [
@@ -92,6 +93,7 @@ class SettingsService {
       transactionRecipients: [...DEFAULT_RECIPIENTS],
       transactionTypes: [...DEFAULT_TRANSACTION_TYPES],
       theme: "ocean",
+      hiddenPortals: [],
     };
   }
 
@@ -119,6 +121,7 @@ class SettingsService {
           transactionRecipients: parsed.transactionRecipients?.length ? parsed.transactionRecipients : DEFAULT_RECIPIENTS,
           transactionTypes: parsed.transactionTypes?.length ? parsed.transactionTypes : DEFAULT_TRANSACTION_TYPES,
           theme: parsed.theme || "ocean",
+          hiddenPortals: Array.isArray(parsed.hiddenPortals) ? parsed.hiddenPortals : [],
         };
       }
     } catch (e) {
@@ -151,6 +154,9 @@ class SettingsService {
               transactionRecipients: newSettings.transactionRecipients || this.settings.transactionRecipients,
               transactionTypes: newSettings.transactionTypes || this.settings.transactionTypes,
               theme: newTheme,
+              hiddenPortals: Array.isArray(newSettings.hiddenPortals)
+                ? newSettings.hiddenPortals
+                : this.settings.hiddenPortals || [],
             };
             themeService.setAccent(newTheme);
             this.saveLocalCache();
@@ -220,6 +226,7 @@ class SettingsService {
           transactionRecipients: parsed.transactionRecipients || [...DEFAULT_RECIPIENTS],
           transactionTypes: parsed.transactionTypes || [...DEFAULT_TRANSACTION_TYPES],
           theme: currentTheme,
+          hiddenPortals: Array.isArray(parsed.hiddenPortals) ? parsed.hiddenPortals : [],
         };
         themeService.setAccent(currentTheme);
         this.saveLocalCache();
@@ -293,6 +300,7 @@ class SettingsService {
       transactionRecipients: [...this.settings.transactionRecipients],
       transactionTypes: [...this.settings.transactionTypes],
       theme: this.settings.theme || "ocean",
+      hiddenPortals: [...(this.settings.hiddenPortals || [])],
     };
   }
 
@@ -416,6 +424,47 @@ class SettingsService {
     this.saveAndPersist();
   }
 
+  // --- Portal Comparison Chart Visibility ---
+  public getHiddenPortals(): string[] {
+    return [...(this.settings.hiddenPortals || [])];
+  }
+
+  public isPortalHidden(portalIdentifier: string): boolean {
+    if (!portalIdentifier) return false;
+    const hidden = this.settings.hiddenPortals || [];
+    const lower = portalIdentifier.toLowerCase();
+    return hidden.some((h) => h.toLowerCase() === lower);
+  }
+
+  public setPortalHidden(portalIdentifier: string, hidden: boolean): void {
+    if (!portalIdentifier) return;
+    const current = this.settings.hiddenPortals || [];
+    const lower = portalIdentifier.toLowerCase();
+    let updated: string[];
+
+    if (hidden) {
+      if (!current.some((h) => h.toLowerCase() === lower)) {
+        updated = [...current, portalIdentifier];
+      } else {
+        return;
+      }
+    } else {
+      updated = current.filter((h) => h.toLowerCase() !== lower);
+    }
+
+    this.settings.hiddenPortals = updated;
+    this.saveAndPersist();
+  }
+
+  public setAllPortalsVisibility(portalIdentifiers: string[], visible: boolean): void {
+    if (visible) {
+      this.settings.hiddenPortals = [];
+    } else {
+      this.settings.hiddenPortals = [...new Set(portalIdentifiers)];
+    }
+    this.saveAndPersist();
+  }
+
   // --- Reset to Defaults ---
   public resetToDefaults(): void {
     this.settings = {
@@ -424,6 +473,7 @@ class SettingsService {
       transactionRecipients: [...DEFAULT_RECIPIENTS],
       transactionTypes: [...DEFAULT_TRANSACTION_TYPES],
       theme: "ocean",
+      hiddenPortals: [],
     };
     themeService.setAccent("ocean");
     this.saveAndPersist();
@@ -443,6 +493,7 @@ class SettingsService {
           transactionRecipients: parsed.transactionRecipients || [...DEFAULT_RECIPIENTS],
           transactionTypes: parsed.transactionTypes || [...DEFAULT_TRANSACTION_TYPES],
           theme: parsed.theme || this.settings.theme || "ocean",
+          hiddenPortals: Array.isArray(parsed.hiddenPortals) ? parsed.hiddenPortals : [],
         };
         if (this.settings.theme) {
           themeService.setAccent(this.settings.theme);

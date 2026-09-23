@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRole } from "@/hooks/useRole";
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -43,6 +46,9 @@ import {
   Receipt,
   BrainCircuit,
   Sliders,
+  PieChart,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { AiIcon } from "@/components/icons/AiIcon";
 import { useToast } from "@/hooks/use-toast";
@@ -107,6 +113,36 @@ const Settings = () => {
 
   // Reset dialog
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
+
+  // Portal Comparison Chart Visibility State
+  const [portalsList, setPortalsList] = useState<Array<{ id: string; name: string }>>([]);
+  const [isPortalsLoading, setIsPortalsLoading] = useState(true);
+
+  const loadPortals = useCallback(async () => {
+    setIsPortalsLoading(true);
+    try {
+      const { data } = await supabase
+        .from("portals")
+        .select("id, name, is_active")
+        .order("name", { ascending: true });
+
+      const dbPortals = (data || []).map((p) => ({ id: p.id, name: p.name }));
+      const knownNames = new Set(dbPortals.map((p) => p.name.toLowerCase()));
+      const extraFromRecipients = (settings.transactionRecipients || [])
+        .filter((r) => !knownNames.has(r.name.toLowerCase()))
+        .map((r) => ({ id: r.id, name: r.name }));
+
+      setPortalsList([...dbPortals, ...extraFromRecipients]);
+    } catch (err) {
+      console.error("Failed to load portals list:", err);
+    } finally {
+      setIsPortalsLoading(false);
+    }
+  }, [settings.transactionRecipients]);
+
+  useEffect(() => {
+    loadPortals();
+  }, [loadPortals]);
 
   useEffect(() => {
     const update = (s: AppSettings) => setSettings(s);
@@ -449,7 +485,131 @@ const Settings = () => {
               </CardContent>
             </Card>
 
-            {/* 2. Card Types & Commission Rates */}
+            {/* 2. Portal Comparison Chart Visibility */}
+            <Card className="border shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <div>
+                  <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                    <PieChart className="h-4 w-4 text-primary" />
+                    Portal Comparison Chart Visibility
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Choose which portals are displayed in the Portal Comparison Chart on the Dashboard
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs gap-1"
+                    onClick={() => {
+                      settingsService.setAllPortalsVisibility([], true);
+                      toast({
+                        title: "All Portals Visible",
+                        description: "All portals will now appear in the Portal Comparison Chart.",
+                      });
+                    }}
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    Show All
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      const allNames = portalsList.map((p) => p.name);
+                      settingsService.setAllPortalsVisibility(allNames, false);
+                      toast({
+                        title: "All Portals Hidden",
+                        description: "All portals are now hidden from the Portal Comparison Chart.",
+                      });
+                    }}
+                  >
+                    <EyeOff className="h-3.5 w-3.5" />
+                    Hide All
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isPortalsLoading ? (
+                  <div className="h-24 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary" />
+                  </div>
+                ) : portalsList.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-muted-foreground">
+                    No portals found. Portals will appear here once added or used in transactions.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {portalsList.map((portal) => {
+                      const isHidden =
+                        settingsService.isPortalHidden(portal.name) ||
+                        settingsService.isPortalHidden(portal.id);
+                      return (
+                        <div
+                          key={portal.id}
+                          className="flex items-center justify-between p-3 rounded-xl border bg-card hover:bg-muted/30 transition-colors"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div
+                              className={cn(
+                                "w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
+                                isHidden
+                                  ? "bg-muted text-muted-foreground"
+                                  : "bg-primary/10 text-primary"
+                              )}
+                            >
+                              {portal.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold truncate text-foreground">
+                                {portal.name}
+                              </p>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                {isHidden ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] px-1.5 py-0 bg-muted/60 text-muted-foreground border-border font-medium gap-1"
+                                  >
+                                    <EyeOff className="h-2.5 w-2.5" />
+                                    Hidden
+                                  </Badge>
+                                ) : (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-medium gap-1"
+                                  >
+                                    <Eye className="h-2.5 w-2.5" />
+                                    Visible
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <Switch
+                            checked={!isHidden}
+                            onCheckedChange={(checked) => {
+                              settingsService.setPortalHidden(portal.name, !checked);
+                              settingsService.setPortalHidden(portal.id, !checked);
+                              toast({
+                                title: checked ? "Portal Visible" : "Portal Hidden",
+                                description: `"${portal.name}" is now ${
+                                  checked ? "visible in" : "hidden from"
+                                } the Portal Comparison Chart.`,
+                              });
+                            }}
+                            aria-label={`Toggle visibility of ${portal.name}`}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 3. Card Types & Commission Rates */}
             <Card className="border shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between pb-3">
                 <div>
@@ -547,7 +707,7 @@ const Settings = () => {
               </CardContent>
             </Card>
 
-            {/* 3. Transaction Types */}
+            {/* 4. Transaction Types */}
             <Card className="border shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between pb-3">
                 <div>

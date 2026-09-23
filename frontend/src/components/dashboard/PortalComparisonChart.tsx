@@ -5,6 +5,7 @@ import { getCardTypeDisplayName } from "@/utils/commissionCalculator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { motion } from "framer-motion";
+import { settingsService } from "@/services/settingsService";
 import {
   format,
   isToday,
@@ -41,6 +42,13 @@ export const PortalComparisonChart = ({
 }: PortalComparisonProps) => {
   const [chartData, setChartData] = useState<PortalData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hiddenPortals, setHiddenPortals] = useState<string[]>(() => settingsService.getHiddenPortals());
+
+  useEffect(() => {
+    return settingsService.subscribe((s) => {
+      setHiddenPortals(s.hiddenPortals || []);
+    });
+  }, []);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -168,6 +176,14 @@ export const PortalComparisonChart = ({
 
       filtered.forEach((tx: any) => {
         const portalName = tx.portals?.name || "Unknown";
+        const portalId = tx.portal_id;
+
+        // Skip portals hidden in settings
+        const isHidden = hiddenPortals.some(
+          (h) => h.toLowerCase() === portalName.toLowerCase() || h === portalId
+        );
+        if (isHidden) return;
+
         if (!portalMap[portalName]) {
           portalMap[portalName] = {
             name: portalName,
@@ -222,7 +238,7 @@ export const PortalComparisonChart = ({
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, period, selectedDate, filters]);
+  }, [userId, period, selectedDate, filters, hiddenPortals]);
 
   const formatCurrency = (amount: number) => {
     return `₹${amount.toLocaleString("en-IN", {
@@ -308,6 +324,14 @@ export const PortalComparisonChart = ({
           <CardTitle className="text-lg sm:text-xl">
             Portal Comparison ({getPeriodLabel()})
           </CardTitle>
+          {hiddenPortals.length > 0 && (
+            <span
+              className="text-[11px] text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border/60"
+              title={`${hiddenPortals.length} portal(s) hidden in Settings`}
+            >
+              {hiddenPortals.length} hidden
+            </span>
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -316,8 +340,20 @@ export const PortalComparisonChart = ({
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
           </div>
         ) : chartData.length === 0 ? (
-          <div className="h-[250px] flex flex-col items-center justify-center text-center">
-            <p className="text-sm text-muted-foreground">No transaction data for {getPeriodLabel()}</p>
+          <div className="h-[250px] flex flex-col items-center justify-center text-center px-4">
+            <p className="text-sm text-muted-foreground">
+              {hiddenPortals.length > 0
+                ? "No data to display (portals may be hidden in Settings)."
+                : `No transaction data for ${getPeriodLabel()}`}
+            </p>
+            {hiddenPortals.length > 0 && (
+              <a
+                href="/settings"
+                className="text-xs text-primary hover:underline mt-2 font-medium"
+              >
+                Manage portal visibility in Settings
+              </a>
+            )}
           </div>
         ) : (
           <div className="flex flex-col lg:flex-row gap-4 lg:gap-8 items-center lg:items-start justify-between">
