@@ -168,6 +168,334 @@ app.post("/api/register", handleRegisterUser);
 app.post("/api/admin-create-user", handleRegisterUser);
 app.post("/functions/v1/admin-create-user", handleRegisterUser);
 
+// ====================================================================
+// WhatsApp Business Cloud API Integration
+// ====================================================================
+
+const WA_API_VERSION = process.env.WHATSAPP_API_VERSION || "v21.0";
+const WA_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+const WA_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
+
+/**
+ * Sends a text message via WhatsApp Business Cloud API
+ */
+async function sendWhatsAppMessage(phone, message) {
+  if (!WA_PHONE_NUMBER_ID || !WA_ACCESS_TOKEN) {
+    throw new Error("WhatsApp not configured: missing WHATSAPP_PHONE_NUMBER_ID or WHATSAPP_ACCESS_TOKEN");
+  }
+
+  const url = `https://graph.facebook.com/${WA_API_VERSION}/${WA_PHONE_NUMBER_ID}/messages`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${WA_ACCESS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to: phone,
+      type: "text",
+      text: { body: message },
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    const errMsg = data?.error?.message || `WhatsApp API error (${response.status})`;
+    throw new Error(errMsg);
+  }
+
+  return data;
+}
+
+/**
+ * Sends a document/PDF via WhatsApp Business Cloud API
+ */
+async function sendWhatsAppDocument(phone, documentUrl, filename, caption) {
+  if (!WA_PHONE_NUMBER_ID || !WA_ACCESS_TOKEN) {
+    throw new Error("WhatsApp not configured: missing WHATSAPP_PHONE_NUMBER_ID or WHATSAPP_ACCESS_TOKEN");
+  }
+
+  const url = `https://graph.facebook.com/${WA_API_VERSION}/${WA_PHONE_NUMBER_ID}/messages`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${WA_ACCESS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to: phone,
+      type: "document",
+      document: {
+        link: documentUrl,
+        filename: filename || "Receipt.pdf",
+        caption: caption || "",
+      },
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    const errMsg = data?.error?.message || `WhatsApp API error (${response.status})`;
+    throw new Error(errMsg);
+  }
+
+  return data;
+}
+
+/**
+ * Logs WhatsApp message to audit table
+ */
+async function logWhatsAppMessage({ phone, action, message, status, error, customerId, customerName, transactionId, userId }) {
+  if (!supabase) return;
+  try {
+    await supabase.from("whatsapp_message_log").insert({
+      phone,
+      action,
+      message,
+      status: status || "sent",
+      error: error || null,
+      customer_id: customerId || null,
+      customer_name: customerName || null,
+      transaction_id: transactionId || null,
+      user_id: userId || null,
+    });
+  } catch (err) {
+    console.error("Failed to log WhatsApp message:", err);
+  }
+}
+
+// POST /api/whatsapp/send-welcome - Send welcome message to new customer
+app.post("/api/whatsapp/send-welcome", async (req, res) => {
+  try {
+    const { customerName, phone, userId, customerId } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({ error: "Phone number is required" });
+    }
+
+    if (!WA_PHONE_NUMBER_ID || !WA_ACCESS_TOKEN) {
+      return res.status(503).json({ error: "WhatsApp not configured on server" });
+    }
+
+    // Fetch business name from user's profile
+    let businessName = "Our Business";
+    if (supabase && userId) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("business_name")
+        .eq("id", userId)
+        .maybeSingle();
+      if (profile?.business_name) {
+        businessName = profile.business_name;
+      }
+    }
+
+    const message = `👋 Welcome, ${customerName || "Valued Customer"}!\n\nThank you for choosing ${businessName}. 🎉\n\nWe'll send your transaction receipts directly here on WhatsApp for your convenience.\n\nFor any queries, feel free to reach out!\n— ${businessName}`;
+
+    await sendWhatsAppMessage(phone, message);
+
+    await logWhatsAppMessage({
+      phone,
+      action: "welcome",
+      message,
+      status: "sent",
+      customerId,
+      customerName,
+      userId,
+    });
+
+    return res.status(200).json({ success: true, message: "Welcome message sent" });
+  } catch (error) {
+    console.error("WhatsApp welcome error:", error);
+
+    await logWhatsAppMessage({
+      phone: req.body.phone,
+      action: "welcome",
+      message: null,
+      status: "failed",
+      error: error.message,
+      customerId: req.body.customerId,
+      customerName: req.body.customerName,
+      userId: req.body.userId,
+    });
+
+    return res.status(500).json({ error: error.message || "Failed to send welcome message" });
+  }
+});
+
+// POST /api/whatsapp/send-receipt - Send transaction receipt to customer
+app.post("/api/whatsapp/send-receipt", async (req, res) => {
+  try {
+    const { customerName, phone, userId, customerId, transactionId, transaction } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({ error: "Phone number is required" });
+    }
+
+    if (!transaction) {
+      return res.status(400).json({ error: "Transaction details are required" });
+    }
+
+    if (!WA_PHONE_NUMBER_ID || !WA_ACCESS_TOKEN) {
+      return res.status(503).json({ error: "WhatsApp not configured on server" });
+    }
+
+    // Fetch business name
+    let businessName = "Our Business";
+    if (supabase && userId) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("business_name")
+        .eq("id", userId)
+        .maybeSingle();
+      if (profile?.business_name) {
+        businessName = profile.business_name;
+      }
+    }
+
+    const amount = Number(transaction.amount || 0).toLocaleString("en-IN");
+    const commission = Number(transaction.commission || 0).toLocaleString("en-IN");
+    const txDate = transaction.transactionDate
+      ? new Date(transaction.transactionDate).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      : "N/A";
+
+    const message = `📄 *Transaction Receipt*\n\n*Customer:* ${customerName || "N/A"}\n*Date:* ${txDate}\n*Portal:* ${transaction.portalName || "N/A"}\n*Type:* ${transaction.transactionType || "N/A"}\n*Amount:* ₹${amount}\n*Commission:* ₹${commission}\n${transaction.cardType ? `*Card Type:* ${transaction.cardType}\n` : ""}\nThank you for your business! 🙏\n— *${businessName}*`;
+
+    if (req.body.pdfUrl) {
+      await sendWhatsAppDocument(phone, req.body.pdfUrl, req.body.pdfFilename || `Receipt_${customerName || "Customer"}.pdf`, message);
+    } else {
+      await sendWhatsAppMessage(phone, message);
+    }
+
+    await logWhatsAppMessage({
+      phone,
+      action: "receipt",
+      message,
+      status: "sent",
+      customerId,
+      customerName,
+      transactionId,
+      userId,
+    });
+
+    return res.status(200).json({ success: true, message: "Receipt sent" });
+  } catch (error) {
+    console.error("WhatsApp receipt error:", error);
+
+    await logWhatsAppMessage({
+      phone: req.body.phone,
+      action: "receipt",
+      message: null,
+      status: "failed",
+      error: error.message,
+      customerId: req.body.customerId,
+      customerName: req.body.customerName,
+      transactionId: req.body.transactionId,
+      userId: req.body.userId,
+    });
+
+    return res.status(500).json({ error: error.message || "Failed to send receipt" });
+  }
+});
+
+// POST /api/whatsapp/status - Check if WhatsApp is configured
+app.post("/api/whatsapp/status", async (req, res) => {
+  const configured = Boolean(WA_PHONE_NUMBER_ID && WA_ACCESS_TOKEN);
+  return res.status(200).json({
+    configured,
+    phoneNumberId: configured ? WA_PHONE_NUMBER_ID.slice(0, 4) + "***" : null,
+    apiVersion: WA_API_VERSION,
+  });
+});
+
+// POST /api/whatsapp/send-test - Send test verification ping
+app.post("/api/whatsapp/send-test", async (req, res) => {
+  try {
+    const { phone, userId } = req.body;
+    if (!phone) {
+      return res.status(400).json({ error: "Phone number is required" });
+    }
+    if (!WA_PHONE_NUMBER_ID || !WA_ACCESS_TOKEN) {
+      return res.status(503).json({ error: "WhatsApp not configured on server. Please add WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN." });
+    }
+
+    let businessName = "Payment Tracker";
+    if (supabase && userId) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("business_name")
+        .eq("id", userId)
+        .maybeSingle();
+      if (profile?.business_name) {
+        businessName = profile.business_name;
+      }
+    }
+
+    const testMsg = `✅ *WhatsApp Connection Verified*\n\nYour WhatsApp Business integration with *${businessName}* is active and connected!\n\nAll customer welcome messages and transaction receipts will be delivered automatically to your clients. 🎉\n\n— *${businessName}*`;
+    await sendWhatsAppMessage(phone, testMsg);
+
+    await logWhatsAppMessage({
+      phone,
+      action: "test",
+      message: testMsg,
+      status: "sent",
+      userId,
+    });
+
+    return res.status(200).json({ success: true, message: "Test message sent successfully" });
+  } catch (error) {
+    console.error("WhatsApp test error:", error);
+    await logWhatsAppMessage({
+      phone: req.body.phone,
+      action: "test",
+      message: null,
+      status: "failed",
+      error: error.message,
+      userId: req.body.userId,
+    });
+    return res.status(500).json({ error: error.message || "Failed to send test message" });
+  }
+});
+
+// POST /api/whatsapp/logs - Get recent message logs
+app.post("/api/whatsapp/logs", async (req, res) => {
+  try {
+    const { userId, limit = 50 } = req.body;
+    if (!supabase) {
+      return res.status(200).json({ logs: [] });
+    }
+
+    let query = supabase
+      .from("whatsapp_message_log")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (userId) {
+      query = query.eq("user_id", userId);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      return res.status(200).json({ logs: [], warning: error.message });
+    }
+
+    return res.status(200).json({ logs: data || [] });
+  } catch (err) {
+    return res.status(200).json({ logs: [] });
+  }
+});
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Payment Tracker Backend running on port ${PORT}`);
 });

@@ -13,6 +13,7 @@ import {
 import { RupeeIcon } from "@/components/icons/RupeeIcon";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
+import { formatCurrency } from "@/utils/format";
 import {
   format,
   isToday,

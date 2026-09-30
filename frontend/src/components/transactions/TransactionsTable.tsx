@@ -1,3 +1,4 @@
+import { formatCurrency } from "@/utils/format";
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -78,6 +79,8 @@ interface Transaction {
   transaction_date: string;
   reference_number?: string | null;
   card_type: string | null;
+  customer_mode?: string | null;
+  bank_name?: string | null;
   customer_id?: string | null;
   customer_name?: string | null;
   customer_phone?: string | null;
@@ -159,6 +162,8 @@ export const TransactionsTable = ({
           profit,
           transaction_date,
           card_type,
+          customer_mode,
+          bank_name,
           customer_id,
           customer_name,
           customer_phone,
@@ -267,6 +272,9 @@ export const TransactionsTable = ({
         (t) =>
           t.portals.name.toLowerCase().includes(q) ||
           t.transaction_type.toLowerCase().includes(q) ||
+          (t.card_type && t.card_type.toLowerCase().includes(q)) ||
+          (t.customer_mode && t.customer_mode.toLowerCase().includes(q)) ||
+          (t.bank_name && t.bank_name.toLowerCase().includes(q)) ||
           (t.notes && t.notes.toLowerCase().includes(q))
       );
     }
@@ -417,13 +425,6 @@ export const TransactionsTable = ({
     }
   }, [inView, hasMore, isLoading, filteredTransactions, displayedTransactions, page]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      minimumFractionDigits: 2,
-    }).format(amount);
-  };
 
   const formatDate = (date: string) => {
     if (!date) return "-";
@@ -906,6 +907,25 @@ export const TransactionsTable = ({
                         </div>
                       </>
                     )}
+                    {(transaction.customer_mode || transaction.bank_name) && (
+                      <div className="flex items-center justify-between gap-2 col-span-2 pt-1 border-t border-border/40 text-[10px]">
+                        <span className="text-muted-foreground">Mode / Bank</span>
+                        <div className="flex items-center gap-1.5 font-medium">
+                          {transaction.customer_mode && (
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] ${
+                              transaction.customer_mode.toLowerCase() === "online"
+                                ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                                : "bg-zinc-500/10 text-zinc-600 dark:text-zinc-400"
+                            }`}>
+                              {transaction.customer_mode}
+                            </span>
+                          )}
+                          {transaction.bank_name && (
+                            <span className="text-foreground/85">{transaction.bank_name}</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               ))}
@@ -1117,7 +1137,25 @@ export const TransactionsTable = ({
                     </Badge>
                   </TableCell>
                   <TableCell className={`${isStaff ? "" : "hidden md:table-cell"} text-xs`}>
-                    {transaction.card_type ? getCardTypeDisplayName(transaction.card_type as CardType) : "-"}
+                    <div className="font-medium">
+                      {transaction.card_type ? getCardTypeDisplayName(transaction.card_type as CardType) : "-"}
+                    </div>
+                    {(transaction.bank_name || transaction.customer_mode) && (
+                      <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                        {transaction.bank_name && (
+                          <span className="font-medium text-foreground/80">{transaction.bank_name}</span>
+                        )}
+                        {transaction.customer_mode && (
+                          <span className={`px-1 py-0.2 rounded text-[9px] ${
+                            transaction.customer_mode.toLowerCase() === "online"
+                              ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                              : "bg-zinc-500/10 text-zinc-600 dark:text-zinc-400"
+                          }`}>
+                            {transaction.customer_mode}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="text-right font-semibold">
                     {formatCurrency(transaction.amount)}

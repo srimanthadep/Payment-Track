@@ -12,7 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { customerService, CustomerRecord } from "@/services/customerService";
-import { UserPlus, Loader2, Phone, User as UserIcon } from "lucide-react";
+import { whatsappService, formatPhoneForWhatsApp } from "@/services/whatsappService";
+import { settingsService } from "@/services/settingsService";
+import { UserPlus, Loader2, Phone, User as UserIcon, MessageCircle } from "lucide-react";
 
 interface AddCustomerDialogProps {
   open: boolean;
@@ -69,6 +71,29 @@ export const AddCustomerDialog = ({
           variant: "destructive",
         });
         return;
+      }
+
+      // Fire-and-forget WhatsApp welcome message if phone exists and WhatsApp is enabled
+      const waPhone = formatPhoneForWhatsApp(phone.trim());
+      const waSettings = (settingsService.getSettings() as any).whatsapp;
+      const waEnabled = waSettings?.enabled !== false; // default to true
+
+      if (waPhone && waEnabled && data) {
+        whatsappService.sendWelcome({
+          customerName: trimmedName,
+          phone: phone.trim(),
+          userId,
+          customerId: data.id,
+        }).then((result) => {
+          if (result.success) {
+            toast({
+              title: "WhatsApp ✅",
+              description: `Welcome message sent to ${trimmedName} on WhatsApp`,
+            });
+          }
+        }).catch(() => {
+          // Silent — customer was already created
+        });
       }
 
       toast({

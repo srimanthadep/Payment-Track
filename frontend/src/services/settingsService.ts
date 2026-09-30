@@ -31,13 +31,26 @@ export interface TransactionTypeOption {
   isDefault?: boolean;
 }
 
+export interface BankOption {
+  id: string;
+  name: string;
+  isDefault?: boolean;
+}
+
+export interface WhatsAppSettings {
+  enabled: boolean;
+  welcomeMessage?: string;
+}
+
 export interface AppSettings {
   expenseCategories: ExpenseCategoryOption[];
   transactionCardTypes: CardTypeOption[];
   transactionRecipients: RecipientOption[];
   transactionTypes: TransactionTypeOption[];
+  banks: BankOption[];
   theme: string;
   hiddenPortals?: string[];
+  whatsapp?: WhatsAppSettings;
 }
 
 export const DEFAULT_EXPENSE_CATEGORIES: ExpenseCategoryOption[] = [
@@ -71,6 +84,21 @@ export const DEFAULT_TRANSACTION_TYPES: TransactionTypeOption[] = [
   { id: "repayment", name: "repayment", label: "Repayment", isDefault: true },
 ];
 
+export const DEFAULT_BANKS: BankOption[] = [
+  { id: "hdfc", name: "HDFC Bank", isDefault: true },
+  { id: "sbi", name: "SBI Card", isDefault: true },
+  { id: "icici", name: "ICICI Bank", isDefault: true },
+  { id: "axis", name: "Axis Bank", isDefault: true },
+  { id: "kotak", name: "Kotak Mahindra Bank", isDefault: true },
+  { id: "rbl", name: "RBL Bank", isDefault: true },
+  { id: "indusind", name: "IndusInd Bank", isDefault: true },
+  { id: "idfc", name: "IDFC FIRST Bank", isDefault: true },
+  { id: "yes", name: "Yes Bank", isDefault: true },
+  { id: "bank_of_baroda", name: "Bank of Baroda", isDefault: true },
+  { id: "standard_chartered", name: "Standard Chartered", isDefault: true },
+  { id: "other", name: "Other", isDefault: true },
+];
+
 const SETTINGS_STORAGE_KEY_PREFIX = "payment_track_custom_settings_u_";
 
 type SettingsListener = (settings: AppSettings) => void;
@@ -92,8 +120,10 @@ class SettingsService {
       transactionCardTypes: [...DEFAULT_CARD_TYPES],
       transactionRecipients: [...DEFAULT_RECIPIENTS],
       transactionTypes: [...DEFAULT_TRANSACTION_TYPES],
+      banks: [...DEFAULT_BANKS],
       theme: "ocean",
       hiddenPortals: [],
+      whatsapp: { enabled: true },
     };
   }
 
@@ -120,8 +150,10 @@ class SettingsService {
           transactionCardTypes: cards,
           transactionRecipients: parsed.transactionRecipients?.length ? parsed.transactionRecipients : DEFAULT_RECIPIENTS,
           transactionTypes: parsed.transactionTypes?.length ? parsed.transactionTypes : DEFAULT_TRANSACTION_TYPES,
+          banks: parsed.banks?.length ? parsed.banks : DEFAULT_BANKS,
           theme: parsed.theme || "ocean",
           hiddenPortals: Array.isArray(parsed.hiddenPortals) ? parsed.hiddenPortals : [],
+          whatsapp: parsed.whatsapp || { enabled: true },
         };
       }
     } catch (e) {
@@ -153,10 +185,12 @@ class SettingsService {
               transactionCardTypes: newSettings.transactionCardTypes || this.settings.transactionCardTypes,
               transactionRecipients: newSettings.transactionRecipients || this.settings.transactionRecipients,
               transactionTypes: newSettings.transactionTypes || this.settings.transactionTypes,
+              banks: newSettings.banks || this.settings.banks || DEFAULT_BANKS,
               theme: newTheme,
               hiddenPortals: Array.isArray(newSettings.hiddenPortals)
                 ? newSettings.hiddenPortals
                 : this.settings.hiddenPortals || [],
+              whatsapp: newSettings.whatsapp || this.settings.whatsapp || { enabled: true },
             };
             themeService.setAccent(newTheme);
             this.saveLocalCache();
@@ -225,8 +259,10 @@ class SettingsService {
           transactionCardTypes: parsed.transactionCardTypes || [...DEFAULT_CARD_TYPES],
           transactionRecipients: parsed.transactionRecipients || [...DEFAULT_RECIPIENTS],
           transactionTypes: parsed.transactionTypes || [...DEFAULT_TRANSACTION_TYPES],
+          banks: parsed.banks || [...DEFAULT_BANKS],
           theme: currentTheme,
           hiddenPortals: Array.isArray(parsed.hiddenPortals) ? parsed.hiddenPortals : [],
+          whatsapp: parsed.whatsapp || { enabled: true },
         };
         themeService.setAccent(currentTheme);
         this.saveLocalCache();
@@ -299,8 +335,10 @@ class SettingsService {
       transactionCardTypes: [...this.settings.transactionCardTypes],
       transactionRecipients: [...this.settings.transactionRecipients],
       transactionTypes: [...this.settings.transactionTypes],
+      banks: [...(this.settings.banks || DEFAULT_BANKS)],
       theme: this.settings.theme || "ocean",
       hiddenPortals: [...(this.settings.hiddenPortals || [])],
+      whatsapp: { ...(this.settings.whatsapp || { enabled: true }) },
     };
   }
 
@@ -378,6 +416,38 @@ class SettingsService {
 
   public deleteCardType(id: string): void {
     this.settings.transactionCardTypes = this.settings.transactionCardTypes.filter((c) => c.id !== id);
+    this.saveAndPersist();
+  }
+
+  // --- Bank Credit Cards ---
+  public getBanks(): BankOption[] {
+    return this.settings.banks || [...DEFAULT_BANKS];
+  }
+
+  public addBank(name: string): BankOption {
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "_") + "_" + Date.now();
+    const newBank: BankOption = { id, name: name.trim(), isDefault: false };
+    this.settings.banks = [...(this.settings.banks || DEFAULT_BANKS), newBank];
+    this.saveAndPersist();
+    return newBank;
+  }
+
+  public updateBank(id: string, name: string): void {
+    const current = this.settings.banks || DEFAULT_BANKS;
+    this.settings.banks = current.map((b) =>
+      b.id === id ? { ...b, name: name.trim() } : b
+    );
+    this.saveAndPersist();
+  }
+
+  public deleteBank(id: string): void {
+    const current = this.settings.banks || DEFAULT_BANKS;
+    this.settings.banks = current.filter((b) => b.id !== id);
+    this.saveAndPersist();
+  }
+
+  public resetBanks(): void {
+    this.settings.banks = [...DEFAULT_BANKS];
     this.saveAndPersist();
   }
 
@@ -465,6 +535,31 @@ class SettingsService {
     this.saveAndPersist();
   }
 
+  // --- WhatsApp Settings ---
+  public getWhatsAppSettings(): WhatsAppSettings {
+    return { ...(this.settings.whatsapp || { enabled: true }) };
+  }
+
+  public isWhatsAppEnabled(): boolean {
+    return this.settings.whatsapp?.enabled !== false;
+  }
+
+  public setWhatsAppEnabled(enabled: boolean): void {
+    this.settings.whatsapp = {
+      ...(this.settings.whatsapp || { enabled: true }),
+      enabled,
+    };
+    this.saveAndPersist();
+  }
+
+  public setWhatsAppWelcomeMessage(message: string): void {
+    this.settings.whatsapp = {
+      ...(this.settings.whatsapp || { enabled: true }),
+      welcomeMessage: message,
+    };
+    this.saveAndPersist();
+  }
+
   // --- Reset to Defaults ---
   public resetToDefaults(): void {
     this.settings = {
@@ -472,8 +567,10 @@ class SettingsService {
       transactionCardTypes: [...DEFAULT_CARD_TYPES],
       transactionRecipients: [...DEFAULT_RECIPIENTS],
       transactionTypes: [...DEFAULT_TRANSACTION_TYPES],
+      banks: [...DEFAULT_BANKS],
       theme: "ocean",
       hiddenPortals: [],
+      whatsapp: { enabled: true },
     };
     themeService.setAccent("ocean");
     this.saveAndPersist();
@@ -492,8 +589,10 @@ class SettingsService {
           transactionCardTypes: parsed.transactionCardTypes || [...DEFAULT_CARD_TYPES],
           transactionRecipients: parsed.transactionRecipients || [...DEFAULT_RECIPIENTS],
           transactionTypes: parsed.transactionTypes || [...DEFAULT_TRANSACTION_TYPES],
+          banks: parsed.banks || [...DEFAULT_BANKS],
           theme: parsed.theme || this.settings.theme || "ocean",
           hiddenPortals: Array.isArray(parsed.hiddenPortals) ? parsed.hiddenPortals : [],
+          whatsapp: parsed.whatsapp || this.settings.whatsapp || { enabled: true },
         };
         if (this.settings.theme) {
           themeService.setAccent(this.settings.theme);

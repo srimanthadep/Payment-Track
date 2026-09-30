@@ -49,6 +49,7 @@ import {
   PieChart,
   Eye,
   EyeOff,
+  MessageCircle,
 } from "lucide-react";
 import { AiIcon } from "@/components/icons/AiIcon";
 import { useToast } from "@/hooks/use-toast";
@@ -61,7 +62,10 @@ import {
   CardTypeOption,
   RecipientOption,
   TransactionTypeOption,
+  BankOption,
+  WhatsAppSettings,
 } from "@/services/settingsService";
+import { whatsappService } from "@/services/whatsappService";
 import { ProfileSettings } from "@/components/settings/ProfileSettings";
 
 const COLOR_PRESETS = [
@@ -110,6 +114,11 @@ const Settings = () => {
   const [transactionTypeModalOpen, setTransactionTypeModalOpen] = useState(false);
   const [editingTxType, setEditingTxType] = useState<TransactionTypeOption | null>(null);
   const [txTypeLabel, setTxTypeLabel] = useState("");
+
+  // Bank Modals
+  const [bankModalOpen, setBankModalOpen] = useState(false);
+  const [editingBank, setEditingBank] = useState<BankOption | null>(null);
+  const [bankName, setBankName] = useState("");
 
   // Reset dialog
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
@@ -229,6 +238,23 @@ const Settings = () => {
     setTxTypeLabel("");
   };
 
+  // --- Bank Handlers ---
+  const handleSaveBank = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bankName.trim()) return;
+
+    if (editingBank) {
+      settingsService.updateBank(editingBank.id, bankName.trim());
+      toast({ title: "Updated", description: `Bank "${bankName}" updated` });
+    } else {
+      settingsService.addBank(bankName.trim());
+      toast({ title: "Added", description: `Bank "${bankName}" added to Credit Card Banks dropdown` });
+    }
+    setBankModalOpen(false);
+    setEditingBank(null);
+    setBankName("");
+  };
+
   // --- Reset Handlers ---
   const handleResetDefaults = () => {
     settingsService.resetToDefaults();
@@ -275,7 +301,7 @@ const Settings = () => {
 
         {/* Tabs */}
         <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="grid grid-cols-5 w-full sm:w-[720px] p-1 bg-muted/60 h-auto">
+          <TabsList className="grid grid-cols-6 w-full sm:w-[860px] p-1 bg-muted/60 h-auto">
             <TabsTrigger
               value="profile"
               className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 text-[11px] sm:text-sm font-semibold h-auto"
@@ -310,6 +336,13 @@ const Settings = () => {
             >
               <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span>Backup</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="whatsapp"
+              className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 text-[11px] sm:text-sm font-semibold h-auto"
+            >
+              <MessageCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>WhatsApp</span>
             </TabsTrigger>
           </TabsList>
 
@@ -485,7 +518,98 @@ const Settings = () => {
               </CardContent>
             </Card>
 
-            {/* 2. Portal Comparison Chart Visibility */}
+            {/* 2. Bank Credit Cards Dropdown */}
+            <Card className="border shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <div>
+                  <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                    <CreditCard className="h-4 w-4 text-primary" />
+                    Bank Credit Cards Dropdown
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Configure available credit card issuing banks (HDFC, SBI Card, ICICI, Axis, Kotak, etc.)
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      settingsService.resetBanks();
+                      toast({ title: "Restored", description: "Banks reset to standard bank presets." });
+                    }}
+                    className="h-8 text-xs gap-1"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Reset
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setEditingBank(null);
+                      setBankName("");
+                      setBankModalOpen(true);
+                    }}
+                    className="h-8 text-xs gap-1"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add Bank
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {(settings.banks || []).map((bank) => (
+                    <div
+                      key={bank.id}
+                      className="flex items-center justify-between p-3 rounded-xl border bg-card hover:bg-muted/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-semibold truncate">{bank.name}</span>
+                        {bank.isDefault && (
+                          <span className="text-[10px] text-muted-foreground uppercase font-medium shrink-0">Default</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          onClick={() => {
+                            setEditingBank(bank);
+                            setBankName(bank.name);
+                            setBankModalOpen(true);
+                          }}
+                        >
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive/70 hover:text-destructive"
+                          onClick={() => {
+                            if ((settings.banks || []).length <= 1) {
+                              toast({
+                                title: "Cannot Delete",
+                                description: "At least 1 bank option is required",
+                                variant: "destructive",
+                              });
+                              return;
+                            }
+                            settingsService.deleteBank(bank.id);
+                            toast({ title: "Deleted", description: `"${bank.name}" removed` });
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 3. Portal Comparison Chart Visibility */}
             <Card className="border shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between pb-3">
                 <div>
@@ -835,6 +959,101 @@ const Settings = () => {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* ===================== TAB 5: WHATSAPP INTEGRATION ===================== */}
+          <TabsContent value="whatsapp" className="space-y-6">
+            {/* WhatsApp Toggle Card */}
+            <Card className="border shadow-sm">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                      <MessageCircle className="h-4 w-4 text-green-600" />
+                      WhatsApp Integration
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Automatically send welcome messages and transaction receipts via WhatsApp
+                    </CardDescription>
+                  </div>
+                  <Switch
+                    checked={settings.whatsapp?.enabled !== false}
+                    onCheckedChange={(checked) => {
+                      settingsService.setWhatsAppEnabled(checked);
+                      toast({
+                        title: checked ? "WhatsApp Enabled" : "WhatsApp Disabled",
+                        description: checked
+                          ? "Customers will receive WhatsApp messages automatically"
+                          : "WhatsApp messages are paused",
+                      });
+                    }}
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Status Indicator */}
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/40 border border-border/60">
+                  <div className={cn(
+                    "h-2.5 w-2.5 rounded-full",
+                    settings.whatsapp?.enabled !== false ? "bg-green-500 animate-pulse" : "bg-zinc-400"
+                  )} />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">
+                      {settings.whatsapp?.enabled !== false ? "Active" : "Paused"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {settings.whatsapp?.enabled !== false
+                        ? "Welcome messages & receipts are being sent"
+                        : "No WhatsApp messages will be sent"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Features list */}
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">What gets sent automatically</p>
+                  <div className="grid gap-2">
+                    <div className="flex items-start gap-2.5 p-2.5 rounded-md bg-green-500/5 border border-green-500/10">
+                      <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium">Welcome Message</p>
+                        <p className="text-xs text-muted-foreground">Sent when you add a new customer with a phone number</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2.5 p-2.5 rounded-md bg-green-500/5 border border-green-500/10">
+                      <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium">Transaction Receipt</p>
+                        <p className="text-xs text-muted-foreground">Sent when you record a transaction for a customer with a phone number</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Message Preview */}
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Welcome Message Preview</p>
+                  <div className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/15 font-mono text-xs leading-relaxed whitespace-pre-line text-muted-foreground">
+                    {`👋 Welcome, [Customer Name]!
+
+Thank you for choosing [Your Business]. 🎉
+
+We'll send your transaction receipts directly here on WhatsApp for your convenience.
+
+For any queries, feel free to reach out!
+— [Your Business]`}
+                  </div>
+                </div>
+
+                {/* Setup Notice */}
+                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    <strong>Setup Required:</strong> WhatsApp Cloud API credentials must be configured on the backend server.
+                    Add <code className="bg-amber-500/10 px-1 py-0.5 rounded text-[10px]">WHATSAPP_PHONE_NUMBER_ID</code> and <code className="bg-amber-500/10 px-1 py-0.5 rounded text-[10px]">WHATSAPP_ACCESS_TOKEN</code> to your backend environment variables.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </motion.div>
 
@@ -917,6 +1136,37 @@ const Settings = () => {
               </Button>
               <Button type="submit" size="sm">
                 Save Recipient
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bank Modal */}
+      <Dialog open={bankModalOpen} onOpenChange={setBankModalOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>{editingBank ? "Edit Bank" : "Add Credit Card Bank"}</DialogTitle>
+            <DialogDescription>Add or update a bank in the credit card bank dropdown</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSaveBank} className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="bank-input-name" className="text-xs font-semibold">Bank Name *</Label>
+              <Input
+                id="bank-input-name"
+                placeholder="e.g. HDFC Bank, SBI Card, ICICI Bank..."
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                required
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button type="button" variant="outline" size="sm" onClick={() => setBankModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" size="sm">
+                Save Bank
               </Button>
             </div>
           </form>

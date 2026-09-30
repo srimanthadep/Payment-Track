@@ -38,11 +38,15 @@ import {
   Edit3,
   Trash2,
   Loader2,
+  MessageCircle,
+  FileText,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { exportTransactionsToCSV } from "@/utils/exportUtils";
 import { customerService } from "@/services/customerService";
+import { whatsappService } from "@/services/whatsappService";
+import { downloadReceiptPDF } from "@/utils/receiptPdf";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -124,6 +128,119 @@ export const CustomerDetailDialog = ({
     toast({
       title: "Statement Exported",
       description: `Statement downloaded for ${customer.name}.`,
+    });
+  };
+
+  const [isSendingWelcome, setIsSendingWelcome] = useState(false);
+  const [sendingReceiptId, setSendingReceiptId] = useState<string | null>(null);
+
+  const handleSendWelcome = async () => {
+    if (!customer.phone) {
+      toast({
+        variant: "destructive",
+        title: "No Phone Number",
+        description: "This customer does not have a phone number saved.",
+      });
+      return;
+    }
+    setIsSendingWelcome(true);
+    try {
+      const res = await whatsappService.sendWelcome({
+        customerName: customer.name,
+        phone: customer.phone,
+        userId,
+        customerId: customer.id,
+      });
+      if (res.success) {
+        toast({
+          title: "WhatsApp Sent ✅",
+          description: `Welcome message sent to ${customer.name}`,
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "WhatsApp Failed",
+          description: res.error || "Could not send message. Check WhatsApp server configuration.",
+        });
+      }
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err.message || "Failed to send WhatsApp message",
+      });
+    } finally {
+      setIsSendingWelcome(false);
+    }
+  };
+
+  const handleSendReceipt = async (t: CustomerTransaction) => {
+    if (!customer.phone) {
+      toast({
+        variant: "destructive",
+        title: "No Phone Number",
+        description: "This customer does not have a phone number saved.",
+      });
+      return;
+    }
+    setSendingReceiptId(t.id);
+    try {
+      const res = await whatsappService.sendReceipt({
+        customerName: customer.name,
+        phone: customer.phone,
+        userId,
+        customerId: customer.id,
+        transactionId: t.id,
+        transaction: {
+          amount: t.amount,
+          portalName: t.portal_name,
+          transactionDate: t.transaction_date,
+          transactionType: t.transaction_type,
+          commission: t.commission,
+          cardType: t.card_type || undefined,
+        },
+      });
+      if (res.success) {
+        toast({
+          title: "Receipt Sent ✅",
+          description: `Transaction receipt sent to ${customer.name} via WhatsApp`,
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "WhatsApp Failed",
+          description: res.error || "Could not send receipt. Check WhatsApp server configuration.",
+        });
+      }
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err.message || "Failed to send receipt",
+      });
+    } finally {
+      setSendingReceiptId(null);
+    }
+  };
+
+  const handleDownloadReceipt = (t: CustomerTransaction) => {
+    downloadReceiptPDF({
+      customerName: customer.name,
+      customerPhone: customer.phone || undefined,
+      transaction: {
+        id: t.id,
+        amount: t.amount,
+        portalName: t.portal_name,
+        transactionDate: t.transaction_date,
+        transactionType: t.transaction_type,
+        commission: t.commission,
+        cardType: t.card_type || undefined,
+        notes: t.notes || undefined,
+      },
+    });
+    toast({
+      title: "PDF Receipt Downloaded",
+      description: `Receipt for ₹${t.amount.toLocaleString("en-IN")} downloaded successfully.`,
     });
   };
 
@@ -309,6 +426,22 @@ export const CustomerDetailDialog = ({
                   Export History
                 </Button>
               )}
+              {customer.phone && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs h-8 gap-1.5 shadow-xs border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+                  onClick={handleSendWelcome}
+                  disabled={isSendingWelcome}
+                >
+                  {isSendingWelcome ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
+                  )}
+                  <span>WhatsApp Welcome</span>
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -408,6 +541,7 @@ export const CustomerDetailDialog = ({
                   {!isStaff && <TableHead className="text-xs font-semibold text-right">Commission</TableHead>}
                   {!isStaff && <TableHead className="text-xs font-semibold text-right">Profit</TableHead>}
                   <TableHead className="text-xs font-semibold">Notes</TableHead>
+                  <TableHead className="text-xs font-semibold text-right">Receipt</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -457,6 +591,35 @@ export const CustomerDetailDialog = ({
                       )}
                       <TableCell className="text-xs py-2.5 text-muted-foreground max-w-[160px] truncate" title={t.notes || ""}>
                         {t.notes || "—"}
+                      </TableCell>
+                      <TableCell className="text-xs py-2.5 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1">
+                          {customer.phone && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
+                              title="Send Receipt via WhatsApp"
+                              onClick={() => handleSendReceipt(t)}
+                              disabled={sendingReceiptId === t.id}
+                            >
+                              {sendingReceiptId === t.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <MessageCircle className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            title="Download PDF Receipt"
+                            onClick={() => handleDownloadReceipt(t)}
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -517,6 +680,34 @@ export const CustomerDetailDialog = ({
                       {t.notes}
                     </div>
                   )}
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/50">
+                    {customer.phone && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-[11px] gap-1 px-2 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+                        onClick={() => handleSendReceipt(t)}
+                        disabled={sendingReceiptId === t.id}
+                      >
+                        {sendingReceiptId === t.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <MessageCircle className="h-3 w-3 text-emerald-600" />
+                        )}
+                        <span>WhatsApp</span>
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-[11px] gap-1 px-2 text-muted-foreground"
+                      onClick={() => handleDownloadReceipt(t)}
+                    >
+                      <FileText className="h-3 w-3" />
+                      <span>PDF</span>
+                    </Button>
+                  </div>
                 </div>
               );
             })}

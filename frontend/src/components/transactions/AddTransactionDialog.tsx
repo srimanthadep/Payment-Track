@@ -32,11 +32,13 @@ import {
   CardTypeOption,
   RecipientOption,
   TransactionTypeOption,
+  BankOption,
 } from "@/services/settingsService";
 import { transactionLearningService } from "@/services/transactionLearningService";
 import { activityLogService } from "@/services/activityLogService";
 import { CustomerCombobox, CustomerValue } from "@/components/customers/CustomerCombobox";
 import { customerService } from "@/services/customerService";
+import { whatsappService, formatPhoneForWhatsApp } from "@/services/whatsappService";
 
 interface AddTransactionDialogProps {
   userId: string;
@@ -55,6 +57,8 @@ interface AddTransactionDialogProps {
     customer_name?: string;
     customer_phone?: string;
     portal_id?: string;
+    customer_mode?: "Online" | "Offline";
+    bank_name?: string;
   } | null;
 }
 
@@ -73,12 +77,14 @@ export const AddTransactionDialog = ({
   const [cardTypes, setCardTypes] = useState<CardTypeOption[]>([]);
   const [recipients, setRecipients] = useState<RecipientOption[]>([]);
   const [txTypes, setTxTypes] = useState<TransactionTypeOption[]>([]);
+  const [banks, setBanks] = useState<BankOption[]>([]);
 
   useEffect(() => {
     const updateDropdowns = () => {
       setCardTypes(settingsService.getCardTypes());
       setRecipients(settingsService.getRecipients());
       setTxTypes(settingsService.getTransactionTypes());
+      setBanks(settingsService.getBanks());
     };
     updateDropdowns();
     return settingsService.subscribe(updateDropdowns);
@@ -93,6 +99,8 @@ export const AddTransactionDialog = ({
     sent_to: "",
     customer_name: "",
     customer_phone: "",
+    customer_mode: "Offline" as "Online" | "Offline",
+    bank_name: "",
     transaction_date: new Date(),
   });
 
@@ -162,6 +170,8 @@ export const AddTransactionDialog = ({
         sent_to: initialData.sent_to || prev.sent_to,
         customer_name: initialData.customer_name || prev.customer_name,
         customer_phone: initialData.customer_phone || prev.customer_phone,
+        customer_mode: initialData.customer_mode || prev.customer_mode || "Offline",
+        bank_name: initialData.bank_name || prev.bank_name || "",
       }));
 
       if (initialData.customer_name || initialData.customer_phone || (initialData as any).customer_id) {
@@ -210,6 +220,8 @@ export const AddTransactionDialog = ({
       sent_to: "",
       customer_name: "",
       customer_phone: "",
+      customer_mode: "Offline",
+      bank_name: "",
       transaction_date: new Date(),
     });
     setCustomerValue(null);
@@ -315,7 +327,9 @@ export const AddTransactionDialog = ({
       }
     }
 
-    let notesStr = `Sent to: ${formData.sent_to} | Commission: ${commPercent}%${
+    let notesStr = `Sent to: ${formData.sent_to} | Mode: ${formData.customer_mode}${
+      formData.bank_name ? ` | Bank: ${formData.bank_name}` : ""
+    } | Commission: ${commPercent}%${
       formData.site_fee_percent ? ` | Site Fee: ${formData.site_fee_percent}%` : ""
     }`;
     if (isChummi) {
@@ -339,6 +353,8 @@ export const AddTransactionDialog = ({
       customer_id: customerId,
       customer_name: customerName,
       customer_phone: customerPhone,
+      customer_mode: formData.customer_mode,
+      bank_name: formData.bank_name || null,
       notes: notesStr,
     };
 
@@ -370,12 +386,14 @@ export const AddTransactionDialog = ({
       activityLogService.log(
         "transaction.created",
         "transaction",
-        `Added ${formData.transaction_type} of ₹${parseFloat(formData.amount).toLocaleString("en-IN")} to ${formData.sent_to} (${formData.card_type}${commPct ? `, Commission: ${commPct}%` : ""}${feePct ? `, Site Fee: ${feePct}%` : ""}${isChummi && formData.customer_name.trim() ? `, Customer: ${formData.customer_name.trim()}` : ""})`,
+        `Added ${formData.transaction_type} of ₹${parseFloat(formData.amount).toLocaleString("en-IN")} to ${formData.sent_to} (${formData.card_type}, ${formData.customer_mode}${formData.bank_name ? `, Bank: ${formData.bank_name}` : ""}${commPct ? `, Commission: ${commPct}%` : ""}${feePct ? `, Site Fee: ${feePct}%` : ""}${isChummi && formData.customer_name.trim() ? `, Customer: ${formData.customer_name.trim()}` : ""})`,
         {
           amount: parseFloat(formData.amount),
           card_type: formData.card_type,
           transaction_type: formData.transaction_type,
           sent_to: formData.sent_to,
+          customer_mode: formData.customer_mode,
+          bank_name: formData.bank_name,
           commission_percent: commPct,
           site_fee_percent: feePct,
           customer_name: isChummi ? formData.customer_name.trim() || null : null,
@@ -387,6 +405,38 @@ export const AddTransactionDialog = ({
         title: "Success",
         description: "Transaction added successfully",
       });
+
+      // Fire-and-forget WhatsApp receipt if customer has a phone number
+      const receiptPhone = customerPhone ? formatPhoneForWhatsApp(customerPhone) : null;
+      const waSettings = (settingsService.getSettings() as any).whatsapp;
+      const waEnabled = waSettings?.enabled !== false;
+
+      if (receiptPhone && waEnabled && customerName) {
+        whatsappService.sendReceipt({
+          customerName,
+          phone: customerPhone!,
+          userId,
+          customerId: customerId || undefined,
+          transaction: {
+            amount: parseFloat(formData.amount),
+            portalName: formData.sent_to,
+            transactionDate: formData.transaction_date.toISOString(),
+            transactionType: formData.transaction_type,
+            commission: commissionAmount,
+            cardType: formData.card_type,
+          },
+        }).then((result) => {
+          if (result.success) {
+            toast({
+              title: "WhatsApp ✅",
+              description: `Receipt sent to ${customerName} on WhatsApp`,
+            });
+          }
+        }).catch(() => {
+          // Silent — transaction was already saved
+        });
+      }
+
       resetForm();
       onOpenChange(false);
       onSuccess?.(addedDate);
@@ -702,6 +752,51 @@ export const AddTransactionDialog = ({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* 8. Customer Mode (Online/Offline) & Bank Credit Card */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label htmlFor="customer_mode" className="text-xs sm:text-sm font-medium">Customer Mode</Label>
+              <Select
+                value={formData.customer_mode}
+                onValueChange={(val: "Online" | "Offline") =>
+                  setFormData((prev) => ({ ...prev, customer_mode: val }))
+                }
+              >
+                <SelectTrigger id="customer_mode">
+                  <SelectValue placeholder="Select mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Offline">Offline</SelectItem>
+                  <SelectItem value="Online">Online</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5 sm:space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="bank_name" className="text-xs sm:text-sm font-medium">Bank Credit Card</Label>
+                <span className="text-[10px] text-muted-foreground">(Optional)</span>
+              </div>
+              <Select
+                value={formData.bank_name}
+                onValueChange={(val) =>
+                  setFormData((prev) => ({ ...prev, bank_name: val }))
+                }
+              >
+                <SelectTrigger id="bank_name">
+                  <SelectValue placeholder="Select bank" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {banks.map((b) => (
+                    <SelectItem key={b.id} value={b.name}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Conditional Customer Info for Chummi Portal */}

@@ -265,10 +265,12 @@ export type Database = {
       transactions: {
         Row: {
           amount: number
+          bank_name: string | null
           card_type: string | null
           commission: number | null
           created_at: string
           customer_id: string | null
+          customer_mode: string | null
           customer_name: string | null
           customer_phone: string | null
           id: string
@@ -284,10 +286,12 @@ export type Database = {
         }
         Insert: {
           amount: number
+          bank_name?: string | null
           card_type?: string | null
           commission?: number | null
           created_at?: string
           customer_id?: string | null
+          customer_mode?: string | null
           customer_name?: string | null
           customer_phone?: string | null
           id?: string
@@ -303,10 +307,12 @@ export type Database = {
         }
         Update: {
           amount?: number
+          bank_name?: string | null
           card_type?: string | null
           commission?: number | null
           created_at?: string
           customer_id?: string | null
+          customer_mode?: string | null
           customer_name?: string | null
           customer_phone?: string | null
           id?: string

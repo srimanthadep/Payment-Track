@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,27 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   User,
-  Camera,
-  Upload,
-  Trash2,
   CheckCircle2,
   Loader2,
   Sparkles,
   Copy,
   Check,
   ShieldCheck,
-  HardDrive,
   Calendar,
   Mail,
   Palette,
@@ -35,22 +21,16 @@ import { useToast } from "@/hooks/use-toast";
 import { profileService, UserProfile } from "@/services/profileService";
 import { themeService, THEME_ACCENTS, ThemeAccent } from "@/services/themeService";
 import { settingsService } from "@/services/settingsService";
-import { motion } from "framer-motion";
 
 export const ProfileSettings = () => {
   const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isUploading, setIsUploading] = useState(false);
   const [isSavingName, setIsSavingName] = useState(false);
-  const [isRemoving, setIsRemoving] = useState(false);
-  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
 
   const [fullName, setFullName] = useState("");
   const [copiedId, setCopiedId] = useState(false);
-  const [isDragOver, setIsDragOver] = useState(false);
   const [activeAccent, setActiveAccent] = useState<ThemeAccent>(() => themeService.getActiveAccent());
 
   const loadProfile = async () => {
@@ -83,94 +63,6 @@ export const ProfileSettings = () => {
       unsubSettings();
     };
   }, []);
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    const file = files[0];
-    await processUpload(file);
-    // Reset file input so same file can be selected again if needed
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  const processUpload = async (file: File) => {
-    setIsUploading(true);
-    try {
-      const { url, error } = await profileService.uploadProfilePicture(file);
-
-      if (error) {
-        toast({
-          title: "Upload Failed",
-          description: error,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Profile Picture Updated",
-          description: "Your new avatar has been uploaded to Supabase 'profile' storage bucket.",
-        });
-        await loadProfile();
-      }
-    } catch (err: any) {
-      toast({
-        title: "Upload Error",
-        description: err?.message || "An unexpected error occurred",
-        variant: "destructive",
-      });
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-  };
-
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      await processUpload(files[0]);
-    }
-  };
-
-  const handleRemovePhoto = async () => {
-    setIsRemoving(true);
-    try {
-      const { success, error } = await profileService.removeProfilePicture();
-      if (error) {
-        toast({
-          title: "Failed to Remove Photo",
-          description: error,
-          variant: "destructive",
-        });
-      } else if (success) {
-        toast({
-          title: "Photo Removed",
-          description: "Your profile picture has been reset to default.",
-        });
-        await loadProfile();
-      }
-    } catch (err: any) {
-      toast({
-        title: "Error",
-        description: err?.message || "Failed to remove photo",
-        variant: "destructive",
-      });
-    } finally {
-      setIsRemoving(false);
-      setRemoveDialogOpen(false);
-    }
-  };
 
   const handleSaveFullName = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -211,97 +103,27 @@ export const ProfileSettings = () => {
     });
   };
 
-  const getInitials = (name?: string, email?: string) => {
-    if (name?.trim()) {
-      const parts = name.trim().split(" ");
-      if (parts.length >= 2) {
-        return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-      }
-      return parts[0].slice(0, 2).toUpperCase();
-    }
-    if (email) {
-      return email.slice(0, 2).toUpperCase();
-    }
-    return "PT";
-  };
-
   return (
     <div className="space-y-6">
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/svg+xml"
-        className="hidden"
-        onChange={handleFileChange}
-      />
-
-      {/* Main Profile & Avatar Card */}
+      {/* Main Profile & Brand Card */}
       <Card className="border shadow-sm overflow-hidden">
-        <div className="h-24 sm:h-32 bg-gradient-to-r from-primary/20 via-primary/10 to-accent/20 border-b relative">
-          <div className="hidden sm:flex absolute top-3 right-3 items-center gap-1.5 px-2.5 py-1 rounded-full bg-background/80 backdrop-blur-md border border-border/60 text-xs font-semibold text-foreground/80 shadow-xs">
-            <HardDrive className="h-3.5 w-3.5 text-primary" />
-            <span>Supabase Bucket: <code className="font-mono text-primary font-bold">profile</code></span>
-          </div>
-        </div>
+        <div className="h-24 sm:h-32 bg-gradient-to-r from-primary/20 via-primary/10 to-accent/20 border-b relative" />
 
         <CardContent className="pt-0 relative px-4 sm:px-6 pb-5">
           <div className="flex flex-col sm:flex-row items-center sm:items-end sm:justify-between gap-4 -mt-12 sm:-mt-16 mb-5 text-center sm:text-left">
             {/* Avatar & User Details */}
             <div className="flex flex-col sm:flex-row items-center sm:items-end gap-3 sm:gap-4">
-              <div
-                className={`relative group cursor-pointer rounded-full p-1 bg-background ring-4 ring-card shadow-lg transition-all duration-200 ${
-                  isDragOver ? "ring-primary scale-105" : ""
-                }`}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onClick={() => !isUploading && fileInputRef.current?.click()}
-                title="Click or drag & drop to change profile picture"
-              >
-                <Avatar className="h-20 w-20 sm:h-28 sm:w-28 rounded-full border-2 border-border/80 bg-muted overflow-hidden">
+              <div className="relative rounded-full p-1 bg-background ring-4 ring-card shadow-lg">
+                <Avatar className="h-20 w-20 sm:h-28 sm:w-28 rounded-full border-2 border-border/80 bg-background overflow-hidden">
                   <AvatarImage
-                    src={profile?.avatarUrl || "/logo-circle.png"}
-                    alt={profile?.fullName || "User Profile"}
-                    className="object-cover h-full w-full"
+                    src="/logo-circle.png"
+                    alt="Logo"
+                    className="object-contain h-full w-full p-1"
                   />
                   <AvatarFallback className="text-lg sm:text-xl font-bold bg-primary/15 text-primary">
-                    {getInitials(profile?.fullName, profile?.email)}
+                    PT
                   </AvatarFallback>
                 </Avatar>
-
-                {/* Upload Hover Overlay */}
-                <div className="absolute inset-1 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center text-white text-xs font-medium">
-                  {isUploading ? (
-                    <Loader2 className="h-5 w-5 animate-spin text-white" />
-                  ) : (
-                    <>
-                      <Camera className="h-5 w-5 mb-0.5" />
-                      <span className="text-[10px]">Change</span>
-                    </>
-                  )}
-                </div>
-
-                {/* Active Uploading Spinner */}
-                {isUploading && (
-                  <div className="absolute inset-1 rounded-full bg-black/60 flex flex-col items-center justify-center text-white">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary-foreground mb-0.5" />
-                    <span className="text-[9px] font-semibold">Uploading...</span>
-                  </div>
-                )}
-
-                {/* Camera Quick Button Badge */}
-                <button
-                  type="button"
-                  disabled={isUploading}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    fileInputRef.current?.click();
-                  }}
-                  className="absolute bottom-0 right-0 h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-primary text-primary-foreground shadow-md flex items-center justify-center hover:bg-primary/90 transition-transform active:scale-95 border-2 border-background"
-                >
-                  <Camera className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                </button>
               </div>
 
               {/* Basic Profile Name Display */}
@@ -318,71 +140,6 @@ export const ProfileSettings = () => {
                 <p className="text-xs text-muted-foreground flex items-center justify-center sm:justify-start gap-1.5">
                   <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                   {profile?.email || "No email available"}
-                </p>
-              </div>
-            </div>
-
-            {/* Avatar Action Buttons */}
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-center">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={isUploading}
-                onClick={() => fileInputRef.current?.click()}
-                className="h-8 sm:h-9 text-xs sm:text-sm gap-1.5 font-medium shadow-xs flex-1 sm:flex-none"
-              >
-                {isUploading ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Uploading...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-3.5 w-3.5 text-primary" />
-                    {profile?.avatarUrl ? "Change Photo" : "Upload Picture"}
-                  </>
-                )}
-              </Button>
-
-              {profile?.avatarUrl && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  disabled={isUploading || isRemoving}
-                  onClick={() => setRemoveDialogOpen(true)}
-                  className="h-8 sm:h-9 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 gap-1.5"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Remove
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Desktop Drag & Drop Upload Zone */}
-          <div
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => !isUploading && fileInputRef.current?.click()}
-            className={`hidden sm:block cursor-pointer border-2 border-dashed rounded-xl p-4 text-center transition-all duration-200 ${
-              isDragOver
-                ? "border-primary bg-primary/5 scale-[1.01]"
-                : "border-border/80 bg-muted/20 hover:bg-muted/40 hover:border-primary/50"
-            }`}
-          >
-            <div className="flex flex-col items-center justify-center space-y-1.5">
-              <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                <Upload className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold">
-                  Click to browse or drag and drop your photo
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Supported formats: JPG, PNG, WEBP, GIF, SVG (Up to 5 MB). Stored in <code className="font-semibold text-primary">profile</code> bucket.
                 </p>
               </div>
             </div>
@@ -457,33 +214,18 @@ export const ProfileSettings = () => {
           </CardContent>
         </Card>
 
-        {/* Supabase Storage & Account Metadata */}
+        {/* Account Info */}
         <Card className="border shadow-sm">
           <CardHeader>
             <CardTitle className="text-base sm:text-lg flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" />
-              Storage & Account Info
+              Account Info
             </CardTitle>
             <CardDescription className="text-xs">
-              Supabase storage bucket and authentication status
+              Authentication and account metadata
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="p-3.5 rounded-xl border bg-muted/20 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                  <HardDrive className="h-3.5 w-3.5 text-primary" />
-                  Storage Bucket
-                </span>
-                <Badge variant="outline" className="font-mono text-xs font-semibold text-primary border-primary/30 bg-primary/5">
-                  profile
-                </Badge>
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                Profile images are directly uploaded and synced using Supabase Cloud Storage.
-              </p>
-            </div>
-
             <div className="space-y-2.5">
               <div className="flex items-center justify-between text-xs py-1 border-b border-border/50">
                 <span className="text-muted-foreground">User ID</span>
@@ -521,9 +263,9 @@ export const ProfileSettings = () => {
               </div>
 
               <div className="flex items-center justify-between text-xs py-1">
-                <span className="text-muted-foreground">App Brand Header</span>
+                <span className="text-muted-foreground">App Brand Logo</span>
                 <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                  Profile Pic Synced
+                  Active
                 </span>
               </div>
             </div>
@@ -579,28 +321,6 @@ export const ProfileSettings = () => {
           </CardContent>
         </Card>
       </div>
-
-      {/* Confirmation Dialog for Photo Removal */}
-      <AlertDialog open={removeDialogOpen} onOpenChange={setRemoveDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove Profile Picture?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to remove your current profile picture? The logo fallback will be displayed instead.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isRemoving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleRemovePhoto}
-              disabled={isRemoving}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isRemoving ? "Removing..." : "Remove Photo"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };

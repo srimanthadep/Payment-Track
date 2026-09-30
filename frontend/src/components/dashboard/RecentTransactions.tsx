@@ -1,3 +1,4 @@
+import { formatCurrency } from "@/utils/format";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -168,13 +169,6 @@ export const RecentTransactions = ({ userId, filters }: RecentTransactionsProps)
     };
   }, [userId, filters]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      minimumFractionDigits: 2,
-    }).format(amount);
-  };
 
   const formatDate = (date: string) => {
     try {

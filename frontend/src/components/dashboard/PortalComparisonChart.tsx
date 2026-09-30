@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { motion } from "framer-motion";
 import { settingsService } from "@/services/settingsService";
+import { formatCurrency } from "@/utils/format";
 import {
   format,
   isToday,

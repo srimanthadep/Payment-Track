@@ -1,3 +1,4 @@
+import { formatCurrency } from "@/utils/format";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { FilterState } from "@/components/transactions/TransactionFilters";
@@ -246,14 +247,6 @@ export const ProfitChart = ({ userId, filters }: ProfitChartProps) => {
     };
   }, [userId, period, filters]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ value: number; payload: ChartDataPoint }> }) => {
     if (active && payload && payload.length) {

@@ -222,12 +222,9 @@ export const DashboardLayout = ({ children, headerAction }: DashboardLayoutProps
           >
             <div className="relative flex items-center justify-center">
               <img
-                src={userProfile?.avatarUrl || "/logo-circle.png"}
-                alt="Profile"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src = "/logo-circle.png";
-                }}
-                className="h-8 w-8 rounded-full object-cover ring-2 ring-primary/20 shadow-xs group-hover:ring-primary/50 transition-all"
+                src="/logo-circle.png"
+                alt="Logo"
+                className="h-8 w-8 rounded-full object-contain ring-2 ring-primary/20 shadow-xs group-hover:ring-primary/50 transition-all bg-card p-0.5"
               />
               <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-card" />
             </div>
@@ -255,12 +252,9 @@ export const DashboardLayout = ({ children, headerAction }: DashboardLayoutProps
               >
                 <div className="flex items-center space-x-3">
                   <img
-                    src={userProfile?.avatarUrl || "/logo-circle.png"}
-                    alt="Profile"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = "/logo-circle.png";
-                    }}
-                    className="h-10 w-10 rounded-full object-cover ring-2 ring-primary/30 shadow-md"
+                    src="/logo-circle.png"
+                    alt="Logo"
+                    className="h-10 w-10 rounded-full object-contain ring-2 ring-primary/30 shadow-md bg-card p-1"
                   />
                   <div>
                     <span className="font-bold text-base tracking-tight block">Payment Tracker</span>
@@ -312,7 +306,7 @@ export const DashboardLayout = ({ children, headerAction }: DashboardLayoutProps
       {/* Main Layout Body */}
       <div className="flex-1 flex">
         {/* Desktop Sidebar */}
-        <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 border-r border-border/80 bg-card/60 backdrop-blur-xl z-20 shadow-xs">
+        <aside className="hidden lg:flex lg:flex-col lg:w-72 lg:fixed lg:inset-y-0 border-r border-border/80 bg-card/60 backdrop-blur-xl z-20 shadow-xs">
           {/* Brand header */}
           <div className="flex items-center justify-between px-4 py-3.5 border-b border-border/70 bg-gradient-to-b from-card to-card/50">
             <div
@@ -322,12 +316,9 @@ export const DashboardLayout = ({ children, headerAction }: DashboardLayoutProps
             >
               <div className="relative shrink-0">
                 <img
-                  src={userProfile?.avatarUrl || "/logo-circle.png"}
-                  alt="Profile"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src = "/logo-circle.png";
-                  }}
-                  className="h-9 w-9 rounded-full object-cover ring-2 ring-primary/25 shadow-sm group-hover:ring-primary/50 group-hover:scale-105 transition-all"
+                  src="/logo-circle.png"
+                  alt="Logo"
+                  className="h-9 w-9 rounded-full object-contain ring-2 ring-primary/25 shadow-sm group-hover:ring-primary/50 group-hover:scale-105 transition-all bg-card p-0.5"
                 />
                 <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-card" />
               </div>
@@ -417,7 +408,7 @@ export const DashboardLayout = ({ children, headerAction }: DashboardLayoutProps
         </aside>
 
         {/* Main Content Area */}
-        <div className="lg:pl-64 flex-1 flex flex-col min-w-0">
+        <div className="lg:pl-72 flex-1 flex flex-col min-w-0">
           <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-28 sm:pb-32 lg:pb-10 max-w-7xl w-full mx-auto">
             {children}
           </main>

@@ -1,3 +1,4 @@
+import { formatCurrency } from "@/utils/format";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -182,13 +183,6 @@ export const AdminTransactions = () => {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      minimumFractionDigits: 2,
-    }).format(amount);
-  };
 
   const formatDateTimeParts = (date: string) => {
     if (!date) return { date: "-", time: "" };
