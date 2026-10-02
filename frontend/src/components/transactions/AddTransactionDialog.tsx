@@ -469,16 +469,17 @@ export const AddTransactionDialog = ({
         onOpenChange(val);
       }}
     >
-      <DialogContent className="sm:max-w-[540px]">
-        <DialogHeader>
-          <DialogTitle>Add Transaction</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="sm:max-w-[540px] max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl">
+        <DialogHeader className="px-5 pt-4 pb-3 border-b border-border/50 shrink-0 text-left">
+          <DialogTitle className="text-lg font-bold">Add Transaction</DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground">
             Add a new transaction manually.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* 1. Date & Amount */}
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-5 py-3.5 space-y-3.5 sleek-scrollbar">
+            {/* 1. Date & Amount */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="tx-date">Date</Label>
@@ -811,8 +812,10 @@ export const AddTransactionDialog = ({
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex justify-end space-x-2 pt-4">
+          </div>
+
+          {/* Action Buttons (Fixed at bottom) */}
+          <div className="px-5 py-3 border-t border-border/50 bg-muted/20 shrink-0 flex justify-end space-x-2">
             <Button
               type="button"
               variant="outline"
