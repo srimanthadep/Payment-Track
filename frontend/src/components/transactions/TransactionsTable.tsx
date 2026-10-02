@@ -480,6 +480,11 @@ export const TransactionsTable = ({
         profit,
         transaction_date,
         card_type,
+        customer_mode,
+        bank_name,
+        customer_id,
+        customer_name,
+        customer_phone,
         notes,
         portals (
           name
@@ -530,6 +535,11 @@ export const TransactionsTable = ({
           profit,
           transaction_date,
           card_type,
+          customer_mode,
+          bank_name,
+          customer_id,
+          customer_name,
+          customer_phone,
           notes,
           portals (
             name
