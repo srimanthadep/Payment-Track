@@ -69,9 +69,9 @@ export const useRole = (): UseRoleReturn => {
               .order("created_at", { ascending: true })
               .limit(1)
               .maybeSingle();
-            ownerId = adminProfile?.id || "98cab8fb-b582-493f-91a0-b8f3954a1366";
+            ownerId = adminProfile?.id || null;
           }
-          effectiveUserId = ownerId;
+          effectiveUserId = ownerId || userId;
         }
 
         const newCachedData: CachedRoleData = {

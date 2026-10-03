@@ -108,8 +108,6 @@ const Settings = () => {
   const [cardTypeModalOpen, setCardTypeModalOpen] = useState(false);
   const [editingCardType, setEditingCardType] = useState<CardTypeOption | null>(null);
   const [cardTypeName, setCardTypeName] = useState("");
-  const [cardWithdrawRate, setCardWithdrawRate] = useState("");
-  const [cardRepayRate, setCardRepayRate] = useState("");
 
   const [transactionTypeModalOpen, setTransactionTypeModalOpen] = useState(false);
   const [editingTxType, setEditingTxType] = useState<TransactionTypeOption | null>(null);
@@ -204,21 +202,14 @@ const Settings = () => {
     e.preventDefault();
     if (!cardTypeName.trim()) return;
 
-    const wRate = parseFloat(cardWithdrawRate) || 0;
-    const rRate = parseFloat(cardRepayRate) || 0;
-
     if (editingCardType) {
       settingsService.updateCardType(editingCardType.id, {
         name: cardTypeName.trim(),
-        withdrawRate: wRate,
-        repayRate: rRate,
       });
       toast({ title: "Updated", description: `Card "${cardTypeName}" updated` });
     } else {
       settingsService.addCardType({
         name: cardTypeName.trim(),
-        withdrawRate: wRate,
-        repayRate: rRate,
       });
       toast({ title: "Added", description: `Card "${cardTypeName}" added to Card Type dropdown` });
     }
@@ -268,7 +259,7 @@ const Settings = () => {
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="space-y-6 max-w-6xl mx-auto"
+        className="space-y-6 max-w-6xl mx-auto pb-24 sm:pb-12"
       >
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2 border-b border-border/60">
@@ -286,7 +277,7 @@ const Settings = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 self-start sm:self-auto">
             <Button
               variant="outline"
               size="sm"
@@ -301,50 +292,52 @@ const Settings = () => {
 
         {/* Tabs */}
         <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="grid grid-cols-6 w-full sm:w-[860px] p-1 bg-muted/60 h-auto">
-            <TabsTrigger
-              value="profile"
-              className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 text-[11px] sm:text-sm font-semibold h-auto"
-            >
-              <User className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span>Profile</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="expenses"
-              className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 text-[11px] sm:text-sm font-semibold h-auto"
-            >
-              <Wallet className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span>Expenses</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="transactions"
-              className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 text-[11px] sm:text-sm font-semibold h-auto"
-            >
-              <Receipt className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span>Tx Config</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="ai-learning"
-              className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 text-[11px] sm:text-sm font-semibold h-auto"
-            >
-              <AiIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span>AI Learning</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="backup"
-              className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 text-[11px] sm:text-sm font-semibold h-auto"
-            >
-              <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span>Backup</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="whatsapp"
-              className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 text-[11px] sm:text-sm font-semibold h-auto"
-            >
-              <MessageCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span>WhatsApp</span>
-            </TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto pb-1 -mx-2 px-2 sm:mx-0 sm:px-0 scrollbar-none">
+            <TabsList className="inline-flex sm:grid sm:grid-cols-6 w-max sm:w-[860px] p-1 bg-muted/60 h-auto min-w-full sm:min-w-0 gap-1 sm:gap-0">
+              <TabsTrigger
+                value="profile"
+                className="flex items-center justify-center gap-1.5 py-2 px-3 sm:px-2 text-xs sm:text-sm font-semibold h-9 shrink-0 sm:shrink"
+              >
+                <User className="h-3.5 w-3.5 shrink-0" />
+                <span>Profile</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="expenses"
+                className="flex items-center justify-center gap-1.5 py-2 px-3 sm:px-2 text-xs sm:text-sm font-semibold h-9 shrink-0 sm:shrink"
+              >
+                <Wallet className="h-3.5 w-3.5 shrink-0" />
+                <span>Expenses</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="transactions"
+                className="flex items-center justify-center gap-1.5 py-2 px-3 sm:px-2 text-xs sm:text-sm font-semibold h-9 shrink-0 sm:shrink"
+              >
+                <Receipt className="h-3.5 w-3.5 shrink-0" />
+                <span>Tx Config</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="ai-learning"
+                className="flex items-center justify-center gap-1.5 py-2 px-3 sm:px-2 text-xs sm:text-sm font-semibold h-9 shrink-0 sm:shrink"
+              >
+                <AiIcon className="h-3.5 w-3.5 shrink-0" />
+                <span>AI Learning</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="backup"
+                className="flex items-center justify-center gap-1.5 py-2 px-3 sm:px-2 text-xs sm:text-sm font-semibold h-9 shrink-0 sm:shrink"
+              >
+                <RotateCcw className="h-3.5 w-3.5 shrink-0" />
+                <span>Backup</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="whatsapp"
+                className="flex items-center justify-center gap-1.5 py-2 px-3 sm:px-2 text-xs sm:text-sm font-semibold h-9 shrink-0 sm:shrink"
+              >
+                <MessageCircle className="h-3.5 w-3.5 shrink-0" />
+                <span>WhatsApp</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* ===================== TAB 0: PROFILE & ACCOUNT SETTINGS ===================== */}
           <TabsContent value="profile" className="space-y-6">
@@ -355,11 +348,11 @@ const Settings = () => {
           <TabsContent value="expenses" className="space-y-6">
             {/* 1. Expense Categories */}
             <Card className="border shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
-                <div>
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3">
+                <div className="space-y-0.5">
                   <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                    <Tag className="h-4 w-4 text-primary" />
-                    Expense Categories Dropdown
+                    <Tag className="h-4 w-4 text-primary shrink-0" />
+                    <span>Expense Categories Dropdown</span>
                   </CardTitle>
                   <CardDescription className="text-xs">
                     Categories available when adding or filtering expenses
@@ -373,7 +366,7 @@ const Settings = () => {
                     setCategoryColor(COLOR_PRESETS[0].class);
                     setCategoryModalOpen(true);
                   }}
-                  className="h-8 text-xs gap-1"
+                  className="h-8 text-xs gap-1 self-start sm:self-auto"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Add Category
@@ -443,11 +436,11 @@ const Settings = () => {
           <TabsContent value="transactions" className="space-y-6">
             {/* 1. Sent To / Recipients */}
             <Card className="border shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
-                <div>
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3">
+                <div className="space-y-0.5">
                   <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                    <User className="h-4 w-4 text-primary" />
-                    "Sent To" (Portals / Persons) Dropdown
+                    <User className="h-4 w-4 text-primary shrink-0" />
+                    <span>"Sent To" (Portals / Persons) Dropdown</span>
                   </CardTitle>
                   <CardDescription className="text-xs">
                     Options for who transactions are sent to (Upender, Chummi, etc.)
@@ -460,7 +453,7 @@ const Settings = () => {
                     setRecipientName("");
                     setRecipientModalOpen(true);
                   }}
-                  className="h-8 text-xs gap-1"
+                  className="h-8 text-xs gap-1 self-start sm:self-auto"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Add Recipient
@@ -473,13 +466,13 @@ const Settings = () => {
                       key={rec.id}
                       className="flex items-center justify-between p-3 rounded-xl border bg-card hover:bg-muted/30 transition-colors"
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold">{rec.name}</span>
+                      <div className="flex items-center gap-2 min-w-0 pr-2">
+                        <span className="text-sm font-semibold truncate">{rec.name}</span>
                         {rec.isDefault && (
-                          <span className="text-[10px] text-muted-foreground uppercase font-medium">Default</span>
+                          <span className="text-[10px] text-muted-foreground uppercase font-medium shrink-0 bg-muted/80 px-1.5 py-0.5 rounded">Default</span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 shrink-0">
                         <Button
                           variant="ghost"
                           size="icon"
@@ -520,17 +513,17 @@ const Settings = () => {
 
             {/* 2. Bank Credit Cards Dropdown */}
             <Card className="border shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
-                <div>
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3">
+                <div className="space-y-0.5">
                   <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                    <CreditCard className="h-4 w-4 text-primary" />
-                    Bank Credit Cards Dropdown
+                    <CreditCard className="h-4 w-4 text-primary shrink-0" />
+                    <span>Bank Credit Cards Dropdown</span>
                   </CardTitle>
                   <CardDescription className="text-xs">
                     Configure available credit card issuing banks (HDFC, SBI Card, ICICI, Axis, Kotak, etc.)
                   </CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 self-start sm:self-auto">
                   <Button
                     variant="outline"
                     size="sm"
@@ -564,10 +557,10 @@ const Settings = () => {
                       key={bank.id}
                       className="flex items-center justify-between p-3 rounded-xl border bg-card hover:bg-muted/30 transition-colors"
                     >
-                      <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0 pr-2">
                         <span className="text-sm font-semibold truncate">{bank.name}</span>
                         {bank.isDefault && (
-                          <span className="text-[10px] text-muted-foreground uppercase font-medium shrink-0">Default</span>
+                          <span className="text-[10px] text-muted-foreground uppercase font-medium shrink-0 bg-muted/80 px-1.5 py-0.5 rounded">Default</span>
                         )}
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
@@ -611,17 +604,17 @@ const Settings = () => {
 
             {/* 3. Portal Comparison Chart Visibility */}
             <Card className="border shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
-                <div>
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3">
+                <div className="space-y-0.5">
                   <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                    <PieChart className="h-4 w-4 text-primary" />
-                    Portal Comparison Chart Visibility
+                    <PieChart className="h-4 w-4 text-primary shrink-0" />
+                    <span>Portal Comparison Chart Visibility</span>
                   </CardTitle>
                   <CardDescription className="text-xs">
                     Choose which portals are displayed in the Portal Comparison Chart on the Dashboard
                   </CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 self-start sm:self-auto">
                   <Button
                     variant="outline"
                     size="sm"
@@ -733,39 +726,24 @@ const Settings = () => {
               </CardContent>
             </Card>
 
-            {/* 3. Card Types & Commission Rates */}
+            {/* 3. Card Types */}
             <Card className="border shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
-                <div>
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3">
+                <div className="space-y-0.5">
                   <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                    <CreditCard className="h-4 w-4 text-primary" />
-                    Card Types & Commission Rates Dropdown
+                    <CreditCard className="h-4 w-4 text-primary shrink-0" />
+                    <span>Card Types Dropdown</span>
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    Card types with their respective default withdraw and repay commission percentages
+                    Card types available for credit card transactions
                   </CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      settings.transactionCardTypes.forEach((c) => {
-                        settingsService.updateCardType(c.id, { withdrawRate: 0, repayRate: 0 });
-                      });
-                      toast({ title: "Rates Reset", description: "All card rates set to 0%" });
-                    }}
-                    className="h-8 text-xs"
-                  >
-                    Set All to 0%
-                  </Button>
+                <div className="flex items-center gap-2 self-start sm:self-auto">
                   <Button
                     size="sm"
                     onClick={() => {
                       setEditingCardType(null);
                       setCardTypeName("");
-                      setCardWithdrawRate("");
-                      setCardRepayRate("");
                       setCardTypeModalOpen(true);
                     }}
                     className="h-8 text-xs gap-1"
@@ -780,50 +758,41 @@ const Settings = () => {
                   {settings.transactionCardTypes.map((card) => (
                     <div
                       key={card.id}
-                      className="p-3.5 rounded-xl border bg-card hover:bg-muted/30 transition-colors space-y-2"
+                      className="p-3.5 rounded-xl border bg-card hover:bg-muted/30 transition-colors flex items-center justify-between"
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-sm">{card.name}</span>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                            onClick={() => {
-                              setEditingCardType(card);
-                              setCardTypeName(card.name);
-                              setCardWithdrawRate(card.withdrawRate > 0 ? card.withdrawRate.toString() : "");
-                              setCardRepayRate(card.repayRate > 0 ? card.repayRate.toString() : "");
-                              setCardTypeModalOpen(true);
-                            }}
-                          >
-                            <Edit2 className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-destructive/70 hover:text-destructive"
-                            onClick={() => {
-                              if (settings.transactionCardTypes.length <= 1) {
-                                toast({
-                                  title: "Cannot Delete",
-                                  description: "At least 1 card type required",
-                                  variant: "destructive",
-                                });
-                                return;
-                              }
-                              settingsService.deleteCardType(card.id);
-                              toast({ title: "Deleted", description: `"${card.name}" removed` });
-                            }}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t border-border/50">
-                        <span>Withdraw: <b className="text-foreground">{card.withdrawRate}%</b></span>
-                        <span>Repay: <b className="text-foreground">{card.repayRate}%</b></span>
+                      <span className="font-bold text-sm truncate mr-2">{card.name}</span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          onClick={() => {
+                            setEditingCardType(card);
+                            setCardTypeName(card.name);
+                            setCardTypeModalOpen(true);
+                          }}
+                        >
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive/70 hover:text-destructive"
+                          onClick={() => {
+                            if (settings.transactionCardTypes.length <= 1) {
+                              toast({
+                                title: "Cannot Delete",
+                                description: "At least 1 card type required",
+                                variant: "destructive",
+                              });
+                              return;
+                            }
+                            settingsService.deleteCardType(card.id);
+                            toast({ title: "Deleted", description: `"${card.name}" removed` });
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -833,11 +802,11 @@ const Settings = () => {
 
             {/* 4. Transaction Types */}
             <Card className="border shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
-                <div>
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3">
+                <div className="space-y-0.5">
                   <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                    <Sliders className="h-4 w-4 text-primary" />
-                    Transaction Types Dropdown
+                    <Sliders className="h-4 w-4 text-primary shrink-0" />
+                    <span>Transaction Types Dropdown</span>
                   </CardTitle>
                   <CardDescription className="text-xs">
                     Types available (Withdrawal, Repayment, etc.)
@@ -850,7 +819,7 @@ const Settings = () => {
                     setTxTypeLabel("");
                     setTransactionTypeModalOpen(true);
                   }}
-                  className="h-8 text-xs gap-1"
+                  className="h-8 text-xs gap-1 self-start sm:self-auto"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Add Type
@@ -965,17 +934,18 @@ const Settings = () => {
             {/* WhatsApp Toggle Card */}
             <Card className="border shadow-sm">
               <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="space-y-0.5">
                     <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                      <MessageCircle className="h-4 w-4 text-green-600" />
-                      WhatsApp Integration
+                      <MessageCircle className="h-4 w-4 text-green-600 shrink-0" />
+                      <span>WhatsApp Integration</span>
                     </CardTitle>
                     <CardDescription className="text-xs">
                       Automatically send welcome messages and transaction receipts via WhatsApp
                     </CardDescription>
                   </div>
                   <Switch
+                    className="shrink-0"
                     checked={settings.whatsapp?.enabled !== false}
                     onCheckedChange={(checked) => {
                       settingsService.setWhatsAppEnabled(checked);
@@ -1175,10 +1145,10 @@ For any queries, feel free to reach out!
 
       {/* Card Type Modal */}
       <Dialog open={cardTypeModalOpen} onOpenChange={setCardTypeModalOpen}>
-        <DialogContent className="sm:max-w-[440px]">
+        <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>{editingCardType ? "Edit Card Type" : "Add Card Type"}</DialogTitle>
-            <DialogDescription>Configure card type name and default commission rates</DialogDescription>
+            <DialogDescription>Enter the name for this card type</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveCardType} className="space-y-4 pt-2">
             <div className="space-y-1.5">
@@ -1191,35 +1161,6 @@ For any queries, feel free to reach out!
                 required
                 autoFocus
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="ct-wrate" className="text-xs font-semibold">Withdraw Rate (%)</Label>
-                <Input
-                  id="ct-wrate"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  placeholder="0"
-                  value={cardWithdrawRate}
-                  onChange={(e) => setCardWithdrawRate(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="ct-rrate" className="text-xs font-semibold">Repay Rate (%)</Label>
-                <Input
-                  id="ct-rrate"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  placeholder="0"
-                  value={cardRepayRate}
-                  onChange={(e) => setCardRepayRate(e.target.value)}
-                />
-              </div>
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t">

@@ -146,6 +146,9 @@ const Dashboard = () => {
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
+      if (!session) {
+        navigate("/auth", { replace: true });
+      }
     });
 
     // 3. Safety timeout fallback: guarantee that skeleton disappears within 1.5s

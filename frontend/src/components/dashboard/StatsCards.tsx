@@ -47,7 +47,7 @@ interface Stats {
   totalRupaySiteFee: number;
 }
 
-// Letter B Icon for Barath Portal
+// Letter B Icon for Bharath Portal
 const LetterBIcon = ({ className }: { className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -440,7 +440,7 @@ export const StatsCards = ({
       gradient: "from-indigo-500 to-indigo-600",
     },
     {
-      title: `RuPay Barath (${getPeriodLabel()})`,
+      title: `RuPay Bharath (${getPeriodLabel()})`,
       value: stats.bharatRupaySiteFee,
       icon: LetterBIcon,
       gradient: "from-orange-500 to-amber-600",

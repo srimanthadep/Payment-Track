@@ -1,15 +1,14 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import { BrowserRouter } from 'react-router-dom'
+import { describe, it, expect, vi, beforeAll } from 'vitest'
+import { render } from '@testing-library/react'
 import App from '@/App'
 
 describe('App', () => {
+  beforeAll(() => {
+    window.scrollTo = vi.fn()
+  })
+
   it('renders without crashing', () => {
-    render(
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    )
+    render(<App />)
     expect(document.body).toBeDefined()
   })
 })

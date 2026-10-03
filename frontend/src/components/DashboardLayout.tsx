@@ -50,6 +50,26 @@ export const DashboardLayout = ({ children, headerAction }: DashboardLayoutProps
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (mounted && !session) {
+        navigate("/auth", { replace: true });
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (mounted && !session && event === "SIGNED_OUT") {
+        navigate("/auth", { replace: true });
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [navigate]);
+
+  useEffect(() => {
     profileService.getUserProfile().then((p) => {
       setUserProfile(p);
     });

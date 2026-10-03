@@ -125,21 +125,56 @@ async function handleRegisterUser(req, res) {
       return res.status(500).json({ error: "User creation failed: missing id" });
     }
 
+    const isAdminRoute = req.path.includes("admin-create-user");
+    let callerAdminId = null;
+
+    if (isAdminRoute) {
+      // Verify caller is admin
+      const authHeader = req.headers.authorization || "";
+      const token = authHeader.replace(/^Bearer\s+/i, "");
+      if (token) {
+        const { data: { user: callerUser }, error: authErr } = await supabase.auth.getUser(token);
+        if (!authErr && callerUser) {
+          const { data: callerProfile } = await supabase
+            .from("profiles")
+            .select("role, id")
+            .eq("id", callerUser.id)
+            .maybeSingle();
+          if (callerProfile?.role === "admin") {
+            callerAdminId = callerProfile.id;
+          }
+        }
+      }
+
+      // If admins already exist in the system, caller MUST be an authenticated admin
+      const { count: adminCount } = await supabase
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .eq("role", "admin");
+
+      if (adminCount && adminCount > 0 && !callerAdminId) {
+        return res.status(403).json({ error: "Unauthorized: Admin privileges required to manage users" });
+      }
+    }
+
     // 2. Upsert profile with role and owner_id
     let roleToAssign = "user";
     let ownerIdToAssign = null;
-    if (role === "admin" || make_admin) {
+    if (isAdminRoute && (role === "admin" || make_admin)) {
       roleToAssign = "admin";
-    } else if (role === "staff" || make_staff) {
+    } else if (isAdminRoute && (role === "staff" || make_staff)) {
       roleToAssign = "staff";
-      const { data: adminUser } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("role", "admin")
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      ownerIdToAssign = adminUser?.id || "98cab8fb-b582-493f-91a0-b8f3954a1366";
+      ownerIdToAssign = callerAdminId;
+      if (!ownerIdToAssign) {
+        const { data: adminUser } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("role", "admin")
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        ownerIdToAssign = adminUser?.id || null;
+      }
     }
 
     await supabase.from("profiles").upsert({

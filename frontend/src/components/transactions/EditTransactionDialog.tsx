@@ -28,14 +28,13 @@ import { Loader2, Calendar as CalendarIcon } from "lucide-react";
 import { format, isToday } from "date-fns";
 import {
   calculateCommission,
-  getCardTypesForTransaction,
-  getCardTypeDisplayNameWithRate,
   type CardType,
 } from "@/utils/commissionCalculator";
 import { settingsService, CardTypeOption, BankOption } from "@/services/settingsService";
 import { activityLogService } from "@/services/activityLogService";
 import { CustomerCombobox, CustomerValue } from "@/components/customers/CustomerCombobox";
 import { customerService } from "@/services/customerService";
+import { transactionLearningService } from "@/services/transactionLearningService";
 
 interface EditTransactionDialogProps {
   transaction: {
@@ -264,12 +263,9 @@ export const EditTransactionDialog = ({
   };
 
   const handleCardTypeChange = (cardType: string) => {
-    const cardOpt = customCards.find((c) => c.name.toLowerCase() === cardType.toLowerCase());
-    const defaultRate = formData.transaction_type === "repayment" ? cardOpt?.repayRate : cardOpt?.withdrawRate;
     setFormData((prev) => ({
       ...prev,
       card_type: cardType,
-      commission_percent: defaultRate && defaultRate > 0 ? defaultRate.toString() : prev.commission_percent,
     }));
   };
 
@@ -413,6 +409,22 @@ export const EditTransactionDialog = ({
           customer_phone: isChummi ? customerPhone : null,
         }
       );
+      // Update learning engine with edited transaction
+      transactionLearningService.recordNewTransaction({
+        id: transaction.id,
+        card_type: formData.card_type,
+        transaction_type: formData.transaction_type,
+        sent_to: selectedPortal?.name || "Portal",
+        bank_name: formData.bank_name,
+        customer_mode: formData.customer_mode,
+        customer_name: customerName || undefined,
+        customer_id: customerId || undefined,
+        amount: parseFloat(formData.amount),
+        commission_percent: commPercent,
+        site_fee_percent: feePercent,
+        transaction_date: formData.transaction_date,
+      });
+
       toast({
         title: "Success",
         description: "Transaction updated successfully",
@@ -555,49 +567,19 @@ export const EditTransactionDialog = ({
                   <SelectValue placeholder="Select card type" />
                 </SelectTrigger>
                 <SelectContent className="max-h-60">
-                  <SelectItem value="RuPay">RuPay</SelectItem>
-                  <SelectItem value="Visa">Visa</SelectItem>
-                  <SelectItem value="Mastercard">Mastercard</SelectItem>
-                  <SelectItem value="Business Card">Business Card</SelectItem>
-                  <SelectItem value="AU Cards">AU Cards</SelectItem>
-                  <SelectItem value="Amex & Diners">Amex & Diners</SelectItem>
-                  <SelectItem value="Machine Swiping">Machine Swiping</SelectItem>
-                  {customCards
-                    .filter(
-                      (c) =>
-                        ![
-                          "rupay",
-                          "visa",
-                          "mastercard",
-                          "business card",
-                          "au cards",
-                          "amex & diners",
-                          "machine swiping",
-                        ].includes(c.name.toLowerCase())
-                    )
-                    .map((c) => {
-                      const rate =
-                        formData.transaction_type === "repayment"
-                          ? c.repayRate
-                          : c.withdrawRate;
-                      const label =
-                        rate && rate > 0 ? `${c.name} (${rate}%)` : c.name;
-                      return (
-                        <SelectItem key={c.id} value={c.name}>
-                          {label}
-                        </SelectItem>
-                      );
-                    })}
-                  {getCardTypesForTransaction(formData.transaction_type).map(
-                    (cardType) => (
-                      <SelectItem key={cardType} value={cardType}>
-                        {getCardTypeDisplayNameWithRate(
-                          cardType,
-                          formData.transaction_type
-                        )}
+                  {customCards.map((c) => (
+                    <SelectItem key={c.id} value={c.name}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                  {formData.card_type &&
+                    !customCards.some(
+                      (c) => c.name.toLowerCase() === (formData.card_type as string).toLowerCase()
+                    ) && (
+                      <SelectItem value={formData.card_type}>
+                        {formData.card_type}
                       </SelectItem>
-                    )
-                  )}
+                    )}
                 </SelectContent>
               </Select>
             </div>

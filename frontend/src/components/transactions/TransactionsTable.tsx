@@ -244,6 +244,7 @@ export const TransactionsTable = ({
     if (dateRange?.from || dateRange?.to) {
       if (dateRange.from) {
         const fromDate = new Date(dateRange.from);
+        fromDate.setHours(0, 0, 0, 0);
         filtered = filtered.filter((t) => new Date(t.transaction_date) >= fromDate);
       }
       if (dateRange.to) {
@@ -281,16 +282,19 @@ export const TransactionsTable = ({
 
     // Secondary Date range filter from popover filters
     if (filters.dateRange.from) {
+      const fromDate = new Date(filters.dateRange.from);
+      fromDate.setHours(0, 0, 0, 0);
       filtered = filtered.filter((t) => {
         const txDate = new Date(t.transaction_date);
-        return txDate >= filters.dateRange.from!;
+        return txDate >= fromDate;
       });
     }
     if (filters.dateRange.to) {
+      const toDate = new Date(filters.dateRange.to);
+      toDate.setHours(23, 59, 59, 999);
       filtered = filtered.filter((t) => {
         const txDate = new Date(t.transaction_date);
-        txDate.setHours(23, 59, 59, 999);
-        return txDate <= filters.dateRange.to!;
+        return txDate <= toDate;
       });
     }
 

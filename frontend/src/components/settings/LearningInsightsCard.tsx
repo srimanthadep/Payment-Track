@@ -30,7 +30,13 @@ import {
   BacktestResults,
   TransactionFeeRecommendation,
 } from "@/services/transactionLearningService";
-import { settingsService, CardTypeOption, RecipientOption, TransactionTypeOption } from "@/services/settingsService";
+import {
+  settingsService,
+  CardTypeOption,
+  RecipientOption,
+  TransactionTypeOption,
+  BankOption,
+} from "@/services/settingsService";
 import { useToast } from "@/hooks/use-toast";
 
 export const LearningInsightsCard = () => {
@@ -44,10 +50,13 @@ export const LearningInsightsCard = () => {
   const [cardTypes, setCardTypes] = useState<CardTypeOption[]>([]);
   const [recipients, setRecipients] = useState<RecipientOption[]>([]);
   const [txTypes, setTxTypes] = useState<TransactionTypeOption[]>([]);
+  const [banks, setBanks] = useState<BankOption[]>([]);
 
   const [testCard, setTestCard] = useState("");
   const [testTx, setTestTx] = useState("withdrawal");
   const [testRecipient, setTestRecipient] = useState("");
+  const [testBank, setTestBank] = useState("");
+  const [testMode, setTestMode] = useState<"Offline" | "Online">("Offline");
   const [testResult, setTestResult] = useState<TransactionFeeRecommendation | null>(null);
 
   useEffect(() => {
@@ -64,9 +73,11 @@ export const LearningInsightsCard = () => {
       const c = settingsService.getCardTypes();
       const r = settingsService.getRecipients();
       const t = settingsService.getTransactionTypes();
+      const b = settingsService.getBanks();
       setCardTypes(c);
       setRecipients(r);
       setTxTypes(t);
+      setBanks(b);
 
       if (c.length > 0) setTestCard(c[0].name);
       if (r.length > 0) setTestRecipient(r[0].name);
@@ -86,10 +97,12 @@ export const LearningInsightsCard = () => {
         cardType: testCard,
         transactionType: testTx,
         sentTo: testRecipient,
+        bankName: testBank || undefined,
+        customerMode: testMode,
       });
       setTestResult(rec);
     }
-  }, [testCard, testTx, testRecipient]);
+  }, [testCard, testTx, testRecipient, testBank, testMode]);
 
   const handleRunBacktest = () => {
     setIsRunningBacktest(true);
@@ -224,18 +237,18 @@ export const LearningInsightsCard = () => {
       {/* 2. Interactive Prediction Sandbox */}
       <Card className="border shadow-sm">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div className="space-y-1">
               <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                <SlidersHorizontal className="h-4 w-4 text-primary" />
-                Live Model Prediction Sandbox
+                <SlidersHorizontal className="h-4 w-4 text-primary shrink-0" />
+                <span>Live Model Prediction Sandbox</span>
               </CardTitle>
               <CardDescription className="text-xs">
                 Test how the model auto-fills values for different combinations of inputs in real time.
               </CardDescription>
             </div>
             {testResult && testResult.source !== "none" && (
-              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-xs gap-1">
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-xs gap-1 self-start sm:self-auto shrink-0">
                 <AiIcon className="h-3.5 w-3.5" />
                 {Math.round(testResult.confidence * 100)}% Confidence
               </Badge>
@@ -243,7 +256,7 @@ export const LearningInsightsCard = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Card Type</Label>
               <Select value={testCard} onValueChange={setTestCard}>
@@ -291,6 +304,36 @@ export const LearningInsightsCard = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Bank Card</Label>
+              <Select value={testBank || "all"} onValueChange={(v) => setTestBank(v === "all" ? "" : v)}>
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="Any / Default" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-xs text-muted-foreground">Any / Default</SelectItem>
+                  {banks.filter((b) => Boolean(b.name)).map((b) => (
+                    <SelectItem key={b.id} value={b.name} className="text-xs">
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Mode</Label>
+              <Select value={testMode} onValueChange={(v: "Offline" | "Online") => setTestMode(v)}>
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="Select mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Offline" className="text-xs">Offline</SelectItem>
+                  <SelectItem value="Online" className="text-xs">Online</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Result Banner */}
@@ -313,11 +356,19 @@ export const LearningInsightsCard = () => {
 
             <div className="text-right sm:text-right text-xs text-muted-foreground">
               <span className="font-semibold text-foreground block">
-                {testResult?.source === "card_tx_portal"
-                  ? "Tier 1: Card + Tx + Portal Match"
-                  : testResult?.source === "card_tx"
-                    ? "Tier 2: Card + Tx Fallback"
-                    : "No Pattern Discovered"}
+                {testResult?.source === "customer_history"
+                  ? "Tier 0: Recurring Client Rate"
+                  : testResult?.source === "card_tx_portal_bank_mode"
+                    ? "Tier 1: Bank & Channel Specific Rate"
+                    : testResult?.source === "card_tx_portal_bank"
+                      ? "Tier 2: Bank Terminal Rate"
+                      : testResult?.source === "card_tx_portal"
+                        ? "Tier 3: Portal General Match"
+                        : testResult?.source === "card_tx"
+                          ? "Tier 4: Card & Tx Fallback"
+                          : testResult?.source === "global_baseline"
+                            ? "Tier 5: Automated Empirical Baseline"
+                            : "No Pattern Discovered"}
               </span>
               <span>{testResult?.explanation || "Requires at least 2 historical matches"}</span>
             </div>

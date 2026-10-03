@@ -13,8 +13,8 @@ export interface ExpenseCategoryOption {
 export interface CardTypeOption {
   id: string;
   name: string;
-  withdrawRate: number;
-  repayRate: number;
+  withdrawRate?: number;
+  repayRate?: number;
   isDefault?: boolean;
 }
 
@@ -75,7 +75,7 @@ export const DEFAULT_CARD_TYPES: CardTypeOption[] = [
 
 export const DEFAULT_RECIPIENTS: RecipientOption[] = [
   { id: "upender", name: "Upender", isDefault: true },
-  { id: "bharat", name: "Bharat", isDefault: true },
+  { id: "bharath", name: "Bharath", isDefault: true },
   { id: "chummi", name: "Chummi", isDefault: true },
 ];
 
@@ -145,10 +145,15 @@ class SettingsService {
             }))
           : DEFAULT_CARD_TYPES;
 
+        const rawRecipients = parsed.transactionRecipients?.length ? parsed.transactionRecipients : DEFAULT_RECIPIENTS;
+        const recipients = rawRecipients.map((r: RecipientOption) =>
+          r.name.toLowerCase() === "bharat" ? { ...r, id: "bharath", name: "Bharath" } : r
+        );
+
         return {
           expenseCategories: parsed.expenseCategories?.length ? parsed.expenseCategories : DEFAULT_EXPENSE_CATEGORIES,
           transactionCardTypes: cards,
-          transactionRecipients: parsed.transactionRecipients?.length ? parsed.transactionRecipients : DEFAULT_RECIPIENTS,
+          transactionRecipients: recipients,
           transactionTypes: parsed.transactionTypes?.length ? parsed.transactionTypes : DEFAULT_TRANSACTION_TYPES,
           banks: parsed.banks?.length ? parsed.banks : DEFAULT_BANKS,
           theme: parsed.theme || "ocean",
@@ -180,10 +185,15 @@ class SettingsService {
           const newSettings = payload.new?.settings;
           if (newSettings && typeof newSettings === "object") {
             const newTheme = newSettings.theme || this.settings.theme || "ocean";
+            const rawRecipients = newSettings.transactionRecipients || this.settings.transactionRecipients;
+            const recipients = rawRecipients.map((r: RecipientOption) =>
+              r.name.toLowerCase() === "bharat" ? { ...r, id: "bharath", name: "Bharath" } : r
+            );
+
             this.settings = {
               expenseCategories: newSettings.expenseCategories || this.settings.expenseCategories,
               transactionCardTypes: newSettings.transactionCardTypes || this.settings.transactionCardTypes,
-              transactionRecipients: newSettings.transactionRecipients || this.settings.transactionRecipients,
+              transactionRecipients: recipients,
               transactionTypes: newSettings.transactionTypes || this.settings.transactionTypes,
               banks: newSettings.banks || this.settings.banks || DEFAULT_BANKS,
               theme: newTheme,
@@ -254,10 +264,15 @@ class SettingsService {
       if (data && data.settings && typeof data.settings === "object") {
         const parsed = data.settings as any;
         const currentTheme = parsed.theme || this.settings.theme || "ocean";
+        const rawRecipients = parsed.transactionRecipients || [...DEFAULT_RECIPIENTS];
+        const recipients = rawRecipients.map((r: RecipientOption) =>
+          r.name.toLowerCase() === "bharat" ? { ...r, id: "bharath", name: "Bharath" } : r
+        );
+
         this.settings = {
           expenseCategories: parsed.expenseCategories || [...DEFAULT_EXPENSE_CATEGORIES],
           transactionCardTypes: parsed.transactionCardTypes || [...DEFAULT_CARD_TYPES],
-          transactionRecipients: parsed.transactionRecipients || [...DEFAULT_RECIPIENTS],
+          transactionRecipients: recipients,
           transactionTypes: parsed.transactionTypes || [...DEFAULT_TRANSACTION_TYPES],
           banks: parsed.banks || [...DEFAULT_BANKS],
           theme: currentTheme,
@@ -387,13 +402,16 @@ class SettingsService {
     return this.settings.transactionCardTypes;
   }
 
-  public addCardType(card: { name: string; withdrawRate: number; repayRate: number }): CardTypeOption {
-    const id = card.name.toLowerCase().replace(/[^a-z0-9]+/g, "_") + "_" + Date.now();
+  public addCardType(card: { name: string; withdrawRate?: number; repayRate?: number } | string): CardTypeOption {
+    const cardName = typeof card === "string" ? card.trim() : card.name.trim();
+    const wRate = typeof card === "object" && card.withdrawRate !== undefined ? card.withdrawRate : 0;
+    const rRate = typeof card === "object" && card.repayRate !== undefined ? card.repayRate : 0;
+    const id = cardName.toLowerCase().replace(/[^a-z0-9]+/g, "_") + "_" + Date.now();
     const newCard: CardTypeOption = {
       id,
-      name: card.name.trim(),
-      withdrawRate: card.withdrawRate,
-      repayRate: card.repayRate,
+      name: cardName,
+      withdrawRate: wRate,
+      repayRate: rRate,
       isDefault: false,
     };
     this.settings.transactionCardTypes = [...this.settings.transactionCardTypes, newCard];

@@ -124,9 +124,12 @@ export const AddTransactionDialog = ({
 
   // Helper to query and apply transaction fee recommendations based on historical learning
   const applyLearningRecommendation = (
-    txType: string,
-    cType: string,
-    recipient: string,
+    txType = formData.transaction_type,
+    cType = formData.card_type,
+    recipient = formData.sent_to,
+    bank = formData.bank_name,
+    mode = formData.customer_mode,
+    cust = customerValue,
     manualComm = isCommissionManual,
     manualFee = isSiteFeeManual
   ) => {
@@ -136,6 +139,10 @@ export const AddTransactionDialog = ({
       cardType: cType,
       transactionType: txType,
       sentTo: recipient,
+      bankName: bank,
+      customerMode: mode,
+      customerName: cust?.name || undefined,
+      customerId: cust?.id || undefined,
     });
 
     if (rec.source !== "none") {
@@ -375,6 +382,10 @@ export const AddTransactionDialog = ({
         card_type: formData.card_type,
         transaction_type: formData.transaction_type,
         sent_to: formData.sent_to,
+        bank_name: formData.bank_name,
+        customer_mode: formData.customer_mode,
+        customer_name: customerName,
+        customer_id: customerId || undefined,
         amount: parseFloat(formData.amount),
         commission_percent: parseFloat(formData.commission_percent) || 0,
         site_fee_percent: parseFloat(formData.site_fee_percent) || 0,
@@ -569,7 +580,14 @@ export const AddTransactionDialog = ({
                     ...prev,
                     transaction_type: newType,
                   }));
-                  applyLearningRecommendation(newType, formData.card_type, formData.sent_to);
+                  applyLearningRecommendation(
+                    newType,
+                    formData.card_type,
+                    formData.sent_to,
+                    formData.bank_name,
+                    formData.customer_mode,
+                    customerValue
+                  );
                 }}
                 required
               >
@@ -595,7 +613,14 @@ export const AddTransactionDialog = ({
                     ...prev,
                     card_type: val,
                   }));
-                  applyLearningRecommendation(formData.transaction_type, val, formData.sent_to);
+                  applyLearningRecommendation(
+                    formData.transaction_type,
+                    val,
+                    formData.sent_to,
+                    formData.bank_name,
+                    formData.customer_mode,
+                    customerValue
+                  );
                 }}
                 required
               >
@@ -603,19 +628,11 @@ export const AddTransactionDialog = ({
                   <SelectValue placeholder="Select card type" />
                 </SelectTrigger>
                 <SelectContent className="max-h-60">
-                  {cardTypes.map((card) => {
-                    const rate =
-                      formData.transaction_type === "repayment"
-                        ? card.repayRate
-                        : card.withdrawRate;
-                    const label =
-                      rate && rate > 0 ? `${card.name} (${rate}%)` : card.name;
-                    return (
-                      <SelectItem key={card.id} value={card.name}>
-                        {label}
-                      </SelectItem>
-                    );
-                  })}
+                  {cardTypes.map((card) => (
+                    <SelectItem key={card.id} value={card.name}>
+                      {card.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -734,11 +751,19 @@ export const AddTransactionDialog = ({
             <Select
               value={formData.sent_to}
               onValueChange={(val) => {
+                const nextCust = val.trim().toLowerCase() !== "chummi" ? null : customerValue;
                 setFormData((prev) => ({ ...prev, sent_to: val }));
                 if (val.trim().toLowerCase() !== "chummi") {
                   setCustomerValue(null);
                 }
-                applyLearningRecommendation(formData.transaction_type, formData.card_type, val);
+                applyLearningRecommendation(
+                  formData.transaction_type,
+                  formData.card_type,
+                  val,
+                  formData.bank_name,
+                  formData.customer_mode,
+                  nextCust
+                );
               }}
               required
             >
@@ -761,9 +786,17 @@ export const AddTransactionDialog = ({
               <Label htmlFor="customer_mode" className="text-xs sm:text-sm font-medium">Customer Mode</Label>
               <Select
                 value={formData.customer_mode}
-                onValueChange={(val: "Online" | "Offline") =>
-                  setFormData((prev) => ({ ...prev, customer_mode: val }))
-                }
+                onValueChange={(val: "Online" | "Offline") => {
+                  setFormData((prev) => ({ ...prev, customer_mode: val }));
+                  applyLearningRecommendation(
+                    formData.transaction_type,
+                    formData.card_type,
+                    formData.sent_to,
+                    formData.bank_name,
+                    val,
+                    customerValue
+                  );
+                }}
               >
                 <SelectTrigger id="customer_mode">
                   <SelectValue placeholder="Select mode" />
@@ -782,9 +815,17 @@ export const AddTransactionDialog = ({
               </div>
               <Select
                 value={formData.bank_name}
-                onValueChange={(val) =>
-                  setFormData((prev) => ({ ...prev, bank_name: val }))
-                }
+                onValueChange={(val) => {
+                  setFormData((prev) => ({ ...prev, bank_name: val }));
+                  applyLearningRecommendation(
+                    formData.transaction_type,
+                    formData.card_type,
+                    formData.sent_to,
+                    val,
+                    formData.customer_mode,
+                    customerValue
+                  );
+                }}
               >
                 <SelectTrigger id="bank_name">
                   <SelectValue placeholder="Select bank" />
@@ -806,7 +847,19 @@ export const AddTransactionDialog = ({
               <CustomerCombobox
                 userId={userId}
                 value={customerValue}
-                onChange={setCustomerValue}
+                onChange={(val) => {
+                  setCustomerValue(val);
+                  if (val) {
+                    applyLearningRecommendation(
+                      formData.transaction_type,
+                      formData.card_type,
+                      formData.sent_to,
+                      formData.bank_name,
+                      formData.customer_mode,
+                      val
+                    );
+                  }
+                }}
                 disabled={isLoading}
               />
             </div>

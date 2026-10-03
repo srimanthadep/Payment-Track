@@ -14,11 +14,17 @@ export async function invokeBackendApi<T = any>(
       ? `${BACKEND_URL.replace(/\/+$/, "")}/api/${cleanEndpoint}`
       : `/api/${cleanEndpoint}`;
 
+    const { data: sessionData } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (sessionData?.session?.access_token) {
+      headers["Authorization"] = `Bearer ${sessionData.session.access_token}`;
+    }
+
     const res = await fetch(targetUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify(payload),
     });
 

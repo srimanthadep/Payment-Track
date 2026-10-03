@@ -25,7 +25,13 @@ import { StaffRestrictedRoute } from "@/components/StaffRestrictedRoute";
 const ScrollToTop = () => {
   const { pathname } = useLocation();
   useEffect(() => {
-    window.scrollTo(0, 0);
+    try {
+      if (typeof window !== "undefined" && typeof window.scrollTo === "function") {
+        window.scrollTo(0, 0);
+      }
+    } catch {
+      // Safe fallback for testing environments (jsdom)
+    }
   }, [pathname]);
   return null;
 };

@@ -137,14 +137,14 @@ export const AdminUsers = () => {
     if (!editing) return;
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const currentAdminId = session?.user?.id || "98cab8fb-b582-493f-91a0-b8f3954a1366";
+      const currentAdminId = session?.user?.id || null;
       const updatePayload: any = {
         full_name: editForm.full_name,
         business_name: editForm.business_name,
         email: editForm.email,
         role: editForm.role,
       };
-      if (editForm.role === "staff") {
+      if (editForm.role === "staff" && currentAdminId) {
         updatePayload.owner_id = currentAdminId;
       }
 

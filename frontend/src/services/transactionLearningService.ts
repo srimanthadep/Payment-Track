@@ -4,7 +4,15 @@ export interface TransactionFeeRecommendation {
   commission: number | null;
   siteFee: number | null;
   confidence: number; // 0.0 to 1.0
-  source: "card_tx_portal" | "card_tx" | "card" | "portal" | "none";
+  source:
+    | "customer_history"
+    | "card_tx_portal_bank_mode"
+    | "card_tx_portal_bank"
+    | "card_tx_portal"
+    | "card_tx"
+    | "card"
+    | "global_baseline"
+    | "none";
   sampleCount: number;
   explanation?: string;
 }
@@ -14,16 +22,14 @@ export interface HistoricalTransactionRecord {
   card_type: string;
   transaction_type: string;
   sent_to: string;
+  bank_name?: string;
+  customer_mode?: string;
+  customer_name?: string;
+  customer_id?: string;
   commission_percent: number;
   site_fee_percent: number;
   transaction_date: Date;
   amount: number;
-}
-
-interface ValueWeight {
-  value: number;
-  weightedScore: number;
-  rawCount: number;
 }
 
 // Normalizer helpers
@@ -31,13 +37,44 @@ const normalize = (str?: string | null): string => {
   return (str || "").trim().toLowerCase();
 };
 
+const CARD_ALIAS_MAP: Record<string, string> = {
+  normal_visa: "visa",
+  hdfc_visa: "visa",
+  visa: "visa",
+  normal_rupay: "rupay",
+  hdfc_rupay: "rupay",
+  rupay: "rupay",
+  normal_master: "mastercard",
+  hdfc_master: "mastercard",
+  mastercard: "mastercard",
+  master: "mastercard",
+  all_master_cards: "mastercard",
+  hdfc_business: "business card",
+  all_business_cards: "business card",
+  business: "business card",
+  "business card": "business card",
+  au_card: "au cards",
+  "au cards": "au cards",
+  amex_diners: "amex & diners",
+  "amex & diners": "amex & diners",
+  machine_swiping: "machine swiping",
+  "machine swiping": "machine swiping",
+};
+
+export const normalizeCardType = (card?: string | null): string => {
+  if (!card) return "";
+  const raw = card.trim().toLowerCase();
+  const slug = raw.replace(/[\s_-]+/g, "_");
+  return CARD_ALIAS_MAP[slug] || CARD_ALIAS_MAP[raw] || raw;
+};
+
 /**
  * Intelligent Transaction Learning Service
  * 
- * Uses Maximum A Posteriori (MAP) with Hierarchical Backoff,
- * Time-Decay Weighting, and Bayesian Confidence Estimation.
+ * Uses a 5-Tier Hierarchical Bayesian Cascade with Kernel Density Estimation (KDE),
+ * 30-day Recency Weighting, Bank-Sensitivity, and Recurring Customer Memory.
  */
-class TransactionLearningService {
+export class TransactionLearningService {
   private records: HistoricalTransactionRecord[] = [];
   private isInitialized = false;
   private loadPromise: Promise<void> | null = null;
@@ -45,15 +82,25 @@ class TransactionLearningService {
 
   constructor() {
     this.init();
+
+    // Re-index whenever user signs in or auth token updates
+    if (typeof window !== "undefined") {
+      supabase.auth.onAuthStateChange((event, session) => {
+        if (session) {
+          this.fetchAndIndexTransactions();
+        }
+      });
+    }
   }
 
   public async init(): Promise<void> {
-    if (this.isInitialized) return;
+    if (this.isInitialized && this.records.length > 0) return;
     if (this.loadPromise) return this.loadPromise;
 
-    this.loadPromise = this.fetchAndIndexTransactions();
+    this.loadPromise = this.fetchAndIndexTransactions().finally(() => {
+      this.loadPromise = null;
+    });
     await this.loadPromise;
-    this.isInitialized = true;
   }
 
   /**
@@ -71,6 +118,10 @@ class TransactionLearningService {
           commission,
           site_fee,
           notes,
+          bank_name,
+          customer_mode,
+          customer_name,
+          customer_id,
           transaction_date,
           portal_id,
           portals ( name )
@@ -78,12 +129,13 @@ class TransactionLearningService {
         .order("transaction_date", { ascending: false });
 
       if (error) {
-        console.error("[LearningService] Error fetching historical transactions:", error);
+        // Do not crash or permanently mark initialized on RLS/auth errors
         return;
       }
 
       if (!data || data.length === 0) {
         this.records = [];
+        this.isInitialized = true;
         return;
       }
 
@@ -91,9 +143,10 @@ class TransactionLearningService {
         .map((row: any) => this.parseRecord(row))
         .filter((r): r is HistoricalTransactionRecord => r !== null);
 
+      this.isInitialized = true;
       this.notifyListeners();
     } catch (err) {
-      console.error("[LearningService] Failed to load transactions:", err);
+      // Graceful fallback
     }
   }
 
@@ -119,6 +172,28 @@ class TransactionLearningService {
 
     if (!cardType || !txType) return null;
 
+    // Determine Bank Name
+    let bankName = (row.bank_name || "").trim();
+    if (!bankName && notes) {
+      const bm = notes.match(/Bank:\s*([^|]+)/i);
+      if (bm && bm[1]) bankName = bm[1].trim();
+    }
+
+    // Determine Customer Mode
+    let customerMode = (row.customer_mode || "").trim();
+    if (!customerMode && notes) {
+      const mm = notes.match(/Mode:\s*([^|]+)/i);
+      if (mm && mm[1]) customerMode = mm[1].trim();
+    }
+
+    // Determine Customer Name & ID
+    let customerName = (row.customer_name || "").trim();
+    if (!customerName && notes) {
+      const cm = notes.match(/Customer:\s*([^|]+)/i);
+      if (cm && cm[1]) customerName = cm[1].trim();
+    }
+    const customerId = (row.customer_id || "").trim();
+
     // Extract Commission %
     let commPercent: number | null = null;
     const commMatch = notes.match(/Commission:\s*([0-9.]+)/i);
@@ -141,9 +216,13 @@ class TransactionLearningService {
 
     return {
       id: row.id,
-      card_type: cardType,
+      card_type: normalizeCardType(cardType),
       transaction_type: txType,
       sent_to: sentTo,
+      bank_name: bankName,
+      customer_mode: customerMode,
+      customer_name: customerName,
+      customer_id: customerId,
       commission_percent: commPercent ?? 0,
       site_fee_percent: siteFeePercent ?? 0,
       transaction_date: txDate,
@@ -159,6 +238,10 @@ class TransactionLearningService {
     card_type: string;
     transaction_type: string;
     sent_to: string;
+    bank_name?: string;
+    customer_mode?: string;
+    customer_name?: string;
+    customer_id?: string;
     amount: number;
     commission_percent: number;
     site_fee_percent: number;
@@ -166,9 +249,13 @@ class TransactionLearningService {
   }) {
     const record: HistoricalTransactionRecord = {
       id: tx.id || `local-${Date.now()}`,
-      card_type: tx.card_type.trim(),
+      card_type: normalizeCardType(tx.card_type),
       transaction_type: tx.transaction_type.trim(),
       sent_to: tx.sent_to.trim(),
+      bank_name: (tx.bank_name || "").trim(),
+      customer_mode: (tx.customer_mode || "").trim(),
+      customer_name: (tx.customer_name || "").trim(),
+      customer_id: (tx.customer_id || "").trim(),
       commission_percent: Number(tx.commission_percent) || 0,
       site_fee_percent: Number(tx.site_fee_percent) || 0,
       transaction_date: tx.transaction_date || new Date(),
@@ -181,144 +268,232 @@ class TransactionLearningService {
   }
 
   /**
-   * Query the learning engine for the best recommendation
-   * 
-   * Priority:
-   * 1. Card Type + Transaction Type + Sent To (Highest specificity)
-   * 2. Card Type + Transaction Type
-   * 3. Card Type
-   * 4. None
+   * Directly sets records for isolated unit and backtest testing
+   */
+  public setRecordsForTesting(records: HistoricalTransactionRecord[]) {
+    this.records = [...records];
+    this.isInitialized = true;
+  }
+
+  /**
+   * Continuous Kernel Density Estimation (KDE) over historical matches
+   */
+  private evaluateKernelDensity(
+    matches: HistoricalTransactionRecord[],
+    sourceName: TransactionFeeRecommendation["source"],
+    minConfidence = 0.25
+  ): TransactionFeeRecommendation | null {
+    if (matches.length === 0) return null;
+
+    const now = Date.now();
+    // 30-day half-life: decayFactorPerDay = ln(2) / 30 = 0.0231
+    const decayFactorPerDay = 0.0231;
+    const tolerance = 0.05; // 0.05% tolerance window to eliminate floating point drift
+
+    // Candidate rates
+    const candidateComms = Array.from(new Set(matches.map((m) => Math.round(m.commission_percent * 100) / 100)));
+    const candidateFees = Array.from(new Set(matches.map((m) => Math.round(m.site_fee_percent * 100) / 100)));
+
+    let totalWeight = 0;
+    const weights = matches.map((rec) => {
+      const daysDiff = Math.max(0, (now - rec.transaction_date.getTime()) / (1000 * 60 * 60 * 24));
+      const w = Math.exp(-decayFactorPerDay * daysDiff);
+      totalWeight += w;
+      return { rec, w };
+    });
+
+    // Continuous KDE for Commission
+    let bestCommVal: number | null = null;
+    let maxCommWeight = 0;
+    for (const cand of candidateComms) {
+      let score = 0;
+      for (const { rec, w } of weights) {
+        if (Math.abs(rec.commission_percent - cand) <= tolerance) {
+          score += w;
+        }
+      }
+      if (score > maxCommWeight) {
+        maxCommWeight = score;
+        bestCommVal = cand;
+      }
+    }
+
+    // Continuous KDE for Site Fee
+    let bestFeeVal: number | null = null;
+    let maxFeeWeight = 0;
+    for (const cand of candidateFees) {
+      let score = 0;
+      for (const { rec, w } of weights) {
+        if (Math.abs(rec.site_fee_percent - cand) <= tolerance) {
+          score += w;
+        }
+      }
+      if (score > maxFeeWeight) {
+        maxFeeWeight = score;
+        bestFeeVal = cand;
+      }
+    }
+
+    if (bestCommVal === null && bestFeeVal === null) return null;
+
+    const sampleCount = matches.length;
+    const sampleCredibility = sampleCount / (sampleCount + 1.5);
+    const commDominance = totalWeight > 0 ? maxCommWeight / totalWeight : 0;
+    const confidence = Math.min(0.99, Math.round(sampleCredibility * commDominance * 100) / 100);
+
+    if (sampleCount === 1 && sourceName !== "customer_history" && confidence < minConfidence) {
+      return null;
+    }
+
+    let explanation = `Based on ${sampleCount} past transactions (${Math.round(commDominance * 100)}% pattern consistency)`;
+    if (sourceName === "customer_history") {
+      explanation = `Client recurring rate (${sampleCount} past transaction${sampleCount > 1 ? "s" : ""})`;
+    } else if (sourceName === "card_tx_portal_bank_mode" || sourceName === "card_tx_portal_bank") {
+      explanation = `Bank & terminal rate from ${sampleCount} past transaction${sampleCount > 1 ? "s" : ""}`;
+    }
+
+    return {
+      commission: bestCommVal,
+      siteFee: bestFeeVal,
+      confidence,
+      source: sourceName,
+      sampleCount,
+      explanation,
+    };
+  }
+
+  /**
+   * Query the learning engine using the 5-Tier Bayesian Cascade
    */
   public getRecommendation(params: {
     cardType?: string;
     transactionType?: string;
     sentTo?: string;
+    bankName?: string;
+    customerMode?: string;
+    customerName?: string;
+    customerId?: string;
   }): TransactionFeeRecommendation {
-    const card = normalize(params.cardType);
+    const card = normalizeCardType(params.cardType);
     const tx = normalize(params.transactionType);
     const portal = normalize(params.sentTo);
+    const bank = normalize(params.bankName);
+    const mode = normalize(params.customerMode);
+    const custName = normalize(params.customerName);
+    const custId = (params.customerId || "").trim();
 
-    if (!card && !tx) {
-      return {
-        commission: null,
-        siteFee: null,
-        confidence: 0,
-        source: "none",
-        sampleCount: 0,
-      };
+    // Tier 0: Recurring Customer Memory (Chummi mode or named client)
+    if (custId || custName) {
+      const custMatches = this.records.filter((r) => {
+        if (custId && r.customer_id && r.customer_id === custId) return true;
+        if (custName && r.customer_name && normalize(r.customer_name) === custName) return true;
+        return false;
+      });
+
+      if (custMatches.length > 0) {
+        // Prefer same transaction type (e.g. withdrawal vs repayment)
+        const custTxMatches = custMatches.filter((r) => normalize(r.transaction_type) === tx);
+        const targetMatches = custTxMatches.length > 0 ? custTxMatches : custMatches;
+        const custRec = this.evaluateKernelDensity(targetMatches, "customer_history", 0.3);
+        if (custRec) {
+          custRec.confidence = Math.max(0.95, custRec.confidence);
+          return custRec;
+        }
+      }
     }
 
-    const now = Date.now();
-    // Decay parameter: half-life of 90 days (approx 7.7e-3 per day)
-    const decayFactorPerDay = 0.0077;
-
-    // Helper to calculate weighted mode for an array of matches
-    const computeBestRate = (
-      matches: HistoricalTransactionRecord[],
-      sourceName: "card_tx_portal" | "card_tx" | "card" | "portal"
-    ): TransactionFeeRecommendation | null => {
-      if (matches.length === 0) return null;
-
-      const commWeights = new Map<number, ValueWeight>();
-      const feeWeights = new Map<number, ValueWeight>();
-      let totalWeight = 0;
-
-      for (const rec of matches) {
-        const daysDiff = Math.max(0, (now - rec.transaction_date.getTime()) / (1000 * 60 * 60 * 24));
-        const weight = Math.exp(-decayFactorPerDay * daysDiff);
-        totalWeight += weight;
-
-        // Commission
-        const cVal = Math.round(rec.commission_percent * 100) / 100;
-        const cEntry = commWeights.get(cVal) || { value: cVal, weightedScore: 0, rawCount: 0 };
-        cEntry.weightedScore += weight;
-        cEntry.rawCount += 1;
-        commWeights.set(cVal, cEntry);
-
-        // Site Fee
-        const sVal = Math.round(rec.site_fee_percent * 100) / 100;
-        const sEntry = feeWeights.get(sVal) || { value: sVal, weightedScore: 0, rawCount: 0 };
-        sEntry.weightedScore += weight;
-        sEntry.rawCount += 1;
-        feeWeights.set(sVal, sEntry);
-      }
-
-      // Find highest weighted modes
-      let bestComm: ValueWeight | null = null;
-      for (const entry of commWeights.values()) {
-        if (!bestComm || entry.weightedScore > bestComm.weightedScore) {
-          bestComm = entry;
-        }
-      }
-
-      let bestFee: ValueWeight | null = null;
-      for (const entry of feeWeights.values()) {
-        if (!bestFee || entry.weightedScore > bestFee.weightedScore) {
-          bestFee = entry;
-        }
-      }
-
-      if (!bestComm && !bestFee) return null;
-
-      // Bayesian confidence calculation:
-      // sampleCredibility = N / (N + 2)
-      // dominance = modalWeight / totalWeight
-      const sampleCount = matches.length;
-      const sampleCredibility = sampleCount / (sampleCount + 2);
-      const commDominance = bestComm && totalWeight > 0 ? (bestComm.weightedScore / totalWeight) : 0;
-      const confidence = Math.round(sampleCredibility * commDominance * 100) / 100;
-
-      // Safe threshold: require at least 1 match, but if only 1 match and confidence < 0.35, don't overfit
-      if (sampleCount === 1 && commDominance < 0.8) {
-        return null;
-      }
-
-      return {
-        commission: bestComm ? bestComm.value : null,
-        siteFee: bestFee ? bestFee.value : null,
-        confidence,
-        source: sourceName,
-        sampleCount,
-        explanation: `Based on ${sampleCount} past transactions (${Math.round(commDominance * 100)}% pattern consistency)`,
-      };
-    };
-
-    // Tier 1: Card Type + Transaction Type + Sent To
-    if (card && tx && portal) {
-      const tier1Matches = this.records.filter(
+    // Tier 1: Card + Tx + Portal + Bank + Mode (Highest specificity)
+    if (card && tx && portal && bank && mode) {
+      const t1Matches = this.records.filter(
         (r) =>
-          normalize(r.card_type) === card &&
+          normalizeCardType(r.card_type) === card &&
+          normalize(r.transaction_type) === tx &&
+          normalize(r.sent_to) === portal &&
+          normalize(r.bank_name) === bank &&
+          normalize(r.customer_mode) === mode
+      );
+      if (t1Matches.length >= 2) {
+        const rec = this.evaluateKernelDensity(t1Matches, "card_tx_portal_bank_mode", 0.3);
+        if (rec) return rec;
+      }
+    }
+
+    // Tier 2: Card + Tx + Portal + Bank
+    if (card && tx && portal && bank) {
+      const t2Matches = this.records.filter(
+        (r) =>
+          normalizeCardType(r.card_type) === card &&
+          normalize(r.transaction_type) === tx &&
+          normalize(r.sent_to) === portal &&
+          normalize(r.bank_name) === bank
+      );
+      if (t2Matches.length >= 2) {
+        const rec = this.evaluateKernelDensity(t2Matches, "card_tx_portal_bank", 0.3);
+        if (rec) return rec;
+      }
+    }
+
+    // Tier 3: Card + Tx + Portal
+    if (card && tx && portal) {
+      const t3Matches = this.records.filter(
+        (r) =>
+          normalizeCardType(r.card_type) === card &&
           normalize(r.transaction_type) === tx &&
           normalize(r.sent_to) === portal
       );
-      const tier1Rec = computeBestRate(tier1Matches, "card_tx_portal");
-      if (tier1Rec && tier1Rec.confidence >= 0.3) {
-        return tier1Rec;
-      }
+      const rec = this.evaluateKernelDensity(t3Matches, "card_tx_portal", 0.25);
+      if (rec) return rec;
     }
 
-    // Tier 2: Card Type + Transaction Type
+    // Tier 4: Card + Tx
     if (card && tx) {
-      const tier2Matches = this.records.filter(
+      const t4Matches = this.records.filter(
         (r) =>
-          normalize(r.card_type) === card &&
+          normalizeCardType(r.card_type) === card &&
           normalize(r.transaction_type) === tx
       );
-      const tier2Rec = computeBestRate(tier2Matches, "card_tx");
-      if (tier2Rec && tier2Rec.confidence >= 0.25) {
-        return tier2Rec;
-      }
+      const rec = this.evaluateKernelDensity(t4Matches, "card_tx", 0.25);
+      if (rec) return rec;
     }
 
-    // Tier 3: Card Type only (if selected)
+    // Tier 5: Card only
     if (card) {
-      const tier3Matches = this.records.filter(
-        (r) => normalize(r.card_type) === card
-      );
-      const tier3Rec = computeBestRate(tier3Matches, "card");
-      if (tier3Rec && tier3Rec.confidence >= 0.4) {
-        return tier3Rec;
+      const t5Matches = this.records.filter((r) => normalizeCardType(r.card_type) === card);
+      const rec = this.evaluateKernelDensity(t5Matches, "card", 0.35);
+      if (rec) return rec;
+    }
+
+    // Tier 6: Automated Empirical Baseline Prior (zero-history cold-start)
+    if (tx === "repayment") {
+      return {
+        commission: 3.0,
+        siteFee: 0.0,
+        confidence: 0.5,
+        source: "global_baseline",
+        sampleCount: 0,
+        explanation: "Standard empirical baseline for repayments",
+      };
+    } else if (tx === "withdrawal") {
+      let comm = 2.0;
+      let fee = 1.55;
+      if (card === "rupay") {
+        comm = 2.0;
+        fee = 0.5;
+      } else if (card === "visa") {
+        comm = (bank && (bank.includes("sbi") || bank.includes("icici"))) ? 2.7 : 2.0;
+        fee = 1.55;
+      } else if (card === "mastercard") {
+        comm = 2.0;
+        fee = 1.55;
       }
+      return {
+        commission: comm,
+        siteFee: fee,
+        confidence: 0.5,
+        source: "global_baseline",
+        sampleCount: 0,
+        explanation: "Automated empirical baseline rate",
+      };
     }
 
     return {
@@ -352,14 +527,15 @@ class TransactionLearningService {
   }
 
   /**
-   * Returns top learned transaction patterns grouped by Card + Tx + SentTo
+   * Returns top learned transaction patterns grouped by Card + Tx + SentTo + Bank
    */
   public getTopPatterns(limit = 10): PatternSummary[] {
     const groups = new Map<string, HistoricalTransactionRecord[]>();
 
     for (const r of this.records) {
       if (!r.card_type || !r.transaction_type) continue;
-      const key = `${r.card_type}|${r.transaction_type}|${r.sent_to || "General"}`;
+      const bankLabel = r.bank_name ? ` (${r.bank_name})` : "";
+      const key = `${r.card_type}|${r.transaction_type}|${r.sent_to || "General"}${bankLabel}`;
       const list = groups.get(key) || [];
       list.push(r);
       groups.set(key, list);
@@ -368,11 +544,9 @@ class TransactionLearningService {
     const summaries: PatternSummary[] = [];
 
     for (const [key, list] of groups.entries()) {
-      if (list.length < 2) continue; // Only patterns with repeated data
+      if (list.length < 2) continue;
 
-      const [cardType, transactionType, sentTo] = key.split("|");
-
-      // Calculate mode for commission & site fee
+      const [cardType, transactionType, sentToWithBank] = key.split("|");
       const commCounts = new Map<number, number>();
       const feeCounts = new Map<number, number>();
 
@@ -404,7 +578,7 @@ class TransactionLearningService {
       summaries.push({
         cardType,
         transactionType,
-        sentTo: sentTo === "General" ? "" : sentTo,
+        sentTo: sentToWithBank === "General" ? "" : sentToWithBank,
         modalCommission: modalComm,
         modalSiteFee: modalFee,
         sampleCount: list.length,
@@ -417,7 +591,7 @@ class TransactionLearningService {
   }
 
   /**
-   * Leave-One-Out Cross-Validation (LOOCV) backtest
+   * Leave-One-Out Cross-Validation (LOOCV) backtest across all tiers
    */
   public runBacktest(): BacktestResults {
     const valid = this.records.filter((r) => r.card_type && r.transaction_type);
@@ -451,72 +625,100 @@ class TransactionLearningService {
       const target = valid[i];
       const training = valid.filter((_, idx) => idx !== i);
 
-      const card = normalize(target.card_type);
+      const card = normalizeCardType(target.card_type);
       const tx = normalize(target.transaction_type);
       const portal = normalize(target.sent_to);
+      const bank = normalize(target.bank_name);
+      const mode = normalize(target.customer_mode);
+      const custName = normalize(target.customer_name);
+      const custId = target.customer_id;
 
-      let matches = training.filter(
-        (r) =>
-          normalize(r.card_type) === card &&
-          normalize(r.transaction_type) === tx &&
-          normalize(r.sent_to) === portal
-      );
-      let isTier1 = true;
+      // 1. Customer Match
+      let matches: HistoricalTransactionRecord[] = [];
+      let source: TransactionFeeRecommendation["source"] = "none";
 
+      if (custId || custName) {
+        matches = training.filter((r) => {
+          if (custId && r.customer_id && r.customer_id === custId) return true;
+          if (custName && r.customer_name && normalize(r.customer_name) === custName) return true;
+          return false;
+        });
+        if (matches.length > 0) {
+          const custTxMatches = matches.filter((r) => normalize(r.transaction_type) === tx);
+          matches = custTxMatches.length > 0 ? custTxMatches : matches;
+          source = "customer_history";
+        }
+      }
+
+      // 2. Card + Tx + Portal + Bank + Mode
+      if (matches.length === 0 && bank && mode) {
+        matches = training.filter(
+          (r) =>
+            normalizeCardType(r.card_type) === card &&
+            normalize(r.transaction_type) === tx &&
+            normalize(r.sent_to) === portal &&
+            normalize(r.bank_name) === bank &&
+            normalize(r.customer_mode) === mode
+        );
+        if (matches.length >= 2) source = "card_tx_portal_bank_mode";
+        else matches = [];
+      }
+
+      // 3. Card + Tx + Portal + Bank
+      if (matches.length === 0 && bank) {
+        matches = training.filter(
+          (r) =>
+            normalizeCardType(r.card_type) === card &&
+            normalize(r.transaction_type) === tx &&
+            normalize(r.sent_to) === portal &&
+            normalize(r.bank_name) === bank
+        );
+        if (matches.length >= 2) source = "card_tx_portal_bank";
+        else matches = [];
+      }
+
+      // 4. Card + Tx + Portal
       if (matches.length === 0) {
         matches = training.filter(
           (r) =>
-            normalize(r.card_type) === card &&
+            normalizeCardType(r.card_type) === card &&
+            normalize(r.transaction_type) === tx &&
+            normalize(r.sent_to) === portal
+        );
+        if (matches.length > 0) source = "card_tx_portal";
+      }
+
+      // 5. Card + Tx
+      if (matches.length === 0) {
+        matches = training.filter(
+          (r) =>
+            normalizeCardType(r.card_type) === card &&
             normalize(r.transaction_type) === tx
         );
-        isTier1 = false;
+        if (matches.length > 0) source = "card_tx";
       }
 
       if (matches.length === 0) continue;
 
-      // Find mode
-      const commMap = new Map<number, number>();
-      const feeMap = new Map<number, number>();
-
-      for (const m of matches) {
-        commMap.set(m.commission_percent, (commMap.get(m.commission_percent) || 0) + 1);
-        feeMap.set(m.site_fee_percent, (feeMap.get(m.site_fee_percent) || 0) + 1);
-      }
-
-      let pComm = 0;
-      let maxC = 0;
-      for (const [val, c] of commMap.entries()) {
-        if (c > maxC) {
-          maxC = c;
-          pComm = val;
-        }
-      }
-
-      let pFee = 0;
-      let maxF = 0;
-      for (const [val, c] of feeMap.entries()) {
-        if (c > maxF) {
-          maxF = c;
-          pFee = val;
-        }
-      }
+      const rec = this.evaluateKernelDensity(matches, source, 0.2);
+      if (!rec || rec.commission === null || rec.siteFee === null) continue;
 
       totalEvaluated++;
-      const isCommOk = Math.abs(pComm - target.commission_percent) <= 0.05;
-      const isFeeOk = Math.abs(pFee - target.site_fee_percent) <= 0.05;
+      const isCommOk = Math.abs(rec.commission - target.commission_percent) <= 0.05;
+      const isFeeOk = Math.abs(rec.siteFee - target.site_fee_percent) <= 0.05;
 
       if (isCommOk) commCorrect++;
       if (isFeeOk) feeCorrect++;
       if (isCommOk && isFeeOk) bothCorrect++;
 
-      if (isTier1) {
+      const isTopTier = source === "customer_history" || source === "card_tx_portal_bank_mode" || source === "card_tx_portal_bank" || source === "card_tx_portal";
+      if (isTopTier) {
         tier1Count++;
         if (isCommOk) tier1CommCorrect++;
         if (isFeeOk) tier1FeeCorrect++;
       }
 
-      const dominance = maxC / matches.length;
-      if (matches.length >= 3 && dominance >= 0.7) {
+      if (rec.confidence >= 0.7) {
         highConfCount++;
         if (isCommOk) highConfCommCorrect++;
         if (isFeeOk) highConfFeeCorrect++;
@@ -562,4 +764,5 @@ export interface BacktestResults {
 }
 
 export const transactionLearningService = new TransactionLearningService();
+
 
