@@ -174,6 +174,14 @@ export const AddTransactionDialog = ({
         source: rec.source,
         confidence: rec.confidence,
       });
+    } else {
+      setRecommendationInfo(rec);
+      setAiPredictedValues({
+        commission: null,
+        siteFee: null,
+        source: "none",
+        confidence: 0,
+      });
     }
   };
 
@@ -412,41 +420,39 @@ export const AddTransactionDialog = ({
         transaction_date: formData.transaction_date,
       });
 
-      // Track AI prediction acceptance/override (fire-and-forget)
-      if (aiPredictedValues && aiPredictedValues.source !== "none") {
-        const actualComm = parseFloat(formData.commission_percent) || 0;
-        const actualFee = parseFloat(formData.site_fee_percent) || 0;
-        const predictedComm = aiPredictedValues.commission ?? 0;
-        const predictedFee = aiPredictedValues.siteFee ?? 0;
+      // Track prediction outcome for every transaction (fire-and-forget)
+      const actualComm = parseFloat(formData.commission_percent) || 0;
+      const actualFee = parseFloat(formData.site_fee_percent) || 0;
+      const hasPrediction = Boolean(aiPredictedValues && aiPredictedValues.source !== "none");
+      const predictedComm = hasPrediction ? aiPredictedValues?.commission ?? 0 : actualComm;
+      const predictedFee = hasPrediction ? aiPredictedValues?.siteFee ?? 0 : actualFee;
+      const commAccepted = hasPrediction ? Math.abs(actualComm - predictedComm) < 0.01 : true;
+      const feeAccepted = hasPrediction ? Math.abs(actualFee - predictedFee) < 0.01 : true;
 
-        const commAccepted = Math.abs(actualComm - predictedComm) < 0.01;
-        const feeAccepted = Math.abs(actualFee - predictedFee) < 0.01;
-
-        predictionTrackingService.recordPrediction({
-          transactionId: insertedTx?.id,
-          amount: parseFloat(formData.amount) || 0,
-          profit: profitAmount,
-          customerName: customerName || undefined,
-          customerPhone: customerPhone || undefined,
-          portalName: portalName || formData.sent_to,
-          notes: notesStr,
-          commissionAccepted: commAccepted,
-          siteFeeAccepted: feeAccepted,
-          predictedCommission: predictedComm,
-          predictedSiteFee: predictedFee,
-          actualCommission: actualComm,
-          actualSiteFee: actualFee,
-          predictionSource: aiPredictedValues.source,
-          predictionConfidence: aiPredictedValues.confidence,
-          cardType: formData.card_type,
-          transactionType: formData.transaction_type,
-          sentTo: formData.sent_to,
-          bankName: formData.bank_name || undefined,
-          customerMode: formData.customer_mode,
-        }).catch(() => {
-          // Silent — tracking should never break the main flow
-        });
-      }
+      predictionTrackingService.recordPrediction({
+        transactionId: insertedTx?.id,
+        amount: parseFloat(formData.amount) || 0,
+        profit: profitAmount,
+        customerName: customerName || undefined,
+        customerPhone: customerPhone || undefined,
+        portalName: portalName || formData.sent_to,
+        notes: notesStr,
+        commissionAccepted: commAccepted,
+        siteFeeAccepted: feeAccepted,
+        predictedCommission: predictedComm,
+        predictedSiteFee: predictedFee,
+        actualCommission: actualComm,
+        actualSiteFee: actualFee,
+        predictionSource: hasPrediction ? aiPredictedValues!.source : "none",
+        predictionConfidence: hasPrediction ? aiPredictedValues!.confidence : 0,
+        cardType: formData.card_type,
+        transactionType: formData.transaction_type,
+        sentTo: formData.sent_to,
+        bankName: formData.bank_name || undefined,
+        customerMode: formData.customer_mode,
+      }).catch(() => {
+        // Silent — tracking should never break the main flow
+      });
 
       const commPct = parseFloat(formData.commission_percent) || 0;
       const feePct = parseFloat(formData.site_fee_percent) || 0;

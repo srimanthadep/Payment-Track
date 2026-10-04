@@ -59,6 +59,7 @@ import { predictionTrackingService, PredictionEvent, PredictionStats } from "@/s
 import { format } from "date-fns";
 
 const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
+  none: { label: "No Prediction", color: "bg-muted text-muted-foreground border-border" },
   customer_history: { label: "Customer Memory", color: "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20" },
   card_tx_portal_bank_mode: { label: "Full Context Match", color: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20" },
   card_tx_portal_bank: { label: "Bank + Portal", color: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/20" },
@@ -404,6 +405,7 @@ export default function AiTracker() {
                       <SelectItem value="card_tx">Card + Type</SelectItem>
                       <SelectItem value="card">Card Only</SelectItem>
                       <SelectItem value="global_baseline">Baseline Default</SelectItem>
+                      <SelectItem value="none">No Prediction</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
