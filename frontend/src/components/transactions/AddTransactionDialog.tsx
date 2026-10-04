@@ -393,7 +393,7 @@ export const AddTransactionDialog = ({
       notes: notesStr,
     };
 
-    const { data: insertedTx, error } = await supabase.from("transactions").insert(payload).select().maybeSingle();
+    const { error } = await supabase.from("transactions").insert(payload);
 
     setIsLoading(false);
 
@@ -430,7 +430,7 @@ export const AddTransactionDialog = ({
       const feeAccepted = hasPrediction ? Math.abs(actualFee - predictedFee) < 0.01 : true;
 
       predictionTrackingService.recordPrediction({
-        transactionId: insertedTx?.id,
+        transactionId: undefined,
         amount: parseFloat(formData.amount) || 0,
         profit: profitAmount,
         customerName: customerName || undefined,
