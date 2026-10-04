@@ -36,6 +36,7 @@ import {
 } from "@/services/settingsService";
 import { transactionLearningService } from "@/services/transactionLearningService";
 import { activityLogService } from "@/services/activityLogService";
+import { predictionTrackingService } from "@/services/predictionTrackingService";
 import { CustomerCombobox, CustomerValue } from "@/components/customers/CustomerCombobox";
 import { customerService } from "@/services/customerService";
 import { whatsappService, formatPhoneForWhatsApp } from "@/services/whatsappService";
@@ -116,6 +117,14 @@ export const AddTransactionDialog = ({
     explanation?: string;
   } | null>(null);
 
+  // Track the AI-predicted values at the moment they were set (for acceptance tracking)
+  const [aiPredictedValues, setAiPredictedValues] = useState<{
+    commission: number | null;
+    siteFee: number | null;
+    source: string;
+    confidence: number;
+  } | null>(null);
+
   useEffect(() => {
     if (open) {
       transactionLearningService.init();
@@ -157,6 +166,14 @@ export const AddTransactionDialog = ({
         return next;
       });
       setRecommendationInfo(rec);
+
+      // Snapshot AI-predicted values for acceptance tracking
+      setAiPredictedValues({
+        commission: rec.commission,
+        siteFee: rec.siteFee,
+        source: rec.source,
+        confidence: rec.confidence,
+      });
     }
   };
 
@@ -235,6 +252,7 @@ export const AddTransactionDialog = ({
     setIsCommissionManual(false);
     setIsSiteFeeManual(false);
     setRecommendationInfo(null);
+    setAiPredictedValues(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -355,7 +373,9 @@ export const AddTransactionDialog = ({
       transaction_type: formData.transaction_type.toLowerCase(),
       amount: parseFloat(formData.amount),
       commission: commissionAmount,
+      commission_percent: commPercent,
       site_fee: siteFeeAmount,
+      site_fee_percent: parseFloat(formData.site_fee_percent) || 0,
       transaction_date: formData.transaction_date.toISOString(),
       customer_id: customerId,
       customer_name: customerName,
@@ -365,7 +385,7 @@ export const AddTransactionDialog = ({
       notes: notesStr,
     };
 
-    const { error } = await supabase.from("transactions").insert(payload);
+    const { data: insertedTx, error } = await supabase.from("transactions").insert(payload).select().maybeSingle();
 
     setIsLoading(false);
 
@@ -391,6 +411,42 @@ export const AddTransactionDialog = ({
         site_fee_percent: parseFloat(formData.site_fee_percent) || 0,
         transaction_date: formData.transaction_date,
       });
+
+      // Track AI prediction acceptance/override (fire-and-forget)
+      if (aiPredictedValues && aiPredictedValues.source !== "none") {
+        const actualComm = parseFloat(formData.commission_percent) || 0;
+        const actualFee = parseFloat(formData.site_fee_percent) || 0;
+        const predictedComm = aiPredictedValues.commission ?? 0;
+        const predictedFee = aiPredictedValues.siteFee ?? 0;
+
+        const commAccepted = Math.abs(actualComm - predictedComm) < 0.01;
+        const feeAccepted = Math.abs(actualFee - predictedFee) < 0.01;
+
+        predictionTrackingService.recordPrediction({
+          transactionId: insertedTx?.id,
+          amount: parseFloat(formData.amount) || 0,
+          profit: profitAmount,
+          customerName: customerName || undefined,
+          customerPhone: customerPhone || undefined,
+          portalName: portalName || formData.sent_to,
+          notes: notesStr,
+          commissionAccepted: commAccepted,
+          siteFeeAccepted: feeAccepted,
+          predictedCommission: predictedComm,
+          predictedSiteFee: predictedFee,
+          actualCommission: actualComm,
+          actualSiteFee: actualFee,
+          predictionSource: aiPredictedValues.source,
+          predictionConfidence: aiPredictedValues.confidence,
+          cardType: formData.card_type,
+          transactionType: formData.transaction_type,
+          sentTo: formData.sent_to,
+          bankName: formData.bank_name || undefined,
+          customerMode: formData.customer_mode,
+        }).catch(() => {
+          // Silent — tracking should never break the main flow
+        });
+      }
 
       const commPct = parseFloat(formData.commission_percent) || 0;
       const feePct = parseFloat(formData.site_fee_percent) || 0;
@@ -638,7 +694,75 @@ export const AddTransactionDialog = ({
             </div>
           </div>
 
-          {/* 4. Commission (%) & 5. Site Fee (%) */}
+          {/* 4. Customer Mode (Online/Offline) & Bank Credit Card */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label
+                htmlFor="customer_mode"
+                className="text-xs sm:text-sm font-medium truncate block"
+              >
+                Customer Mode
+              </Label>
+              <Select
+                value={formData.customer_mode}
+                onValueChange={(val: "Online" | "Offline") => {
+                  setFormData((prev) => ({ ...prev, customer_mode: val }));
+                  applyLearningRecommendation(
+                    formData.transaction_type,
+                    formData.card_type,
+                    formData.sent_to,
+                    formData.bank_name,
+                    val,
+                    customerValue
+                  );
+                }}
+              >
+                <SelectTrigger id="customer_mode">
+                  <SelectValue placeholder="Select mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Offline">Offline</SelectItem>
+                  <SelectItem value="Online">Online</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label
+                htmlFor="bank_name"
+                className="text-xs sm:text-sm font-medium truncate block"
+              >
+                Bank Credit Card <span className="text-[10px] font-normal text-muted-foreground"><span className="hidden sm:inline">(Optional)</span><span className="sm:hidden">(Opt)</span></span>
+              </Label>
+              <Select
+                value={formData.bank_name}
+                onValueChange={(val) => {
+                  setFormData((prev) => ({ ...prev, bank_name: val }));
+                  applyLearningRecommendation(
+                    formData.transaction_type,
+                    formData.card_type,
+                    formData.sent_to,
+                    val,
+                    formData.customer_mode,
+                    customerValue
+                  );
+                }}
+              >
+                <SelectTrigger id="bank_name">
+                  <SelectValue placeholder="Select bank" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {banks.map((b) => (
+                    <SelectItem key={b.id} value={b.name}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* 5. Commission (%) & Site Fee (%) */}
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <div className="space-y-1.5 sm:space-y-2">
               <Label
@@ -745,7 +869,7 @@ export const AddTransactionDialog = ({
             </div>
           )}
 
-          {/* 7. Sent to (Portals / Recipients) */}
+          {/* 8. Sent to (Portals / Recipients) */}
           <div className="space-y-2">
             <Label htmlFor="sent_to">Sent To</Label>
             <Select
@@ -778,67 +902,6 @@ export const AddTransactionDialog = ({
                 ))}
               </SelectContent>
             </Select>
-          </div>
-
-          {/* 8. Customer Mode (Online/Offline) & Bank Credit Card */}
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
-            <div className="space-y-1.5 sm:space-y-2">
-              <Label htmlFor="customer_mode" className="text-xs sm:text-sm font-medium">Customer Mode</Label>
-              <Select
-                value={formData.customer_mode}
-                onValueChange={(val: "Online" | "Offline") => {
-                  setFormData((prev) => ({ ...prev, customer_mode: val }));
-                  applyLearningRecommendation(
-                    formData.transaction_type,
-                    formData.card_type,
-                    formData.sent_to,
-                    formData.bank_name,
-                    val,
-                    customerValue
-                  );
-                }}
-              >
-                <SelectTrigger id="customer_mode">
-                  <SelectValue placeholder="Select mode" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Offline">Offline</SelectItem>
-                  <SelectItem value="Online">Online</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5 sm:space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="bank_name" className="text-xs sm:text-sm font-medium">Bank Credit Card</Label>
-                <span className="text-[10px] text-muted-foreground">(Optional)</span>
-              </div>
-              <Select
-                value={formData.bank_name}
-                onValueChange={(val) => {
-                  setFormData((prev) => ({ ...prev, bank_name: val }));
-                  applyLearningRecommendation(
-                    formData.transaction_type,
-                    formData.card_type,
-                    formData.sent_to,
-                    val,
-                    formData.customer_mode,
-                    customerValue
-                  );
-                }}
-              >
-                <SelectTrigger id="bank_name">
-                  <SelectValue placeholder="Select bank" />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  {banks.map((b) => (
-                    <SelectItem key={b.id} value={b.name}>
-                      {b.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           {/* Conditional Customer Info for Chummi Portal */}

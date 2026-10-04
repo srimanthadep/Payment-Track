@@ -116,7 +116,9 @@ export class TransactionLearningService {
           transaction_type,
           amount,
           commission,
+          commission_percent,
           site_fee,
+          site_fee_percent,
           notes,
           bank_name,
           customer_mode,
@@ -196,20 +198,28 @@ export class TransactionLearningService {
 
     // Extract Commission %
     let commPercent: number | null = null;
-    const commMatch = notes.match(/Commission:\s*([0-9.]+)/i);
-    if (commMatch && commMatch[1]) {
-      commPercent = parseFloat(commMatch[1]);
-    } else if (amount > 0 && row.commission !== undefined && row.commission !== null) {
-      commPercent = Math.round(((Number(row.commission) / amount) * 100) * 100) / 100;
+    if (row.commission_percent !== undefined && row.commission_percent !== null) {
+      commPercent = Number(row.commission_percent);
+    } else {
+      const commMatch = notes.match(/Commission:\s*([0-9.]+)/i);
+      if (commMatch && commMatch[1]) {
+        commPercent = parseFloat(commMatch[1]);
+      } else if (amount > 0 && row.commission !== undefined && row.commission !== null) {
+        commPercent = Math.round(((Number(row.commission) / amount) * 100) * 100) / 100;
+      }
     }
 
     // Extract Site Fee %
     let siteFeePercent: number | null = null;
-    const feeMatch = notes.match(/Site Fee:\s*([0-9.]+)/i);
-    if (feeMatch && feeMatch[1]) {
-      siteFeePercent = parseFloat(feeMatch[1]);
-    } else if (amount > 0 && row.site_fee !== undefined && row.site_fee !== null) {
-      siteFeePercent = Math.round(((Number(row.site_fee) / amount) * 100) * 100) / 100;
+    if (row.site_fee_percent !== undefined && row.site_fee_percent !== null) {
+      siteFeePercent = Number(row.site_fee_percent);
+    } else {
+      const feeMatch = notes.match(/Site Fee:\s*([0-9.]+)/i);
+      if (feeMatch && feeMatch[1]) {
+        siteFeePercent = parseFloat(feeMatch[1]);
+      } else if (amount > 0 && row.site_fee !== undefined && row.site_fee !== null) {
+        siteFeePercent = Math.round(((Number(row.site_fee) / amount) * 100) * 100) / 100;
+      }
     }
 
     const txDate = row.transaction_date ? new Date(row.transaction_date) : new Date();

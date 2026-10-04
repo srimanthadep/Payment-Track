@@ -148,7 +148,7 @@ const Dues = () => {
                 Track money lent, repayment progress, and overdue borrowers in real time.
               </p>
             </div>
-            <Button size="sm" className="h-9 text-xs gap-1.5 shadow-xs" onClick={() => setIsAddOpen(true)}>
+            <Button size="sm" className="hidden sm:inline-flex h-9 text-xs gap-1.5 shadow-xs" onClick={() => setIsAddOpen(true)}>
               <Plus className="h-3.5 w-3.5" />
               Add Due
             </Button>

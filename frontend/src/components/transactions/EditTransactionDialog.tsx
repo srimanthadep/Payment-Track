@@ -366,7 +366,9 @@ export const EditTransactionDialog = ({
       transaction_type: formData.transaction_type.toLowerCase(),
       amount: parseFloat(formData.amount),
       commission: commAmount,
+      commission_percent: commPercent,
       site_fee: feeAmount,
+      site_fee_percent: feePercent,
       profit: profitAmount,
       transaction_date: formData.transaction_date.toISOString(),
       customer_id: customerId,
@@ -585,7 +587,60 @@ export const EditTransactionDialog = ({
             </div>
           </div>
 
-          {/* 3. Commission (%) & Site Fee (%) */}
+          {/* 3. Customer Mode (Online/Offline) & Bank Credit Card */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label
+                htmlFor="edit-customer_mode"
+                className="text-xs sm:text-sm font-medium truncate block"
+              >
+                Customer Mode
+              </Label>
+              <Select
+                value={formData.customer_mode}
+                onValueChange={(val: "Online" | "Offline") =>
+                  setFormData((prev) => ({ ...prev, customer_mode: val }))
+                }
+              >
+                <SelectTrigger id="edit-customer_mode">
+                  <SelectValue placeholder="Select mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Offline">Offline</SelectItem>
+                  <SelectItem value="Online">Online</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label
+                htmlFor="edit-bank_name"
+                className="text-xs sm:text-sm font-medium truncate block"
+              >
+                Bank Credit Card <span className="text-[10px] font-normal text-muted-foreground"><span className="hidden sm:inline">(Optional)</span><span className="sm:hidden">(Opt)</span></span>
+              </Label>
+              <Select
+                value={formData.bank_name || "none"}
+                onValueChange={(val) =>
+                  setFormData((prev) => ({ ...prev, bank_name: val === "none" ? "" : val }))
+                }
+              >
+                <SelectTrigger id="edit-bank_name">
+                  <SelectValue placeholder="Select bank (Optional)" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  <SelectItem value="none">-- None / General --</SelectItem>
+                  {banks.map((b) => (
+                    <SelectItem key={b.id} value={b.name}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* 4. Commission (%) & Site Fee (%) */}
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <div className="space-y-1.5 sm:space-y-2">
               <Label
@@ -617,7 +672,7 @@ export const EditTransactionDialog = ({
                 htmlFor="edit-site_fee_percent"
                 className="text-xs sm:text-sm font-medium truncate block"
               >
-                Site Fee (%) <span className="text-[10px] font-normal text-muted-foreground">(Optional)</span>
+                Site Fee (%) <span className="text-[10px] font-normal text-muted-foreground"><span className="hidden sm:inline">(Optional)</span><span className="sm:hidden">(Opt)</span></span>
               </Label>
               <Input
                 id="edit-site_fee_percent"
@@ -637,7 +692,7 @@ export const EditTransactionDialog = ({
             </div>
           </div>
 
-          {/* 4. Estimated Profit summary box */}
+          {/* 5. Estimated Profit summary box */}
           {hasEnteredCommission && (
             <div className="rounded-lg border bg-muted/40 p-3 space-y-1.5">
               <div className="flex justify-between items-center text-sm font-medium">
@@ -657,7 +712,7 @@ export const EditTransactionDialog = ({
             </div>
           )}
 
-          {/* 5. Portal */}
+          {/* 6. Portal */}
           <div className="space-y-2">
             <Label htmlFor="edit-portal">Portal</Label>
             <Select
@@ -676,56 +731,6 @@ export const EditTransactionDialog = ({
                 ))}
               </SelectContent>
             </Select>
-          </div>
-
-          {/* 6. Customer Mode (Online/Offline) & Bank Credit Card */}
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
-            <div className="space-y-1.5 sm:space-y-2">
-              <Label htmlFor="edit-customer_mode" className="text-xs sm:text-sm font-medium">
-                Customer Mode
-              </Label>
-              <Select
-                value={formData.customer_mode}
-                onValueChange={(val: "Online" | "Offline") =>
-                  setFormData((prev) => ({ ...prev, customer_mode: val }))
-                }
-              >
-                <SelectTrigger id="edit-customer_mode">
-                  <SelectValue placeholder="Select mode" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Offline">Offline</SelectItem>
-                  <SelectItem value="Online">Online</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5 sm:space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="edit-bank_name" className="text-xs sm:text-sm font-medium">
-                  Bank Credit Card
-                </Label>
-                <span className="text-[10px] text-muted-foreground">(Optional)</span>
-              </div>
-              <Select
-                value={formData.bank_name || "none"}
-                onValueChange={(val) =>
-                  setFormData((prev) => ({ ...prev, bank_name: val === "none" ? "" : val }))
-                }
-              >
-                <SelectTrigger id="edit-bank_name">
-                  <SelectValue placeholder="Select bank (Optional)" />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  <SelectItem value="none">-- None / General --</SelectItem>
-                  {banks.map((b) => (
-                    <SelectItem key={b.id} value={b.name}>
-                      {b.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           {/* 7. Conditional Customer Info for Chummi Portal */}

@@ -7,14 +7,18 @@
       "description": "Credit card withdrawals, repayments, customer charges, commissions, and portal fees",
       "columns": [
         { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
-        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "profiles.id", "nullable": false },
+        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "auth.users.id", "nullable": false },
         { "name": "portal_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "portals.id", "nullable": false },
         { "name": "amount", "type": "numeric", "nullable": false, "description": "Total amount in ₹ (amount >= 0)" },
-        { "name": "commission", "type": "numeric", "nullable": true },
-        { "name": "site_fee", "type": "numeric", "nullable": true },
+        { "name": "commission", "type": "numeric", "nullable": true, "description": "Computed commission amount in ₹" },
+        { "name": "commission_percent", "type": "numeric", "nullable": true, "description": "Commission rate %" },
+        { "name": "site_fee", "type": "numeric", "nullable": true, "description": "Computed portal / site fee amount in ₹" },
+        { "name": "site_fee_percent", "type": "numeric", "nullable": true, "description": "Site fee rate %" },
         { "name": "profit", "type": "numeric", "nullable": true, "description": "Net profit = commission - site_fee" },
         { "name": "transaction_type", "type": "text", "nullable": false, "examples": ["withdrawal", "repayment", "cash"] },
-        { "name": "card_type", "type": "text", "nullable": true, "examples": ["Visa", "Mastercard", "Amex"] },
+        { "name": "card_type", "type": "text", "nullable": true, "examples": ["Visa", "Mastercard", "Amex", "RuPay"] },
+        { "name": "customer_mode", "type": "text", "nullable": true, "default": "'Offline'", "examples": ["Offline", "Online"] },
+        { "name": "bank_name", "type": "text", "nullable": true },
         { "name": "transaction_date", "type": "timestamptz", "nullable": false },
         { "name": "customer_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "customers.id", "nullable": true },
         { "name": "customer_name", "type": "text", "nullable": true },
@@ -30,23 +34,9 @@
       "description": "Dedicated canonical customer records for customer tracking, repeat customer auto-fill, and CRM analytics",
       "columns": [
         { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
-        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "profiles.id", "nullable": false },
+        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "auth.users.id", "nullable": false },
         { "name": "name", "type": "text", "nullable": false },
         { "name": "phone", "type": "text", "nullable": true, "description": "Normalized 10-digit customer phone number" },
-        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
-        { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
-      ]
-    },
-    {
-      "name": "expenses",
-      "description": "Operating expenses, salaries, rent, utility bills, and overheads",
-      "columns": [
-        { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
-        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "profiles.id", "nullable": false },
-        { "name": "category", "type": "text", "nullable": false },
-        { "name": "amount", "type": "numeric", "nullable": false },
-        { "name": "expense_date", "type": "timestamptz", "nullable": false, "default": "now()" },
-        { "name": "notes", "type": "text", "nullable": true },
         { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
         { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
       ]
@@ -56,7 +46,7 @@
       "description": "Money lent / borrower dues tracking with repayment ledger and status calculation",
       "columns": [
         { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
-        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "profiles.id", "nullable": false },
+        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "auth.users.id", "nullable": false },
         { "name": "customer_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "customers.id", "nullable": true },
         { "name": "borrower_name", "type": "text", "nullable": false },
         { "name": "borrower_contact", "type": "text", "nullable": true },
@@ -72,11 +62,25 @@
       ]
     },
     {
+      "name": "expenses",
+      "description": "Operating expenses, salaries, rent, utility bills, and overheads",
+      "columns": [
+        { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
+        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "auth.users.id", "nullable": false },
+        { "name": "category", "type": "text", "nullable": false },
+        { "name": "amount", "type": "numeric", "nullable": false },
+        { "name": "expense_date", "type": "timestamptz", "nullable": false, "default": "now()" },
+        { "name": "notes", "type": "text", "nullable": true },
+        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
+        { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
+      ]
+    },
+    {
       "name": "goals",
       "description": "Financial targets and performance tracking",
       "columns": [
         { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
-        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "profiles.id", "nullable": false },
+        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "auth.users.id", "nullable": false },
         { "name": "goal_type", "type": "text", "nullable": false },
         { "name": "target_amount", "type": "numeric", "nullable": false },
         { "name": "period_start", "type": "timestamptz", "nullable": false },
@@ -90,11 +94,51 @@
       "description": "System and user action audit trail",
       "columns": [
         { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
-        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "profiles.id", "nullable": false },
+        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "auth.users.id", "nullable": false },
         { "name": "action", "type": "text", "nullable": false },
         { "name": "category", "type": "text", "nullable": false },
         { "name": "description", "type": "text", "nullable": false },
         { "name": "metadata", "type": "jsonb", "nullable": true },
+        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" }
+      ]
+    },
+    {
+      "name": "prediction_tracking",
+      "description": "AI commission and site fee prediction accuracy tracking (accepted vs overridden events)",
+      "columns": [
+        { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
+        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "auth.users.id", "nullable": false },
+        { "name": "commission_accepted", "type": "boolean", "nullable": false, "default": false },
+        { "name": "site_fee_accepted", "type": "boolean", "nullable": false, "default": false },
+        { "name": "both_accepted", "type": "boolean", "nullable": false, "default": false },
+        { "name": "predicted_commission", "type": "numeric", "nullable": false, "default": 0 },
+        { "name": "predicted_site_fee", "type": "numeric", "nullable": false, "default": 0 },
+        { "name": "actual_commission", "type": "numeric", "nullable": false, "default": 0 },
+        { "name": "actual_site_fee", "type": "numeric", "nullable": false, "default": 0 },
+        { "name": "prediction_source", "type": "text", "nullable": false, "default": "'fallback'" },
+        { "name": "prediction_confidence", "type": "numeric", "nullable": false, "default": 0 },
+        { "name": "card_type", "type": "text", "nullable": false },
+        { "name": "transaction_type", "type": "text", "nullable": false },
+        { "name": "sent_to", "type": "text", "nullable": false },
+        { "name": "bank_name", "type": "text", "nullable": true },
+        { "name": "customer_mode", "type": "text", "nullable": true },
+        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" }
+      ]
+    },
+    {
+      "name": "whatsapp_message_log",
+      "description": "Audit trail for outbound WhatsApp customer receipts and welcome notifications",
+      "columns": [
+        { "name": "id", "type": "bigint", "is_primary_key": true, "nullable": false, "default": "nextval('whatsapp_message_log_id_seq')" },
+        { "name": "user_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "auth.users.id", "nullable": true },
+        { "name": "phone", "type": "text", "nullable": false },
+        { "name": "action", "type": "text", "nullable": false, "examples": ["welcome", "receipt", "reminder"] },
+        { "name": "message", "type": "text", "nullable": true },
+        { "name": "status", "type": "text", "nullable": false, "default": "'sent'", "examples": ["sent", "failed"] },
+        { "name": "error", "type": "text", "nullable": true },
+        { "name": "customer_id", "type": "text", "nullable": true },
+        { "name": "customer_name", "type": "text", "nullable": true },
+        { "name": "transaction_id", "type": "text", "nullable": true },
         { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" }
       ]
     },
@@ -104,8 +148,8 @@
       "columns": [
         { "name": "id", "type": "uuid", "is_primary_key": true, "nullable": false, "default": "gen_random_uuid()" },
         { "name": "name", "type": "text", "nullable": false },
-        { "name": "default_commission_rate", "type": "numeric", "nullable": true },
-        { "name": "default_site_fee", "type": "numeric", "nullable": true },
+        { "name": "default_commission_rate", "type": "numeric", "nullable": true, "default": 0 },
+        { "name": "default_site_fee", "type": "numeric", "nullable": true, "default": 0 },
         { "name": "is_active", "type": "boolean", "nullable": true, "default": true },
         { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
         { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
@@ -113,14 +157,15 @@
     },
     {
       "name": "profiles",
-      "description": "User profile metadata synced with Supabase Auth",
+      "description": "User profile metadata synced with Supabase Auth, supporting role-based staff management",
       "columns": [
         { "name": "id", "type": "uuid", "is_primary_key": true, "is_foreign_key": true, "foreign_key_to": "auth.users.id", "nullable": false },
         { "name": "email", "type": "text", "nullable": true },
         { "name": "full_name", "type": "text", "nullable": true },
         { "name": "business_name", "type": "text", "nullable": true },
         { "name": "avatar_url", "type": "text", "nullable": true },
-        { "name": "role", "type": "app_role", "nullable": false, "enum": ["admin", "user"], "default": "'user'::app_role" },
+        { "name": "role", "type": "app_role", "nullable": false, "enum": ["admin", "user", "staff"], "default": "'user'::app_role" },
+        { "name": "owner_id", "type": "uuid", "is_foreign_key": true, "foreign_key_to": "profiles.id", "nullable": true, "description": "Links staff accounts to parent business owner" },
         { "name": "settings", "type": "jsonb", "nullable": false, "default": "'{}'::jsonb" },
         { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
         { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
@@ -128,6 +173,6 @@
     }
   ],
   "enums": {
-    "app_role": ["admin", "user"]
+    "app_role": ["admin", "user", "staff"]
   }
 }

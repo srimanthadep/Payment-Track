@@ -1,6 +1,6 @@
 # 🗄️ Supabase PostgreSQL Database Schema
 
-Complete database architecture, tables, columns, primary keys, foreign keys, and relationships for the **Payment-Track** platform.
+Complete database architecture, tables, columns, primary keys, foreign keys, indexes, RLS policies, and relationships for the **Payment-Track** platform.
 
 ---
 
@@ -14,6 +14,9 @@ erDiagram
     PROFILES ||--o{ DUES : "user_id"
     PROFILES ||--o{ GOALS : "user_id"
     PROFILES ||--o{ ACTIVITY_LOGS : "user_id"
+    PROFILES ||--o{ PREDICTION_TRACKING : "user_id"
+    PROFILES ||--o{ WHATSAPP_MESSAGE_LOG : "user_id"
+    PROFILES ||--o{ PROFILES : "owner_id"
     
     CUSTOMERS ||--o{ TRANSACTIONS : "customer_id"
     CUSTOMERS ||--o{ DUES : "customer_id"
@@ -26,6 +29,7 @@ erDiagram
         text business_name
         text avatar_url
         app_role role
+        uuid owner_id FK
         jsonb settings
         timestamp created_at
         timestamp updated_at
@@ -47,10 +51,14 @@ erDiagram
         uuid customer_id FK
         numeric amount
         numeric commission
+        numeric commission_percent
         numeric site_fee
+        numeric site_fee_percent
         numeric profit
         text transaction_type
         text card_type
+        text customer_mode
+        text bank_name
         timestamp transaction_date
         text customer_name
         text customer_phone
@@ -99,24 +107,38 @@ erDiagram
         timestamp updated_at
     }
 
-    ACTIVITY_LOGS {
+    PREDICTION_TRACKING {
         uuid id PK
         uuid user_id FK
-        text action
-        text category
-        text description
-        jsonb metadata
+        boolean commission_accepted
+        boolean site_fee_accepted
+        boolean both_accepted
+        numeric predicted_commission
+        numeric predicted_site_fee
+        numeric actual_commission
+        numeric actual_site_fee
+        text prediction_source
+        numeric prediction_confidence
+        text card_type
+        text transaction_type
+        text sent_to
+        text bank_name
+        text customer_mode
         timestamp created_at
     }
 
-    PORTALS {
-        uuid id PK
-        text name
-        numeric default_commission_rate
-        numeric default_site_fee
-        boolean is_active
+    WHATSAPP_MESSAGE_LOG {
+        bigserial id PK
+        uuid user_id FK
+        text phone
+        text action
+        text message
+        text status
+        text error
+        text customer_id
+        text customer_name
+        text transaction_id
         timestamp created_at
-        timestamp updated_at
     }
 ```
 
@@ -130,14 +152,18 @@ Stores credit card withdrawals, repayments, customer charges, commissions, and p
 | Column Name | Data Type | Nullable | Key / Ref | Description |
 |-------------|-----------|----------|-----------|-------------|
 | `id` | `uuid` | NO | **PK** (gen_random_uuid()) | Unique transaction ID |
-| `user_id` | `uuid` | NO | **FK** -> `auth.users.id` / `profiles.id` | User who created the transaction (Multi-tenant) |
+| `user_id` | `uuid` | NO | **FK** -> `auth.users.id` | User who created the transaction (Multi-tenant) |
 | `portal_id` | `uuid` | NO | **FK** -> `portals.id` | Associated portal / gateway |
 | `amount` | `numeric` | NO | - | Total transaction amount (₹) (Check: `amount >= 0`) |
-| `commission` | `numeric` | YES | - | Gross commission earned (₹) |
-| `site_fee` | `numeric` | YES | - | Portal processing / site fee paid (₹) |
+| `commission` | `numeric` | YES | - | Gross commission earned in ₹ |
+| `commission_percent` | `numeric(5,2)` | YES | - | Commission rate percentage (%) |
+| `site_fee` | `numeric` | YES | - | Portal processing / site fee paid in ₹ |
+| `site_fee_percent` | `numeric(5,2)` | YES | - | Site fee rate percentage (%) |
 | `profit` | `numeric` | YES | - | Net profit = `commission - site_fee` (₹) |
 | `transaction_type` | `text` | NO | - | Type (`withdrawal`, `repayment`, `cash`, etc.) |
-| `card_type` | `text` | YES | - | Card brand / category (`Visa`, `Mastercard`, etc.) |
+| `card_type` | `text` | YES | - | Card brand / category (`Visa`, `Mastercard`, `Amex`, `RuPay`) |
+| `customer_mode` | `text` | YES | - | Customer transaction mode (`Offline`, `Online`) |
+| `bank_name` | `text` | YES | - | Bank institution name |
 | `transaction_date` | `timestamptz` | NO | - | Date/time transaction occurred |
 | `customer_id` | `uuid` | YES | **FK** -> `customers.id` | Reference to canonical customer record |
 | `customer_name` | `text` | YES | - | Customer name snapshot / fallback |
@@ -169,7 +195,7 @@ Stores business operating costs, worker salaries, rent, petrol, and overheads.
 | Column Name | Data Type | Nullable | Key / Ref | Description |
 |-------------|-----------|----------|-----------|-------------|
 | `id` | `uuid` | NO | **PK** (gen_random_uuid()) | Unique expense ID |
-| `user_id` | `uuid` | NO | **FK** -> `auth.users.id` / `profiles.id` | Owner of the expense record |
+| `user_id` | `uuid` | NO | **FK** -> `auth.users.id` | Owner of the expense record |
 | `category` | `text` | NO | - | Category (`Worker Salary`, `Petrol`, `Rent`, `Current Bills`, etc.) |
 | `amount` | `numeric` | NO | - | Expense amount in ₹ |
 | `expense_date` | `timestamptz` | NO | - | Date expense was incurred |
@@ -185,7 +211,7 @@ Money lent / borrower dues tracking with repayment ledger and status calculation
 | Column Name | Data Type | Nullable | Key / Ref | Description |
 |-------------|-----------|----------|-----------|-------------|
 | `id` | `uuid` | NO | **PK** (gen_random_uuid()) | Unique dues ID |
-| `user_id` | `uuid` | NO | **FK** -> `auth.users.id` / `profiles.id` | Record owner |
+| `user_id` | `uuid` | NO | **FK** -> `auth.users.id` | Record owner |
 | `customer_id` | `uuid` | YES | **FK** -> `customers.id` | Associated customer |
 | `borrower_name` | `text` | NO | - | Borrower full name |
 | `borrower_contact` | `text` | YES | - | Borrower phone or contact info |
@@ -207,7 +233,7 @@ Financial performance targets (monthly, quarterly, yearly).
 | Column Name | Data Type | Nullable | Key / Ref | Description |
 |-------------|-----------|----------|-----------|-------------|
 | `id` | `uuid` | NO | **PK** (gen_random_uuid()) | Goal ID |
-| `user_id` | `uuid` | NO | **FK** -> `auth.users.id` / `profiles.id` | User owner |
+| `user_id` | `uuid` | NO | **FK** -> `auth.users.id` | User owner |
 | `goal_type` | `text` | NO | - | Goal scope (`monthly`, `quarterly`, `yearly`) |
 | `target_amount` | `numeric` | NO | - | Target amount in ₹ (Check: `> 0`) |
 | `period_start` | `timestamptz` | NO | - | Goal period start date |
@@ -217,14 +243,58 @@ Financial performance targets (monthly, quarterly, yearly).
 
 ---
 
-### 6. `activity_logs`
+### 6. `prediction_tracking`
+AI commission and site fee prediction accuracy tracking.
+
+| Column Name | Data Type | Nullable | Key / Ref | Description |
+|-------------|-----------|----------|-----------|-------------|
+| `id` | `uuid` | NO | **PK** (gen_random_uuid()) | Event ID |
+| `user_id` | `uuid` | NO | **FK** -> `auth.users.id` | User owner |
+| `commission_accepted` | `boolean` | NO | - | Was AI commission accepted as-is? |
+| `site_fee_accepted` | `boolean` | NO | - | Was AI site fee accepted as-is? |
+| `both_accepted` | `boolean` | NO | - | Were both values accepted? |
+| `predicted_commission`| `numeric(6,2)`| NO | - | AI predicted commission % |
+| `predicted_site_fee` | `numeric(6,2)`| NO | - | AI predicted site fee % |
+| `actual_commission` | `numeric(6,2)`| NO | - | User submitted commission % |
+| `actual_site_fee` | `numeric(6,2)`| NO | - | User submitted site fee % |
+| `prediction_source` | `text` | NO | - | Cascade tier name |
+| `prediction_confidence`| `numeric(4,3)`| NO | - | Confidence score (0.0 to 1.0) |
+| `card_type` | `text` | NO | - | Card brand |
+| `transaction_type` | `text` | NO | - | Transaction type |
+| `sent_to` | `text` | NO | - | Portal / recipient |
+| `bank_name` | `text` | YES | - | Bank name |
+| `customer_mode` | `text` | YES | - | Customer mode |
+| `created_at` | `timestamptz` | NO | - | Event timestamp |
+
+---
+
+### 7. `whatsapp_message_log`
+Audit trail recording all outbound WhatsApp customer receipts and welcome notifications.
+
+| Column Name | Data Type | Nullable | Key / Ref | Description |
+|-------------|-----------|----------|-----------|-------------|
+| `id` | `bigint` | NO | **PK** (BIGSERIAL) | Primary Key ID |
+| `user_id` | `uuid` | YES | **FK** -> `auth.users.id` | Sender user ID |
+| `phone` | `text` | NO | - | Recipient phone number |
+| `action` | `text` | NO | - | Action type (`welcome`, `receipt`, `reminder`) |
+| `message` | `text` | YES | - | Outbound message body |
+| `status` | `text` | NO | - | Status (`sent`, `failed`) |
+| `error` | `text` | YES | - | Failure explanation if error occurred |
+| `customer_id` | `text` | YES | - | Related customer identifier |
+| `customer_name` | `text` | YES | - | Related customer name |
+| `transaction_id` | `text` | YES | - | Related transaction identifier |
+| `created_at` | `timestamptz` | NO | - | Log creation timestamp |
+
+---
+
+### 8. `activity_logs`
 Audit log recording user actions, mutations, and system events.
 
 | Column Name | Data Type | Nullable | Key / Ref | Description |
 |-------------|-----------|----------|-----------|-------------|
 | `id` | `uuid` | NO | **PK** (gen_random_uuid()) | Log entry ID |
-| `user_id` | `uuid` | NO | **FK** -> `auth.users.id` / `profiles.id` | Acting user |
-| `action` | `text` | NO | - | Action identifier (e.g. `CREATE_TRANSACTION`) |
+| `user_id` | `uuid` | NO | **FK** -> `auth.users.id` | Acting user |
+| `action` | `text` | NO | - | Action identifier (e.g. `transaction.created`) |
 | `category` | `text` | NO | - | Category (e.g. `transaction`, `expense`, `customer`) |
 | `description` | `text` | NO | - | Human-readable action description |
 | `metadata` | `jsonb` | YES | - | Structured details (record IDs, changed fields) |
@@ -232,7 +302,7 @@ Audit log recording user actions, mutations, and system events.
 
 ---
 
-### 7. `portals`
+### 9. `portals`
 Stores external gateways and portals through which transactions are processed.
 
 | Column Name | Data Type | Nullable | Key / Ref | Description |
@@ -247,8 +317,8 @@ Stores external gateways and portals through which transactions are processed.
 
 ---
 
-### 8. `profiles`
-User profiles synced with Supabase Auth (`auth.users`).
+### 10. `profiles`
+User profiles synced with Supabase Auth (`auth.users`), supporting multi-tenant staff management.
 
 | Column Name | Data Type | Nullable | Key / Ref | Description |
 |-------------|-----------|----------|-----------|-------------|
@@ -257,17 +327,19 @@ User profiles synced with Supabase Auth (`auth.users`).
 | `full_name` | `text` | YES | - | User display name |
 | `business_name` | `text` | YES | - | Company or shop name |
 | `avatar_url` | `text` | YES | - | Public URL of user avatar image |
-| `role` | `app_role` (`admin` \| `user`)| NO | - | User role (default: `'user'`) |
+| `role` | `app_role` (`admin` \| `user` \| `staff`)| NO | - | User role (default: `'user'`) |
+| `owner_id` | `uuid` | YES | **FK** -> `profiles.id` | Business owner UUID for staff accounts |
 | `settings` | `jsonb` | NO | - | User customized dropdown options & preferences (default: `{}`) |
 | `created_at` | `timestamptz` | NO | - | Profile creation date |
 | `updated_at` | `timestamptz` | NO | - | Profile last update date |
 
 ---
 
-## 🔐 Custom Enums & Functions
+## 🔐 Custom Enums & Security Functions
 
 ### Enums
-- **`app_role`**: `'admin'`, `'user'`
+- **`app_role`**: `'admin'`, `'user'`, `'staff'`
 
-### Functions
-- **`has_role(_user_id uuid, _role app_role) -> boolean`**: Checks if user has the specified security role.
+### Security Functions
+- **`private.is_admin(user_uuid uuid) -> boolean`**: Checks if user is an administrator via `profiles`.
+- **`private.get_business_id(user_uuid uuid) -> uuid`**: Resolves owner user UUID for staff accounts to enforce multi-tenant isolation.

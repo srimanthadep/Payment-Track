@@ -57,6 +57,11 @@ export const EditableCell = ({
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={handleCommit}
+        onWheel={(e) => {
+          if (type === "number") {
+            (e.target as HTMLElement).blur();
+          }
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             handleCommit();

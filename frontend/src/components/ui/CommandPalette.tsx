@@ -17,7 +17,9 @@ import {
   IndianRupee,
   Users,
   HandCoins,
+  Sparkles,
 } from "lucide-react";
+import { AiIcon } from "@/components/icons/AiIcon";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 
@@ -86,6 +88,14 @@ const PAGES: SearchResult[] = [
     subtitle: "Revenue charts and insights",
     icon: <BarChart3 className="h-4 w-4" />,
     href: "/analytics",
+  },
+  {
+    id: "page-ai-tracker",
+    type: "page",
+    title: "AI Tracker",
+    subtitle: "AI prediction acceptance and override tracking",
+    icon: <AiIcon className="h-4 w-4" />,
+    href: "/ai-tracker",
   },
   {
     id: "page-goals",

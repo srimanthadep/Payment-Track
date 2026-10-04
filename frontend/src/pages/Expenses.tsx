@@ -270,25 +270,16 @@ const Expenses = () => {
           </div>
 
           {/* Action Row */}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Button
-                className="text-sm h-9 gap-1.5 shadow-sm"
-                onClick={() => setIsAddDialogOpen(true)}
-              >
-                <Plus className="h-4 w-4" />
-                Add Expense
-              </Button>
-              <Button
-                variant="outline"
-                className="text-sm h-9 text-xs sm:text-sm"
-                onClick={() => navigate("/settings")}
-              >
-                Manage Categories
-              </Button>
-            </div>
+          <div className="flex items-center justify-between gap-2">
+            <Button
+              className="hidden sm:inline-flex text-sm h-9 gap-1.5 shadow-sm"
+              onClick={() => setIsAddDialogOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Add Expense
+            </Button>
 
-            <div className="text-xs text-muted-foreground">
+            <div className="text-xs text-muted-foreground ml-auto sm:ml-0">
               Showing <span className="font-semibold text-foreground">{dateFilteredExpenses.length}</span> entries ({selectedDateLabel})
             </div>
           </div>

@@ -628,28 +628,34 @@ const Analytics = ({ defaultTab }: AnalyticsProps = {}) => {
         {/* Top View Switcher & Sub-Header */}
         <div className="space-y-4 pb-2 border-b border-border/60">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
-                  {activeView === "predictions" ? "Predictions & Forecasting" : "Analytics"}
-                </h1>
-                {activeView === "predictions" ? (
-                  <Badge className="text-xs font-semibold px-2.5 py-0.5 rounded-full border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                    <span>{liveForecast.accuracyScore}% Accuracy</span>
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border-primary/20">
-                    {periodLabel}
-                  </Badge>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between sm:justify-start gap-2.5 flex-wrap">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
+                    {activeView === "predictions" ? "Predictions & Forecasting" : "Analytics"}
+                  </h1>
+                  {activeView === "predictions" ? (
+                    <Badge className="text-xs font-semibold px-2.5 py-0.5 rounded-full border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span>{liveForecast.accuracyScore}% Accuracy</span>
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border-primary/20">
+                      {periodLabel}
+                    </Badge>
+                  )}
+                </div>
+                {user && activeView === "overview" && (
+                  <div className="shrink-0">
+                    <PDFReportGenerator userId={user.id} />
+                  </div>
                 )}
               </div>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 {activeView === "predictions"
                   ? "Multi-factor ensemble time-series projection with Day-of-Week Seasonality, 30-day Trajectory & What-If Simulator"
                   : "Complete business intelligence — revenue, expenses, profitability & trends"}
               </p>
-              {user && activeView === "overview" && <PDFReportGenerator userId={user.id} />}
             </div>
 
             {/* View Switcher using standard shadcn Tabs */}

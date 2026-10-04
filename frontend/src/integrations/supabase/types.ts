@@ -234,6 +234,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          owner_id: string | null
           role: Database["public"]["Enums"]["app_role"]
           settings: Json
           updated_at: string
@@ -245,6 +246,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id: string
+          owner_id?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           settings?: Json
           updated_at?: string
@@ -256,6 +258,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          owner_id?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           settings?: Json
           updated_at?: string
@@ -268,6 +271,7 @@ export type Database = {
           bank_name: string | null
           card_type: string | null
           commission: number | null
+          commission_percent: number | null
           created_at: string
           customer_id: string | null
           customer_mode: string | null
@@ -278,6 +282,7 @@ export type Database = {
           portal_id: string
           profit: number | null
           site_fee: number | null
+          site_fee_percent: number | null
           transaction_date: string
           transaction_type: string
           updated_at: string
@@ -289,6 +294,7 @@ export type Database = {
           bank_name?: string | null
           card_type?: string | null
           commission?: number | null
+          commission_percent?: number | null
           created_at?: string
           customer_id?: string | null
           customer_mode?: string | null
@@ -299,6 +305,7 @@ export type Database = {
           portal_id: string
           profit?: number | null
           site_fee?: number | null
+          site_fee_percent?: number | null
           transaction_date?: string
           transaction_type: string
           updated_at?: string
@@ -310,6 +317,7 @@ export type Database = {
           bank_name?: string | null
           card_type?: string | null
           commission?: number | null
+          commission_percent?: number | null
           created_at?: string
           customer_id?: string | null
           customer_mode?: string | null
@@ -320,6 +328,7 @@ export type Database = {
           portal_id?: string
           profit?: number | null
           site_fee?: number | null
+          site_fee_percent?: number | null
           transaction_date?: string
           transaction_type?: string
           updated_at?: string
@@ -342,6 +351,108 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      prediction_tracking: {
+        Row: {
+          actual_commission: number
+          actual_site_fee: number
+          bank_name: string | null
+          both_accepted: boolean
+          card_type: string
+          commission_accepted: boolean
+          created_at: string
+          customer_mode: string | null
+          id: string
+          predicted_commission: number
+          predicted_site_fee: number
+          prediction_confidence: number
+          prediction_source: string
+          sent_to: string
+          site_fee_accepted: boolean
+          transaction_type: string
+          user_id: string
+        }
+        Insert: {
+          actual_commission?: number
+          actual_site_fee?: number
+          bank_name?: string | null
+          both_accepted?: boolean
+          card_type: string
+          commission_accepted?: boolean
+          created_at?: string
+          customer_mode?: string | null
+          id?: string
+          predicted_commission?: number
+          predicted_site_fee?: number
+          prediction_confidence?: number
+          prediction_source?: string
+          sent_to: string
+          site_fee_accepted?: boolean
+          transaction_type: string
+          user_id: string
+        }
+        Update: {
+          actual_commission?: number
+          actual_site_fee?: number
+          bank_name?: string | null
+          both_accepted?: boolean
+          card_type?: string
+          commission_accepted?: boolean
+          created_at?: string
+          customer_mode?: string | null
+          id?: string
+          predicted_commission?: number
+          predicted_site_fee?: number
+          prediction_confidence?: number
+          prediction_source?: string
+          sent_to?: string
+          site_fee_accepted?: boolean
+          transaction_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_message_log: {
+        Row: {
+          action: string
+          created_at: string
+          customer_id: string | null
+          customer_name: string | null
+          error: string | null
+          id: number
+          message: string | null
+          phone: string
+          status: string
+          transaction_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          customer_id?: string | null
+          customer_name?: string | null
+          error?: string | null
+          id?: number
+          message?: string | null
+          phone: string
+          status?: string
+          transaction_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          customer_id?: string | null
+          customer_name?: string | null
+          error?: string | null
+          id?: number
+          message?: string | null
+          phone?: string
+          status?: string
+          transaction_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
     }
     Views: {

@@ -17,4 +17,25 @@ if (typeof document !== "undefined") {
   updateFavicon();
 }
 
+// Globally prevent mouse wheel from increasing/decreasing numerical values on all number inputs
+if (typeof window !== "undefined") {
+  const disableNumberInputScroll = (e: WheelEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (target instanceof HTMLInputElement && target.type === "number") {
+      target.blur();
+    } else if (
+      document.activeElement instanceof HTMLInputElement &&
+      document.activeElement.type === "number"
+    ) {
+      document.activeElement.blur();
+    }
+  };
+
+  window.addEventListener("wheel", disableNumberInputScroll, {
+    passive: true,
+    capture: true,
+  });
+}
+
 createRoot(document.getElementById("root")!).render(<App />);
+

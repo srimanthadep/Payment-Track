@@ -26,6 +26,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { motion, AnimatePresence } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 import { activityLogService } from "@/services/activityLogService";
+import { predictionTrackingService } from "@/services/predictionTrackingService";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -514,6 +515,9 @@ export const TransactionsTable = ({
 
       if (error) throw error;
 
+      // Delete corresponding AI prediction tracking records
+      await predictionTrackingService.deletePredictionsByTransactionId(transactionToDelete);
+
       activityLogService.log(
         "transaction.deleted",
         "transaction",
@@ -589,18 +593,23 @@ export const TransactionsTable = ({
   const bulkDelete = async () => {
     if (selectedIds.size === 0) return;
     try {
+      const idsToDelete = Array.from(selectedIds);
       const { error } = await supabase
         .from("transactions")
         .delete()
-        .in("id", Array.from(selectedIds))
+        .in("id", idsToDelete)
         .eq("user_id", userId);
       if (error) throw error;
+
+      // Delete corresponding AI prediction tracking records
+      await predictionTrackingService.deletePredictionsByTransactionId(idsToDelete);
+
       const count = selectedIds.size;
       activityLogService.log(
         "transaction.bulk_deleted",
         "transaction",
         `Bulk deleted ${count} transaction${count !== 1 ? "s" : ""}`,
-        { count, ids: Array.from(selectedIds) }
+        { count, ids: idsToDelete }
       );
       toast({ title: "Deleted", description: `Deleted ${count} transactions` });
       setSelectedIds(new Set());

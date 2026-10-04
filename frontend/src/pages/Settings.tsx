@@ -50,6 +50,7 @@ import {
   Eye,
   EyeOff,
   MessageCircle,
+  Sparkles,
 } from "lucide-react";
 import { AiIcon } from "@/components/icons/AiIcon";
 import { useToast } from "@/hooks/use-toast";
@@ -262,8 +263,8 @@ const Settings = () => {
         className="space-y-6 max-w-6xl mx-auto pb-24 sm:pb-12"
       >
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2 border-b border-border/60">
-          <div>
+        <div className="pb-2 border-b border-border/60 space-y-1">
+          <div className="flex items-center justify-between gap-2.5">
             <div className="flex items-center gap-2.5">
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
                 Settings
@@ -272,22 +273,20 @@ const Settings = () => {
                 Preferences
               </span>
             </div>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              Manage dropdown menus, expense categories, card commission rates, and portals
-            </p>
-          </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setResetDialogOpen(true)}
-              className="text-xs sm:text-sm h-9 gap-1.5 shadow-xs hover:bg-muted/80"
+              className="text-xs sm:text-sm h-8 gap-1.5 shadow-xs hover:bg-muted/80 shrink-0"
             >
               <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
-              Restore Defaults
+              <span>Restore Defaults</span>
             </Button>
           </div>
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            Manage dropdown menus, expense categories, card commission rates, and portals
+          </p>
         </div>
 
         {/* Tabs */}
@@ -867,6 +866,22 @@ const Settings = () => {
           {/* ===================== TAB: AI LEARNING & ACCURACY ===================== */}
           <TabsContent value="ai-learning" className="space-y-6">
             <LearningInsightsCard />
+            <Card className="border shadow-sm bg-gradient-to-r from-primary/5 via-background to-background">
+              <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <AiIcon className="h-6 w-6 shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-sm text-foreground">AI Prediction Tracker is now on a dedicated page!</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      View every transaction, check accepted AI suggestions vs overrides, and inspect exact rate differences.
+                    </p>
+                  </div>
+                </div>
+                <Button size="sm" onClick={() => navigate("/ai-tracker")} className="shrink-0 gap-2">
+                  Open AI Tracker <ArrowRight className="h-4 w-4" />
+                </Button>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* ===================== TAB 3: BACKUP & RESET ===================== */}

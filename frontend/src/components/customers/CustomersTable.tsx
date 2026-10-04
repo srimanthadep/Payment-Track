@@ -23,6 +23,7 @@ import {
   Sparkles,
   Users,
   Plus,
+  UserPlus,
 } from "lucide-react";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
@@ -32,7 +33,7 @@ interface CustomersTableProps {
   customers: CustomerProfile[];
   isLoading: boolean;
   onSelectCustomer: (customer: CustomerProfile) => void;
-  onAddTransactionClick?: () => void;
+  onAddCustomerClick?: () => void;
   isStaff?: boolean;
 }
 
@@ -43,7 +44,7 @@ export const CustomersTable = ({
   customers,
   isLoading,
   onSelectCustomer,
-  onAddTransactionClick,
+  onAddCustomerClick,
   isStaff = false,
 }: CustomersTableProps) => {
   const { toast } = useToast();
@@ -184,14 +185,14 @@ export const CustomersTable = ({
               ? "Try adjusting your search terms or filter."
               : "When you add a transaction with the Chummi portal, customer name and phone number entries will automatically build your customer CRM directory here."}
           </p>
-          {onAddTransactionClick && (
+          {onAddCustomerClick && (
             <Button
               size="sm"
-              onClick={onAddTransactionClick}
+              onClick={onAddCustomerClick}
               className="gap-1.5 text-xs shadow-xs"
             >
-              <Plus className="h-3.5 w-3.5" />
-              Add Transaction
+              <UserPlus className="h-3.5 w-3.5" />
+              Add Customer
             </Button>
           )}
         </div>

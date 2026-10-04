@@ -16,6 +16,7 @@ import Goals from "./pages/Goals";
 import ActivityLogs from "./pages/ActivityLogs";
 import Customers from "./pages/Customers";
 import Dues from "./pages/Dues";
+import AiTracker from "./pages/AiTracker";
 import NotFound from "./pages/NotFound";
 import { useEffect } from "react";
 import { themeService } from "@/services/themeService";
@@ -79,6 +80,8 @@ const App = () => {
             <Route path="/analytics" element={<StaffRestrictedRoute><Analytics /></StaffRestrictedRoute>} />
             <Route path="/analytics/predictions" element={<StaffRestrictedRoute><Analytics defaultTab="predictions" /></StaffRestrictedRoute>} />
             <Route path="/goals" element={<StaffRestrictedRoute><Goals /></StaffRestrictedRoute>} />
+            <Route path="/ai-tracker" element={<StaffRestrictedRoute><AiTracker /></StaffRestrictedRoute>} />
+            <Route path="/predictions" element={<StaffRestrictedRoute><AiTracker /></StaffRestrictedRoute>} />
             <Route path="/dues" element={<StaffRestrictedRoute><Dues /></StaffRestrictedRoute>} />
             <Route path="/activity-logs" element={<StaffRestrictedRoute><ActivityLogs /></StaffRestrictedRoute>} />
 

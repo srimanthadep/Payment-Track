@@ -27,6 +27,7 @@ pnpm-debug.log*
 *.local
 backend/supabase/functions.env
 backend/supabase/twilio.env
+.agents/
 
 # Supabase CLI Temp
 .temp/

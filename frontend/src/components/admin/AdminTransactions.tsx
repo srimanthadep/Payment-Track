@@ -17,6 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { predictionTrackingService } from "@/services/predictionTrackingService";
 
 interface TransactionWithUser {
   id: string;
@@ -163,6 +164,7 @@ export const AdminTransactions = () => {
         .eq("id", transactionToDelete);
 
       if (error) throw error;
+      await predictionTrackingService.deletePredictionsByTransactionId(transactionToDelete);
 
       toast({
         title: "Success",

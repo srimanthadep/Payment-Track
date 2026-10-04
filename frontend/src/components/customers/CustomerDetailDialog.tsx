@@ -87,6 +87,8 @@ export const CustomerDetailDialog = ({
     name: "",
     phone: "",
   });
+  const [isSendingWelcome, setIsSendingWelcome] = useState(false);
+  const [sendingReceiptId, setSendingReceiptId] = useState<string | null>(null);
 
   if (!customer) return null;
 
@@ -130,9 +132,6 @@ export const CustomerDetailDialog = ({
       description: `Statement downloaded for ${customer.name}.`,
     });
   };
-
-  const [isSendingWelcome, setIsSendingWelcome] = useState(false);
-  const [sendingReceiptId, setSendingReceiptId] = useState<string | null>(null);
 
   const handleSendWelcome = async () => {
     if (!customer.phone) {
@@ -322,7 +321,7 @@ export const CustomerDetailDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl sm:rounded-3xl border-border/80 shadow-2xl">
         {/* Header Banner */}
         <div className="p-5 sm:p-6 bg-muted/40 border-b border-border/80">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -398,7 +397,7 @@ export const CustomerDetailDialog = ({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-xs h-8 gap-1.5 shadow-xs"
+                    className="text-xs h-8 gap-1.5 shadow-xs rounded-xl"
                     onClick={openEditDialog}
                   >
                     <Edit3 className="h-3.5 w-3.5" />
@@ -407,7 +406,7 @@ export const CustomerDetailDialog = ({
                   <Button
                     variant="destructive"
                     size="sm"
-                    className="text-xs h-8 gap-1.5 shadow-xs"
+                    className="text-xs h-8 gap-1.5 shadow-xs rounded-xl"
                     onClick={() => setIsDeleteOpen(true)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -419,27 +418,29 @@ export const CustomerDetailDialog = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="text-xs h-8 gap-1.5 shadow-xs"
+                  className="text-xs h-8 px-2.5 shadow-xs rounded-xl"
                   onClick={handleExportStatement}
+                  title="Export History"
+                  aria-label="Export History"
                 >
                   <Download className="h-3.5 w-3.5" />
-                  Export History
                 </Button>
               )}
               {customer.phone && (
                 <Button
                   variant="outline"
                   size="sm"
-                  className="text-xs h-8 gap-1.5 shadow-xs border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+                  className="text-xs h-8 px-2.5 shadow-xs rounded-xl border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
                   onClick={handleSendWelcome}
                   disabled={isSendingWelcome}
+                  title="Send WhatsApp Welcome"
+                  aria-label="Send WhatsApp Welcome"
                 >
                   {isSendingWelcome ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
                     <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
                   )}
-                  <span>WhatsApp Welcome</span>
                 </Button>
               )}
             </div>
@@ -450,7 +451,7 @@ export const CustomerDetailDialog = ({
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
           {/* Quick Metrics */}
           <div className={`grid grid-cols-2 ${isStaff ? "sm:grid-cols-3" : "sm:grid-cols-4"} gap-3`}>
-            <Card className="bg-card/50 border-border/70 shadow-xs">
+            <Card className="bg-card/50 border-border/70 shadow-xs rounded-2xl">
               <CardContent className="p-3.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
@@ -465,7 +466,7 @@ export const CustomerDetailDialog = ({
             </Card>
 
             {!isStaff && (
-              <Card className="bg-card/50 border-border/70 shadow-xs">
+              <Card className="bg-card/50 border-border/70 shadow-xs rounded-2xl">
                 <CardContent className="p-3.5">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
@@ -480,7 +481,7 @@ export const CustomerDetailDialog = ({
               </Card>
             )}
 
-            <Card className="bg-card/50 border-border/70 shadow-xs">
+            <Card className="bg-card/50 border-border/70 shadow-xs rounded-2xl">
               <CardContent className="p-3.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
@@ -494,7 +495,7 @@ export const CustomerDetailDialog = ({
               </CardContent>
             </Card>
 
-            <Card className="bg-card/50 border-border/70 shadow-xs">
+            <Card className="bg-card/50 border-border/70 shadow-xs rounded-2xl">
               <CardContent className="p-3.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
@@ -507,7 +508,7 @@ export const CustomerDetailDialog = ({
                     <Badge
                       key={p}
                       variant="outline"
-                      className="text-[10px] px-1.5 py-0 bg-background/50"
+                      className="text-[10px] px-1.5 py-0 bg-background/50 rounded-lg"
                     >
                       {p}
                     </Badge>
@@ -529,7 +530,7 @@ export const CustomerDetailDialog = ({
           </div>
 
           {/* Desktop Transactions Table */}
-          <div className="hidden sm:block border border-border/80 rounded-xl overflow-hidden shadow-xs">
+          <div className="hidden sm:block border border-border/80 rounded-2xl overflow-hidden shadow-xs">
             <Table>
               <TableHeader className="bg-muted/50">
                 <TableRow>
@@ -635,7 +636,7 @@ export const CustomerDetailDialog = ({
               return (
                 <div
                   key={t.id}
-                  className="p-3 bg-muted/20 border border-border/70 rounded-xl space-y-2 text-xs"
+                  className="p-3.5 bg-muted/20 border border-border/70 rounded-2xl space-y-2 text-xs"
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-foreground">
@@ -716,14 +717,14 @@ export const CustomerDetailDialog = ({
 
         {/* Footer */}
         <div className="p-4 border-t border-border/80 bg-muted/20 flex justify-end">
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" size="sm" className="rounded-xl px-5" onClick={() => onOpenChange(false)}>
             Close
           </Button>
         </div>
       </DialogContent>
 
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>Edit Customer</DialogTitle>
             <DialogDescription>
@@ -738,6 +739,7 @@ export const CustomerDetailDialog = ({
                 value={editForm.name}
                 onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
                 placeholder="Customer name"
+                className="rounded-xl"
               />
             </div>
             <div className="space-y-2">
@@ -747,6 +749,7 @@ export const CustomerDetailDialog = ({
                 value={editForm.phone}
                 onChange={(e) => setEditForm((prev) => ({ ...prev, phone: e.target.value }))}
                 placeholder="Phone number"
+                className="rounded-xl"
               />
             </div>
           </div>
@@ -755,10 +758,11 @@ export const CustomerDetailDialog = ({
               variant="outline"
               onClick={() => setIsEditOpen(false)}
               disabled={isSaving}
+              className="rounded-xl"
             >
               Cancel
             </Button>
-            <Button onClick={handleSaveCustomer} disabled={isSaving}>
+            <Button onClick={handleSaveCustomer} disabled={isSaving} className="rounded-xl">
               {isSaving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               Save
             </Button>

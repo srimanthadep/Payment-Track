@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { DashboardLayout } from "@/components/DashboardLayout";
+import { FloatingActionButton } from "@/components/ui/FloatingActionButton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -449,7 +450,7 @@ const Goals = () => {
                 resetForm();
                 setDialogOpen(true);
               }}
-              className="gap-1.5 h-9 text-xs sm:text-sm shadow-xs self-start sm:self-auto"
+              className="hidden sm:inline-flex gap-1.5 h-9 text-xs sm:text-sm shadow-xs self-start sm:self-auto"
             >
               <Plus className="h-4 w-4" />
               New Goal
@@ -906,6 +907,15 @@ const Goals = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* Floating Action Button on Mobile */}
+      <FloatingActionButton
+        onClick={() => {
+          setEditingGoal(null);
+          resetForm();
+          setDialogOpen(true);
+        }}
+        aria-label="New Goal"
+      />
     </DashboardLayout>
   );
 };

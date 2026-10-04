@@ -654,8 +654,8 @@ const ActivityLogs = () => {
         className="space-y-4 sm:space-y-6"
       >
         {/* ── Page Header ──────────────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-1 border-b border-border/60">
-          <div>
+        <div className="pb-1 border-b border-border/60 space-y-1">
+          <div className="flex items-center justify-between gap-2.5">
             <div className="flex items-center gap-2.5">
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
                 Activity Logs
@@ -667,44 +667,47 @@ const ActivityLogs = () => {
                 {total.toLocaleString("en-IN")} records
               </Badge>
             </div>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              Complete audit trail of actions, transactions, and system events
-            </p>
-          </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1.5 rounded-md border border-emerald-500/20 whitespace-nowrap">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              Live Audit Feed
+            <div className="flex items-center gap-2">
+              <div className="hidden lg:flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1.5 rounded-md border border-emerald-500/20 whitespace-nowrap">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                Live Audit Feed
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 sm:h-9 gap-1.5 text-xs sm:text-sm font-medium px-2 sm:px-3"
+                onClick={() => {
+                  fetchStats();
+                  fetchLogs(filters, 1);
+                  setPage(1);
+                }}
+                title="Refresh logs"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Refresh</span>
+              </Button>
+
+              <Button
+                size="sm"
+                className="h-8 sm:h-9 gap-1.5 text-xs sm:text-sm font-medium px-2 sm:px-3"
+                onClick={handleExportCSV}
+                disabled={isExporting}
+                title="Export CSV"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Export CSV</span>
+              </Button>
             </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 gap-1.5 text-xs sm:text-sm font-medium"
-              onClick={() => {
-                fetchStats();
-                fetchLogs(filters, 1);
-                setPage(1);
-              }}
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Refresh</span>
-            </Button>
-
-            <Button
-              size="sm"
-              className="h-9 gap-1.5 text-xs sm:text-sm font-medium"
-              onClick={handleExportCSV}
-              disabled={isExporting}
-            >
-              <Download className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Export CSV</span>
-            </Button>
           </div>
+
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            Complete audit trail of actions, transactions, and system events
+          </p>
         </div>
 
         {/* ── Stats Cards Row ──────────────────────────────────────── */}

@@ -147,7 +147,7 @@ export const AddExpenseDialog = ({
         onOpenChange(val);
       }}
     >
-      <DialogContent className="sm:max-w-[520px]">
+      <DialogContent className="sm:max-w-[520px] rounded-2xl overflow-hidden">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-xl bg-destructive/10 text-destructive">
@@ -177,7 +177,7 @@ export const AddExpenseDialog = ({
                 placeholder="e.g. 5000"
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                className="font-medium text-base h-10"
+                className="font-medium text-base h-10 rounded-xl"
                 required
                 autoFocus
               />
@@ -192,10 +192,10 @@ export const AddExpenseDialog = ({
                 onValueChange={(val) => setFormData({ ...formData, category: val })}
                 required
               >
-                <SelectTrigger id="exp-category" className="h-10">
+                <SelectTrigger id="exp-category" className="h-10 rounded-xl">
                   <SelectValue placeholder="Select Category" />
                 </SelectTrigger>
-                <SelectContent className="max-h-60">
+                <SelectContent className="max-h-60 rounded-xl">
                   {categories.map((cat) => (
                     <SelectItem key={cat.id} value={cat.name}>
                       <span className="font-medium">{cat.name}</span>
@@ -217,7 +217,7 @@ export const AddExpenseDialog = ({
                   id="exp-date"
                   type="button"
                   variant="outline"
-                  className="w-full justify-start text-left font-medium h-10 px-3 border-input bg-background"
+                  className="w-full justify-start text-left font-medium h-10 px-3 border-input bg-background rounded-xl"
                 >
                   <CalendarIcon className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
                   <span className="truncate">
@@ -251,7 +251,7 @@ export const AddExpenseDialog = ({
                       setFormData({ ...formData, expense_date: new Date() });
                       setCalendarOpen(false);
                     }}
-                    className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                    className="h-7 text-xs text-muted-foreground hover:text-foreground rounded-lg"
                   >
                     Set Today
                   </Button>
@@ -271,7 +271,7 @@ export const AddExpenseDialog = ({
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               rows={2}
-              className="resize-none"
+              className="resize-none rounded-xl"
             />
           </div>
 
@@ -279,6 +279,7 @@ export const AddExpenseDialog = ({
             <Button
               type="button"
               variant="outline"
+              className="rounded-xl"
               onClick={() => onOpenChange(false)}
               disabled={isLoading}
             >
@@ -287,7 +288,7 @@ export const AddExpenseDialog = ({
             <Button
               type="submit"
               variant="destructive"
-              className="px-6 font-semibold"
+              className="px-6 font-semibold rounded-xl"
               disabled={isLoading}
             >
               {isLoading ? (

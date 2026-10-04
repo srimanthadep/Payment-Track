@@ -34,6 +34,7 @@ import { NotificationCenter } from "@/components/notifications/NotificationCente
 import { useRole } from "@/hooks/useRole";
 import { KeyboardShortcutsDialog } from "@/components/ui/KeyboardShortcutsDialog";
 import { DailyProfitTracker } from "@/components/sidebar/DailyProfitTracker";
+import { AiIcon } from "@/components/icons/AiIcon";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -209,6 +210,7 @@ export const DashboardLayout = ({ children, headerAction }: DashboardLayoutProps
     { name: "Dues", href: "/dues", icon: HandCoins },
     { name: "Customers", href: "/customers", icon: Users },
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
+    { name: "AI Tracker", href: "/ai-tracker", icon: AiIcon },
     { name: "Goals", href: "/goals", icon: Target },
     { name: "Activity Logs", href: "/activity-logs", icon: ScrollText },
     { name: "Settings", href: "/settings", icon: SettingsIcon },

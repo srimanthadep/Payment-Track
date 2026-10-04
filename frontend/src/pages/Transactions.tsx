@@ -225,7 +225,7 @@ const Transactions = () => {
           {/* Action Buttons Row */}
           <div className="flex flex-wrap items-center gap-2">
             <Button
-              className="text-sm h-9 flex items-center gap-2 shadow-xs"
+              className="hidden sm:inline-flex text-sm h-9 items-center gap-2 shadow-xs"
               onClick={() => setIsDialogOpen(true)}
             >
               <Plus className="h-3.5 w-3.5" />
@@ -235,9 +235,9 @@ const Transactions = () => {
               </kbd>
             </Button>
             {!isStaff && (
-              <>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
                 <Button
-                  className="w-full sm:w-auto text-xs sm:text-sm h-9 flex items-center justify-center gap-1.5"
+                  className="flex-1 sm:flex-initial text-xs sm:text-sm h-9 flex items-center justify-center gap-1.5"
                   variant="secondary"
                   onClick={() => setUploadOpen(true)}
                 >
@@ -245,14 +245,14 @@ const Transactions = () => {
                   Import Payouts
                 </Button>
                 <Button
-                  className="w-full sm:w-auto text-xs sm:text-sm h-9 flex items-center justify-center gap-1.5"
+                  className="flex-1 sm:flex-initial text-xs sm:text-sm h-9 flex items-center justify-center gap-1.5"
                   variant="outline"
                   onClick={() => setManagePortalsOpen(true)}
                 >
                   <Layers className="h-3.5 w-3.5" />
                   Manage Portals
                 </Button>
-              </>
+              </div>
             )}
           </div>
 

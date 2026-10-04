@@ -6,7 +6,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { FloatingActionButton } from "@/components/ui/FloatingActionButton";
 import { Button } from "@/components/ui/button";
-import { Users, Plus, RefreshCw, UserPlus, MessageCircle } from "lucide-react";
+import { Users, RefreshCw, UserPlus, MessageCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -17,7 +17,6 @@ import {
 import { CustomerStatsCards } from "@/components/customers/CustomerStatsCards";
 import { CustomersTable } from "@/components/customers/CustomersTable";
 import { CustomerDetailDialog } from "@/components/customers/CustomerDetailDialog";
-import { AddTransactionDialog } from "@/components/transactions/AddTransactionDialog";
 import { AddCustomerDialog } from "@/components/customers/AddCustomerDialog";
 import { WhatsAppConnectionView } from "@/components/customers/WhatsAppConnectionView";
 import { useRole } from "@/hooks/useRole";
@@ -33,7 +32,6 @@ const Customers = () => {
   const [customers, setCustomers] = useState<CustomerProfile[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerProfile | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [isAddTxnOpen, setIsAddTxnOpen] = useState(false);
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -204,21 +202,37 @@ const Customers = () => {
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full space-y-4 sm:space-y-6">
             {/* Header Row */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2 border-b border-border/60">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
-                    Customers
-                  </h1>
-                  <span className={cn(
-                    "text-xs font-semibold px-2 py-0.5 rounded-full border transition-colors",
-                    activeTab === "whatsapp"
-                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
-                      : "bg-primary/15 text-primary border-primary/20"
-                  )}>
-                    {activeTab === "whatsapp" ? "WhatsApp Gateway" : "Directory"}
-                  </span>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between sm:justify-start gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
+                      Customers
+                    </h1>
+                    <span className={cn(
+                      "text-xs font-semibold px-2 py-0.5 rounded-full border transition-colors",
+                      activeTab === "whatsapp"
+                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                        : "bg-primary/15 text-primary border-primary/20"
+                    )}>
+                      {activeTab === "whatsapp" ? "WhatsApp Gateway" : "Directory"}
+                    </span>
+                  </div>
+
+                  {activeTab === "directory" && (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 shadow-xs sm:hidden shrink-0"
+                      onClick={handleRefresh}
+                      disabled={isRefreshing}
+                      title="Refresh"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+                      <span className="sr-only">Refresh</span>
+                    </Button>
+                  )}
                 </div>
-                <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   {activeTab === "whatsapp"
                     ? "Manage WhatsApp Business connection, automated welcome messages & receipt delivery"
                     : "Track client profiles, transaction history, and customer lifetime value"}
@@ -245,32 +259,23 @@ const Customers = () => {
                   <>
                     <Button
                       variant="outline"
-                      size="sm"
-                      className="h-9 text-xs gap-1.5 shadow-xs"
+                      size="icon"
+                      className="hidden sm:inline-flex h-9 w-9 shadow-xs"
                       onClick={handleRefresh}
                       disabled={isRefreshing}
+                      title="Refresh"
                     >
                       <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
-                      <span>Refresh</span>
+                      <span className="sr-only">Refresh</span>
                     </Button>
 
                     <Button
                       size="sm"
-                      className="h-9 text-xs gap-1.5 shadow-xs bg-primary text-primary-foreground hover:bg-primary/90"
+                      className="hidden sm:inline-flex h-9 text-xs gap-1.5 shadow-xs bg-primary text-primary-foreground hover:bg-primary/90"
                       onClick={() => setIsAddCustomerOpen(true)}
                     >
                       <UserPlus className="h-3.5 w-3.5" />
                       <span>Add Customer</span>
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-9 text-xs gap-1.5 shadow-xs"
-                      onClick={() => setIsAddTxnOpen(true)}
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      <span>Add Transaction</span>
                     </Button>
                   </>
                 )}
@@ -291,7 +296,7 @@ const Customers = () => {
                 customers={customers}
                 isLoading={isLoading}
                 onSelectCustomer={handleSelectCustomer}
-                onAddTransactionClick={() => setIsAddTxnOpen(true)}
+                onAddCustomerClick={() => setIsAddCustomerOpen(true)}
                 isStaff={isStaff}
               />
             </TabsContent>
@@ -306,8 +311,8 @@ const Customers = () => {
 
       {/* Floating Action Button on Mobile */}
       <FloatingActionButton
-        onClick={() => setIsAddTxnOpen(true)}
-        aria-label="Add Transaction"
+        onClick={() => setIsAddCustomerOpen(true)}
+        aria-label="Add Customer"
       />
 
       {/* Customer Detail Dialog */}
@@ -334,19 +339,6 @@ const Customers = () => {
           open={isAddCustomerOpen}
           onOpenChange={setIsAddCustomerOpen}
           userId={targetUserId}
-          onSuccess={() => {
-            setRefreshKey((k) => k + 1);
-          }}
-        />
-      )}
-
-      {/* Add Transaction Dialog */}
-      {targetUserId && (
-        <AddTransactionDialog
-          userId={targetUserId}
-          open={isAddTxnOpen}
-          onOpenChange={setIsAddTxnOpen}
-          isStaff={isStaff}
           onSuccess={() => {
             setRefreshKey((k) => k + 1);
           }}
