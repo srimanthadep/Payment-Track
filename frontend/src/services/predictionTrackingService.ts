@@ -438,10 +438,9 @@ class PredictionTrackingService {
       } = await supabase.auth.getUser();
 
       // 1. Delete from dedicated prediction_tracking table
-      let query = supabase.from("prediction_tracking").delete().in("transaction_id", ids);
-      if (user) {
-        query = query.eq("user_id", user.id);
-      }
+      const query = user
+        ? supabase.from("prediction_tracking").delete().in("transaction_id", ids).eq("user_id", user.id)
+        : supabase.from("prediction_tracking").delete().in("transaction_id", ids);
       const { error: dedicatedError } = await query;
       if (dedicatedError) {
         console.warn("Could not delete from prediction_tracking:", dedicatedError.message);

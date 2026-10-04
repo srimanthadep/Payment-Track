@@ -55,8 +55,8 @@ jobs:
       run: npm run build
       working-directory: frontend
       env:
-        VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-        VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://rzslgglgpbvjytjqnair.supabase.co' }}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ6c2xnZ2xncGJ2anl0anFuYWlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2ODM2NDYsImV4cCI6MjEwMjI1OTY0Nn0.oKpRVARTOBNDRp41YaDztftyGpmbME4QYXcZmtIv_zY' }}
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4

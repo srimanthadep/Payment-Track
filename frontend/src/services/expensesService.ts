@@ -36,11 +36,13 @@ export interface ExpenseStats {
     count: number;
     percentage: number;
   }[];
-  monthlyTrend: {
+  todayAmount?: number;
+  thisMonthAmount?: number;
+  monthlyTrend?: {
     month: string;
     amount: number;
   }[];
-  paymentMethodBreakdown: {
+  paymentMethodBreakdown?: {
     method: string;
     amount: number;
     count: number;

@@ -265,6 +265,102 @@ export type Database = {
         }
         Relationships: []
       }
+      prediction_tracking: {
+        Row: {
+          id: string
+          user_id: string
+          commission_accepted: boolean
+          site_fee_accepted: boolean
+          both_accepted: boolean
+          predicted_commission: number
+          predicted_site_fee: number
+          actual_commission: number
+          actual_site_fee: number
+          prediction_source: string
+          prediction_confidence: number
+          card_type: string
+          transaction_type: string
+          sent_to: string
+          bank_name: string | null
+          customer_mode: string | null
+          transaction_id: string | null
+          amount: number | null
+          profit: number | null
+          customer_name: string | null
+          customer_phone: string | null
+          portal_name: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          commission_accepted?: boolean
+          site_fee_accepted?: boolean
+          both_accepted?: boolean
+          predicted_commission?: number
+          predicted_site_fee?: number
+          actual_commission?: number
+          actual_site_fee?: number
+          prediction_source?: string
+          prediction_confidence?: number
+          card_type: string
+          transaction_type: string
+          sent_to: string
+          bank_name?: string | null
+          customer_mode?: string | null
+          transaction_id?: string | null
+          amount?: number | null
+          profit?: number | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          portal_name?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          commission_accepted?: boolean
+          site_fee_accepted?: boolean
+          both_accepted?: boolean
+          predicted_commission?: number
+          predicted_site_fee?: number
+          actual_commission?: number
+          actual_site_fee?: number
+          prediction_source?: string
+          prediction_confidence?: number
+          card_type?: string
+          transaction_type?: string
+          sent_to?: string
+          bank_name?: string | null
+          customer_mode?: string | null
+          transaction_id?: string | null
+          amount?: number | null
+          profit?: number | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          portal_name?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prediction_tracking_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prediction_tracking_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
           amount: number
