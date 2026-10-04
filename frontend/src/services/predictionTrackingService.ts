@@ -186,7 +186,7 @@ class PredictionTrackingService {
         .from("activity_logs")
         .select("metadata, created_at")
         .eq("user_id", user.id)
-        .or("action.eq.prediction.accepted,action.eq.prediction.overridden")
+        .in("action", ["prediction.accepted", "prediction.overridden"])
         .order("created_at", { ascending: false });
 
       if (activityError || !activityData) return empty;
@@ -390,7 +390,7 @@ class PredictionTrackingService {
         .from("activity_logs")
         .select("id, metadata, created_at")
         .eq("user_id", user.id)
-        .or("action.eq.prediction.accepted,action.eq.prediction.overridden")
+        .in("action", ["prediction.accepted", "prediction.overridden"])
         .order("created_at", { ascending: false })
         .limit(limit);
 
