@@ -374,7 +374,10 @@ export const AddTransactionDialog = ({
       }
     }
 
+    const transactionId = crypto.randomUUID();
+
     const payload = {
+      id: transactionId,
       user_id: userId,
       portal_id: portalId,
       card_type: formData.card_type,
@@ -430,7 +433,7 @@ export const AddTransactionDialog = ({
       const feeAccepted = hasPrediction ? Math.abs(actualFee - predictedFee) < 0.01 : true;
 
       predictionTrackingService.recordPrediction({
-        transactionId: undefined,
+        transactionId,
         amount: parseFloat(formData.amount) || 0,
         profit: profitAmount,
         customerName: customerName || undefined,
