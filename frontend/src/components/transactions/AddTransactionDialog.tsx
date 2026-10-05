@@ -435,10 +435,10 @@ export const AddTransactionDialog = ({
       predictionTrackingService.recordPrediction({
         transactionId,
         amount: parseFloat(formData.amount) || 0,
-        profit: profitAmount,
+        profit,
         customerName: customerName || undefined,
         customerPhone: customerPhone || undefined,
-        portalName: portalName || formData.sent_to,
+        portalName: formData.sent_to,
         notes: notesStr,
         commissionAccepted: commAccepted,
         siteFeeAccepted: feeAccepted,
