@@ -521,6 +521,9 @@ export default function AiTracker() {
                               <div className="text-xs text-muted-foreground flex items-center justify-between pt-0.5">
                                 <span>Commission: <strong className="text-foreground">{ev.predictedCommission}%</strong></span>
                                 <span>Site Fee: <strong className="text-foreground">{ev.predictedSiteFee}%</strong></span>
+                                <Badge variant="outline" className="text-[10px] py-0 px-1 font-semibold text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+                                  Margin: +{Math.round((ev.predictedCommission - ev.predictedSiteFee) * 100) / 100}%
+                                </Badge>
                               </div>
                             </div>
                           ) : (

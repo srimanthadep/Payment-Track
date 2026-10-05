@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -57,6 +58,7 @@ export const LearningInsightsCard = () => {
   const [testRecipient, setTestRecipient] = useState("");
   const [testBank, setTestBank] = useState("");
   const [testMode, setTestMode] = useState<"Offline" | "Online">("Offline");
+  const [testAmount, setTestAmount] = useState<string>("50000");
   const [testResult, setTestResult] = useState<TransactionFeeRecommendation | null>(null);
 
   useEffect(() => {
@@ -99,10 +101,11 @@ export const LearningInsightsCard = () => {
         sentTo: testRecipient,
         bankName: testBank || undefined,
         customerMode: testMode,
+        amount: testAmount ? parseFloat(testAmount) : undefined,
       });
       setTestResult(rec);
     }
-  }, [testCard, testTx, testRecipient, testBank, testMode]);
+  }, [testCard, testTx, testRecipient, testBank, testMode, testAmount]);
 
   const handleRunBacktest = () => {
     setIsRunningBacktest(true);
@@ -256,7 +259,7 @@ export const LearningInsightsCard = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Card Type</Label>
               <Select value={testCard} onValueChange={setTestCard}>
@@ -334,11 +337,23 @@ export const LearningInsightsCard = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Amount (₹)</Label>
+              <Input
+                type="number"
+                step="1000"
+                placeholder="e.g. 50000"
+                className="h-9 text-xs"
+                value={testAmount}
+                onChange={(e) => setTestAmount(e.target.value)}
+              />
+            </div>
           </div>
 
           {/* Result Banner */}
           <div className="p-4 rounded-xl border bg-muted/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-6">
+            <div className="flex flex-wrap items-center gap-4 sm:gap-6">
               <div>
                 <span className="text-xs text-muted-foreground block">Predicted Commission</span>
                 <span className="text-lg font-bold text-foreground">
@@ -352,25 +367,55 @@ export const LearningInsightsCard = () => {
                   {testResult && testResult.siteFee !== null ? `${testResult.siteFee}%` : "0% (None)"}
                 </span>
               </div>
+              <div className="h-8 w-px bg-border/60" />
+              <div>
+                <span className="text-xs text-muted-foreground block">Net Profit Margin</span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  {testResult && testResult.commission !== null ? (
+                    (() => {
+                      const comm = testResult.commission;
+                      const fee = testResult.siteFee || 0;
+                      const margin = Math.round((comm - fee) * 100) / 100;
+                      if (margin < 0) {
+                        return <Badge variant="destructive" className="text-[11px] py-0 px-2 font-bold animate-pulse">Loss: {margin}%</Badge>;
+                      }
+                      return (
+                        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-[11px] py-0 px-2 font-bold">
+                          +{margin}%
+                        </Badge>
+                      );
+                    })()
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </div>
+              </div>
             </div>
 
-            <div className="text-right sm:text-right text-xs text-muted-foreground">
-              <span className="font-semibold text-foreground block">
-                {testResult?.source === "customer_history"
-                  ? "Tier 0: Recurring Client Rate"
-                  : testResult?.source === "card_tx_portal_bank_mode"
-                    ? "Tier 1: Bank & Channel Specific Rate"
-                    : testResult?.source === "card_tx_portal_bank"
-                      ? "Tier 2: Bank Terminal Rate"
-                      : testResult?.source === "card_tx_portal"
-                        ? "Tier 3: Portal General Match"
-                        : testResult?.source === "card_tx"
-                          ? "Tier 4: Card & Tx Fallback"
-                          : testResult?.source === "global_baseline"
-                            ? "Tier 5: Automated Empirical Baseline"
-                            : "No Pattern Discovered"}
-              </span>
-              <span>{testResult?.explanation || "Requires at least 2 historical matches"}</span>
+            <div className="text-left sm:text-right text-xs text-muted-foreground space-y-1">
+              <div className="flex sm:justify-end items-center gap-1.5">
+                <span className="font-semibold text-foreground">
+                  {testResult?.source === "customer_history"
+                    ? "Tier 0: Recurring Client Rate"
+                    : testResult?.source === "card_tx_portal_bank_mode"
+                      ? "Tier 1: Bank & Channel Specific Rate"
+                      : testResult?.source === "card_tx_portal_bank"
+                        ? "Tier 2: Bank Terminal Rate"
+                        : testResult?.source === "card_tx_portal"
+                          ? "Tier 3: Portal General Match"
+                          : testResult?.source === "card_tx"
+                            ? "Tier 4: Card & Tx Fallback"
+                            : testResult?.source === "global_baseline"
+                              ? "Tier 5: Automated Empirical Baseline"
+                              : "No Pattern Discovered"}
+                </span>
+                {testResult?.isVolumeAdjusted && (
+                  <Badge variant="secondary" className="text-[10px] py-0 px-1 font-normal">
+                    Volume Tier
+                  </Badge>
+                )}
+              </div>
+              <p className="text-muted-foreground text-[11px]">{testResult?.explanation || "Requires at least 1 historical match"}</p>
             </div>
           </div>
         </CardContent>

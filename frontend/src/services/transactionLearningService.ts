@@ -1,8 +1,28 @@
 import { supabase } from "@/integrations/supabase/client";
 
+export interface RatePair {
+  commission: number;
+  siteFee: number;
+  margin: number;
+}
+
+export interface OverrideRecord {
+  cardType?: string;
+  transactionType?: string;
+  sentTo?: string;
+  bankName?: string;
+  customerMode?: string;
+  actualCommission: number;
+  actualSiteFee: number;
+  predictedCommission: number;
+  predictedSiteFee: number;
+  timestamp: number;
+}
+
 export interface TransactionFeeRecommendation {
   commission: number | null;
   siteFee: number | null;
+  margin?: number | null;
   confidence: number; // 0.0 to 1.0
   source:
     | "customer_history"
@@ -15,6 +35,7 @@ export interface TransactionFeeRecommendation {
     | "none";
   sampleCount: number;
   explanation?: string;
+  isVolumeAdjusted?: boolean;
 }
 
 export interface HistoricalTransactionRecord {
@@ -76,6 +97,7 @@ export const normalizeCardType = (card?: string | null): string => {
  */
 export class TransactionLearningService {
   private records: HistoricalTransactionRecord[] = [];
+  private overrides: OverrideRecord[] = [];
   private isInitialized = false;
   private loadPromise: Promise<void> | null = null;
   private listeners: Array<() => void> = [];
@@ -144,6 +166,33 @@ export class TransactionLearningService {
       this.records = data
         .map((row: any) => this.parseRecord(row))
         .filter((r): r is HistoricalTransactionRecord => r !== null);
+
+      // Load recent negative feedback overrides for closed-loop active learning
+      try {
+        const { data: overrideData } = await supabase
+          .from("prediction_tracking")
+          .select("*")
+          .eq("both_accepted", false)
+          .order("created_at", { ascending: false })
+          .limit(40);
+
+        if (overrideData && overrideData.length > 0) {
+          this.overrides = overrideData.map((row: any) => ({
+            cardType: row.card_type,
+            transactionType: row.transaction_type,
+            sentTo: row.sent_to,
+            bankName: row.bank_name,
+            customerMode: row.customer_mode,
+            actualCommission: Number(row.actual_commission),
+            actualSiteFee: Number(row.actual_site_fee),
+            predictedCommission: Number(row.predicted_commission),
+            predictedSiteFee: Number(row.predicted_site_fee),
+            timestamp: new Date(row.created_at).getTime(),
+          }));
+        }
+      } catch {
+        // Non-breaking fallback
+      }
 
       this.isInitialized = true;
       this.notifyListeners();
@@ -285,95 +334,218 @@ export class TransactionLearningService {
     this.isInitialized = true;
   }
 
+  public recordOverrideFeedback(override: OverrideRecord) {
+    this.overrides.unshift(override);
+    if (this.overrides.length > 50) this.overrides.pop();
+  }
+
+  public setOverridesForTesting(overrides: OverrideRecord[]) {
+    this.overrides = [...overrides];
+  }
+
+  private getOverrideAdjustment(
+    candComm: number,
+    candFee: number,
+    card?: string,
+    tx?: string,
+    portal?: string
+  ): number {
+    if (this.overrides.length === 0) return 0;
+    const now = Date.now();
+    let adjustment = 0;
+
+    for (const o of this.overrides) {
+      // Overrides older than 14 days decay to 0
+      const ageDays = (now - o.timestamp) / (1000 * 60 * 60 * 24);
+      if (ageDays > 14) continue;
+      const decay = Math.max(0, 1 - ageDays / 14);
+
+      // Context matching (if card/tx specified in override, ensure compatibility)
+      if (o.cardType && card && normalizeCardType(o.cardType) !== card) continue;
+      if (o.transactionType && tx && normalize(o.transactionType) !== tx) continue;
+      if (o.sentTo && portal && normalize(o.sentTo) !== portal) continue;
+
+      // If this candidate matches what the user manually selected, boost it
+      const isActual = Math.abs(candComm - o.actualCommission) <= 0.05 && Math.abs(candFee - o.actualSiteFee) <= 0.05;
+      if (isActual) {
+        adjustment += 1.5 * decay;
+      }
+
+      // If this candidate matches what the user rejected, penalize it
+      const isRejected = Math.abs(candComm - o.predictedCommission) <= 0.05 && Math.abs(candFee - o.predictedSiteFee) <= 0.05;
+      if (isRejected && !isActual) {
+        adjustment -= 1.2 * decay;
+      }
+    }
+
+    return adjustment;
+  }
+
   /**
-   * Continuous Kernel Density Estimation (KDE) over historical matches
+   * Joint 2D Kernel Density Estimation (KDE) over coupled (Commission, Site Fee) pairs
+   * with 30-day exponential time decay, Amount-Slab proximity weighting, and Margin protection.
    */
   private evaluateKernelDensity(
     matches: HistoricalTransactionRecord[],
     sourceName: TransactionFeeRecommendation["source"],
-    minConfidence = 0.25
+    minConfidence = 0.25,
+    queryAmount?: number,
+    context?: { card?: string; tx?: string; portal?: string }
   ): TransactionFeeRecommendation | null {
     if (matches.length === 0) return null;
 
     const now = Date.now();
     // 30-day half-life: decayFactorPerDay = ln(2) / 30 = 0.0231
     const decayFactorPerDay = 0.0231;
-    const tolerance = 0.05; // 0.05% tolerance window to eliminate floating point drift
+    const tolerance = 0.08; // 2D Euclidean distance window (covers dx=0.05, dy=0.05)
 
-    // Candidate rates
-    const candidateComms = Array.from(new Set(matches.map((m) => Math.round(m.commission_percent * 100) / 100)));
-    const candidateFees = Array.from(new Set(matches.map((m) => Math.round(m.site_fee_percent * 100) / 100)));
+    // Build unique coupled candidate pairs from observed transactions
+    const pairMap = new Map<string, RatePair>();
+    for (const m of matches) {
+      const comm = Math.round(m.commission_percent * 100) / 100;
+      const fee = Math.round(m.site_fee_percent * 100) / 100;
+      const key = `${comm.toFixed(2)}_${fee.toFixed(2)}`;
+      if (!pairMap.has(key)) {
+        pairMap.set(key, {
+          commission: comm,
+          siteFee: fee,
+          margin: Math.round((comm - fee) * 100) / 100,
+        });
+      }
+    }
+    const candidatePairs = Array.from(pairMap.values());
 
     let totalWeight = 0;
     const weights = matches.map((rec) => {
+      // 1. Recency decay weight
       const daysDiff = Math.max(0, (now - rec.transaction_date.getTime()) / (1000 * 60 * 60 * 24));
-      const w = Math.exp(-decayFactorPerDay * daysDiff);
+      const recencyW = Math.exp(-decayFactorPerDay * daysDiff);
+
+      // 2. Amount-slab proximity weight
+      let amountW = 1.0;
+      if (queryAmount && queryAmount > 0 && rec.amount > 0) {
+        const logDiff = Math.abs(Math.log(rec.amount) - Math.log(queryAmount));
+        // sigma = 1.2 smoothly downweights large ticket disparities
+        amountW = Math.exp(-0.5 * Math.pow(logDiff / 1.2, 2));
+      }
+
+      const w = recencyW * amountW;
       totalWeight += w;
       return { rec, w };
     });
 
-    // Continuous KDE for Commission
-    let bestCommVal: number | null = null;
-    let maxCommWeight = 0;
-    for (const cand of candidateComms) {
+    let bestPair: RatePair | null = null;
+    let maxPairWeight = -Infinity;
+
+    for (const cand of candidatePairs) {
+      // Margin safeguard: if margin is negative and it's not a zero-commission transfer, penalize
+      const isNegativeMargin = cand.margin < -0.01 && cand.commission > 0;
       let score = 0;
+
       for (const { rec, w } of weights) {
-        if (Math.abs(rec.commission_percent - cand) <= tolerance) {
+        const dComm = rec.commission_percent - cand.commission;
+        const dFee = rec.site_fee_percent - cand.siteFee;
+        const dist = Math.sqrt(dComm * dComm + dFee * dFee);
+
+        if (dist <= tolerance) {
           score += w;
         }
       }
-      if (score > maxCommWeight) {
-        maxCommWeight = score;
-        bestCommVal = cand;
+
+      // Heavily discount negative margin combinations to protect business
+      if (isNegativeMargin) {
+        score *= 0.1;
+      }
+
+      // Closed-loop override reinforcement
+      const feedbackAdj = this.getOverrideAdjustment(
+        cand.commission,
+        cand.siteFee,
+        context?.card,
+        context?.tx,
+        context?.portal
+      );
+      score += feedbackAdj;
+
+      if (score > maxPairWeight) {
+        maxPairWeight = score;
+        bestPair = cand;
       }
     }
 
-    // Continuous KDE for Site Fee
-    let bestFeeVal: number | null = null;
-    let maxFeeWeight = 0;
-    for (const cand of candidateFees) {
-      let score = 0;
-      for (const { rec, w } of weights) {
-        if (Math.abs(rec.site_fee_percent - cand) <= tolerance) {
-          score += w;
-        }
-      }
-      if (score > maxFeeWeight) {
-        maxFeeWeight = score;
-        bestFeeVal = cand;
-      }
-    }
-
-    if (bestCommVal === null && bestFeeVal === null) return null;
+    if (!bestPair || maxPairWeight <= 0) return null;
 
     const sampleCount = matches.length;
+    // Bayesian credibility shrinkage: sampleCount / (sampleCount + 1.5)
     const sampleCredibility = sampleCount / (sampleCount + 1.5);
-    const commDominance = totalWeight > 0 ? maxCommWeight / totalWeight : 0;
-    const confidence = Math.min(0.99, Math.round(sampleCredibility * commDominance * 100) / 100);
+    const dominance = totalWeight > 0 ? Math.max(0, Math.min(1.0, maxPairWeight / totalWeight)) : 0;
+    const confidence = Math.min(0.99, Math.round(sampleCredibility * dominance * 100) / 100);
 
     if (sampleCount === 1 && sourceName !== "customer_history" && confidence < minConfidence) {
       return null;
     }
 
-    let explanation = `Based on ${sampleCount} past transactions (${Math.round(commDominance * 100)}% pattern consistency)`;
+    const hasVolumeSlab = queryAmount && queryAmount > 0;
+    let explanation = `Based on ${sampleCount} past transaction${sampleCount > 1 ? "s" : ""} (${Math.round(dominance * 100)}% pattern match)`;
     if (sourceName === "customer_history") {
-      explanation = `Client recurring rate (${sampleCount} past transaction${sampleCount > 1 ? "s" : ""})`;
+      explanation = `Client recurring rate (${sampleCount} past visit${sampleCount > 1 ? "s" : ""})`;
     } else if (sourceName === "card_tx_portal_bank_mode" || sourceName === "card_tx_portal_bank") {
       explanation = `Bank & terminal rate from ${sampleCount} past transaction${sampleCount > 1 ? "s" : ""}`;
     }
+    if (hasVolumeSlab) {
+      explanation += ` • Calibrated for ₹${Number(queryAmount).toLocaleString("en-IN")}`;
+    }
 
     return {
-      commission: bestCommVal,
-      siteFee: bestFeeVal,
+      commission: bestPair.commission,
+      siteFee: bestPair.siteFee,
+      margin: bestPair.margin,
       confidence,
       source: sourceName,
       sampleCount,
       explanation,
+      isVolumeAdjusted: !!hasVolumeSlab,
     };
   }
 
+  private getDynamicBaseline(
+    txType: string,
+    cardType?: string,
+    bankName?: string
+  ): { commission: number; siteFee: number } {
+    const tx = normalize(txType);
+    const matchingTx = this.records.filter((r) => normalize(r.transaction_type) === tx);
+
+    if (matchingTx.length >= 3) {
+      const card = normalizeCardType(cardType);
+      const cardSubset = card ? matchingTx.filter((r) => normalizeCardType(r.card_type) === card) : [];
+      const pool = cardSubset.length >= 3 ? cardSubset : matchingTx;
+
+      const comms = pool.map((r) => r.commission_percent).sort((a, b) => a - b);
+      const fees = pool.map((r) => r.site_fee_percent).sort((a, b) => a - b);
+      const mid = Math.floor(comms.length / 2);
+
+      return {
+        commission: Math.round(comms[mid] * 100) / 100,
+        siteFee: Math.round(fees[mid] * 100) / 100,
+      };
+    }
+
+    // Default empirical fallback if no data in database
+    if (tx === "repayment") {
+      return { commission: 3.0, siteFee: 0.0 };
+    }
+    let comm = 2.0;
+    let fee = 1.55;
+    if (cardType === "rupay") fee = 0.5;
+    if (cardType === "visa" && bankName && (bankName.includes("sbi") || bankName.includes("icici"))) {
+      comm = 2.7;
+    }
+    return { commission: comm, siteFee: fee };
+  }
+
   /**
-   * Query the learning engine using the 5-Tier Bayesian Cascade
+   * Query the learning engine using the 5-Tier Bayesian Cascade with Volume & Shrinkage
    */
   public getRecommendation(params: {
     cardType?: string;
@@ -383,6 +555,7 @@ export class TransactionLearningService {
     customerMode?: string;
     customerName?: string;
     customerId?: string;
+    amount?: number;
   }): TransactionFeeRecommendation {
     const card = normalizeCardType(params.cardType);
     const tx = normalize(params.transactionType);
@@ -391,6 +564,8 @@ export class TransactionLearningService {
     const mode = normalize(params.customerMode);
     const custName = normalize(params.customerName);
     const custId = (params.customerId || "").trim();
+    const amount = params.amount;
+    const context = { card, tx, portal };
 
     // Tier 0: Recurring Customer Memory (Chummi mode or named client)
     if (custId || custName) {
@@ -404,7 +579,7 @@ export class TransactionLearningService {
         // Prefer same transaction type (e.g. withdrawal vs repayment)
         const custTxMatches = custMatches.filter((r) => normalize(r.transaction_type) === tx);
         const targetMatches = custTxMatches.length > 0 ? custTxMatches : custMatches;
-        const custRec = this.evaluateKernelDensity(targetMatches, "customer_history", 0.3);
+        const custRec = this.evaluateKernelDensity(targetMatches, "customer_history", 0.3, amount, context);
         if (custRec) {
           custRec.confidence = Math.max(0.95, custRec.confidence);
           return custRec;
@@ -422,8 +597,8 @@ export class TransactionLearningService {
           normalize(r.bank_name) === bank &&
           normalize(r.customer_mode) === mode
       );
-      if (t1Matches.length >= 2) {
-        const rec = this.evaluateKernelDensity(t1Matches, "card_tx_portal_bank_mode", 0.3);
+      if (t1Matches.length >= 1) {
+        const rec = this.evaluateKernelDensity(t1Matches, "card_tx_portal_bank_mode", 0.25, amount, context);
         if (rec) return rec;
       }
     }
@@ -437,8 +612,8 @@ export class TransactionLearningService {
           normalize(r.sent_to) === portal &&
           normalize(r.bank_name) === bank
       );
-      if (t2Matches.length >= 2) {
-        const rec = this.evaluateKernelDensity(t2Matches, "card_tx_portal_bank", 0.3);
+      if (t2Matches.length >= 1) {
+        const rec = this.evaluateKernelDensity(t2Matches, "card_tx_portal_bank", 0.25, amount, context);
         if (rec) return rec;
       }
     }
@@ -451,8 +626,10 @@ export class TransactionLearningService {
           normalize(r.transaction_type) === tx &&
           normalize(r.sent_to) === portal
       );
-      const rec = this.evaluateKernelDensity(t3Matches, "card_tx_portal", 0.25);
-      if (rec) return rec;
+      if (t3Matches.length >= 1) {
+        const rec = this.evaluateKernelDensity(t3Matches, "card_tx_portal", 0.25, amount, context);
+        if (rec) return rec;
+      }
     }
 
     // Tier 4: Card + Tx
@@ -462,53 +639,40 @@ export class TransactionLearningService {
           normalizeCardType(r.card_type) === card &&
           normalize(r.transaction_type) === tx
       );
-      const rec = this.evaluateKernelDensity(t4Matches, "card_tx", 0.25);
-      if (rec) return rec;
+      if (t4Matches.length >= 1) {
+        const rec = this.evaluateKernelDensity(t4Matches, "card_tx", 0.25, amount, context);
+        if (rec) return rec;
+      }
     }
 
     // Tier 5: Card only
     if (card) {
       const t5Matches = this.records.filter((r) => normalizeCardType(r.card_type) === card);
-      const rec = this.evaluateKernelDensity(t5Matches, "card", 0.35);
-      if (rec) return rec;
+      if (t5Matches.length >= 1) {
+        const rec = this.evaluateKernelDensity(t5Matches, "card", 0.35, amount, context);
+        if (rec) return rec;
+      }
     }
 
-    // Tier 6: Automated Empirical Baseline Prior (zero-history cold-start)
-    if (tx === "repayment") {
+    // Tier 6: Automated Dynamic Empirical Baseline Prior (zero-history cold-start)
+    if (tx) {
+      const baseline = this.getDynamicBaseline(tx, card, bank);
+      const margin = Math.round((baseline.commission - baseline.siteFee) * 100) / 100;
       return {
-        commission: 3.0,
-        siteFee: 0.0,
+        commission: baseline.commission,
+        siteFee: baseline.siteFee,
+        margin,
         confidence: 0.5,
         source: "global_baseline",
         sampleCount: 0,
-        explanation: "Standard empirical baseline for repayments",
-      };
-    } else if (tx === "withdrawal") {
-      let comm = 2.0;
-      let fee = 1.55;
-      if (card === "rupay") {
-        comm = 2.0;
-        fee = 0.5;
-      } else if (card === "visa") {
-        comm = (bank && (bank.includes("sbi") || bank.includes("icici"))) ? 2.7 : 2.0;
-        fee = 1.55;
-      } else if (card === "mastercard") {
-        comm = 2.0;
-        fee = 1.55;
-      }
-      return {
-        commission: comm,
-        siteFee: fee,
-        confidence: 0.5,
-        source: "global_baseline",
-        sampleCount: 0,
-        explanation: "Automated empirical baseline rate",
+        explanation: `Dynamic empirical baseline for ${tx}`,
       };
     }
 
     return {
       commission: null,
       siteFee: null,
+      margin: null,
       confidence: 0,
       source: "none",
       sampleCount: 0,
@@ -670,7 +834,7 @@ export class TransactionLearningService {
             normalize(r.bank_name) === bank &&
             normalize(r.customer_mode) === mode
         );
-        if (matches.length >= 2) source = "card_tx_portal_bank_mode";
+        if (matches.length >= 1) source = "card_tx_portal_bank_mode";
         else matches = [];
       }
 
@@ -683,7 +847,7 @@ export class TransactionLearningService {
             normalize(r.sent_to) === portal &&
             normalize(r.bank_name) === bank
         );
-        if (matches.length >= 2) source = "card_tx_portal_bank";
+        if (matches.length >= 1) source = "card_tx_portal_bank";
         else matches = [];
       }
 
@@ -710,7 +874,7 @@ export class TransactionLearningService {
 
       if (matches.length === 0) continue;
 
-      const rec = this.evaluateKernelDensity(matches, source, 0.2);
+      const rec = this.evaluateKernelDensity(matches, source, 0.2, target.amount, { card, tx, portal });
       if (!rec || rec.commission === null || rec.siteFee === null) continue;
 
       totalEvaluated++;

@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -140,7 +141,8 @@ export const AddTransactionDialog = ({
     mode = formData.customer_mode,
     cust = customerValue,
     manualComm = isCommissionManual,
-    manualFee = isSiteFeeManual
+    manualFee = isSiteFeeManual,
+    amountVal = formData.amount ? parseFloat(formData.amount) : undefined
   ) => {
     if (!cType && !txType) return;
 
@@ -152,6 +154,7 @@ export const AddTransactionDialog = ({
       customerMode: mode,
       customerName: cust?.name || undefined,
       customerId: cust?.id || undefined,
+      amount: amountVal && !isNaN(amountVal) && amountVal > 0 ? amountVal : undefined,
     });
 
     if (rec.source !== "none") {
@@ -457,6 +460,22 @@ export const AddTransactionDialog = ({
         // Silent — tracking should never break the main flow
       });
 
+      // Closed-loop active learning: immediately penalize rejected prediction in-memory
+      if (hasPrediction && (!commAccepted || !feeAccepted)) {
+        transactionLearningService.recordOverrideFeedback({
+          cardType: formData.card_type,
+          transactionType: formData.transaction_type,
+          sentTo: formData.sent_to,
+          bankName: formData.bank_name || undefined,
+          customerMode: formData.customer_mode,
+          actualCommission: actualComm,
+          actualSiteFee: actualFee,
+          predictedCommission: predictedComm,
+          predictedSiteFee: predictedFee,
+          timestamp: Date.now(),
+        });
+      }
+
       const commPct = parseFloat(formData.commission_percent) || 0;
       const feePct = parseFloat(formData.site_fee_percent) || 0;
       activityLogService.log(
@@ -625,9 +644,24 @@ export const AddTransactionDialog = ({
                 step="0.01"
                 placeholder="Enter amount"
                 value={formData.amount}
-                onChange={(e) =>
-                  setFormData({ ...formData, amount: e.target.value })
-                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFormData((prev) => ({ ...prev, amount: val }));
+                  const num = parseFloat(val);
+                  if (!isNaN(num) && num > 0) {
+                    applyLearningRecommendation(
+                      formData.transaction_type,
+                      formData.card_type,
+                      formData.sent_to,
+                      formData.bank_name,
+                      formData.customer_mode,
+                      customerValue,
+                      isCommissionManual,
+                      isSiteFeeManual,
+                      num
+                    );
+                  }
+                }}
                 required
               />
             </div>
@@ -858,14 +892,46 @@ export const AddTransactionDialog = ({
           {!isStaff && hasEnteredCommission && (
             <div className="rounded-lg border bg-muted/40 p-3 space-y-1.5">
               <div className="flex justify-between items-center text-sm font-medium">
-                <span className="text-muted-foreground">Estimated Profit</span>
-                <span
-                  className={`text-base font-bold ${
-                    profit >= 0 ? "text-emerald-600" : "text-red-600"
-                  }`}
-                >
-                  ₹{profit.toFixed(2)}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Estimated Profit</span>
+                  {recommendationInfo?.isVolumeAdjusted && (
+                    <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4.5 font-normal text-muted-foreground border-border/80">
+                      Volume-calibrated
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const commP = parseFloat(formData.commission_percent) || 0;
+                    const feeP = parseFloat(formData.site_fee_percent) || 0;
+                    const netMargin = Math.round((commP - feeP) * 100) / 100;
+                    if (netMargin < 0) {
+                      return (
+                        <Badge variant="destructive" className="text-[10px] py-0 px-1.5 h-4.5 animate-pulse font-semibold">
+                          Loss: {netMargin}%
+                        </Badge>
+                      );
+                    } else if (netMargin < 0.25) {
+                      return (
+                        <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 font-medium">
+                          Low Margin: +{netMargin}%
+                        </Badge>
+                      );
+                    }
+                    return (
+                      <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 font-semibold">
+                        Margin: +{netMargin}%
+                      </Badge>
+                    );
+                  })()}
+                  <span
+                    className={`text-base font-bold ${
+                      profit >= 0 ? "text-emerald-600" : "text-red-600"
+                    }`}
+                  >
+                    ₹{profit.toFixed(2)}
+                  </span>
+                </div>
               </div>
               <div className="flex justify-between text-xs text-muted-foreground pt-0.5 border-t border-border/50">
                 <span>Commission: ₹{commissionAmount.toFixed(2)}</span>
