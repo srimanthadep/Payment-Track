@@ -1,6 +1,34 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { registerSW } from "virtual:pwa-register";
+
+// Auto-recover from chunk load errors caused by newly deployed releases
+if (typeof window !== "undefined") {
+  window.addEventListener("vite:preloadError", (event) => {
+    console.warn("New deployment detected via chunk preload error. Reloading app...", event);
+    window.location.reload();
+  });
+}
+
+// Register PWA service worker with auto-activation and polling
+if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+  const updateSW = registerSW({
+    immediate: true,
+    onNeedRefresh() {
+      console.log("PWA update detected, activating new service worker...");
+      updateSW(true);
+    },
+    onOfflineReady() {
+      console.log("App ready for offline use");
+    },
+  });
+
+  // Periodically check for SW updates
+  setInterval(() => {
+    updateSW();
+  }, 60 * 1000);
+}
 
 // Force browser tab to load fresh favicon without relying on stale browser cache
 if (typeof document !== "undefined") {

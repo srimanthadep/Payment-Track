@@ -22,6 +22,7 @@ import { useEffect } from "react";
 import { themeService } from "@/services/themeService";
 
 import { StaffRestrictedRoute } from "@/components/StaffRestrictedRoute";
+import { VersionUpdateBanner } from "@/components/VersionUpdateBanner";
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -63,6 +64,7 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <VersionUpdateBanner />
           <ScrollToTop />
           <Routes>
             <Route path="/" element={<Index />} />

@@ -51,11 +51,13 @@ import {
   EyeOff,
   MessageCircle,
   Sparkles,
+  RefreshCw,
 } from "lucide-react";
 import { AiIcon } from "@/components/icons/AiIcon";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { LearningInsightsCard } from "@/components/settings/LearningInsightsCard";
+import { appUpdateService, VersionInfo } from "@/services/appUpdateService";
 import {
   settingsService,
   AppSettings,
@@ -121,6 +123,54 @@ const Settings = () => {
 
   // Reset dialog
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
+
+  // App Update State
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [hasNewUpdate, setHasNewUpdate] = useState(appUpdateService.isUpdateAvailable());
+  const [remoteVersion, setRemoteVersion] = useState<VersionInfo | null>(appUpdateService.getRemoteVersionInfo());
+
+  useEffect(() => {
+    return appUpdateService.subscribe((updateAvailable, versionInfo) => {
+      setHasNewUpdate(updateAvailable);
+      if (versionInfo) setRemoteVersion(versionInfo);
+    });
+  }, []);
+
+  const handleCheckForUpdates = async () => {
+    setCheckingUpdate(true);
+    try {
+      const found = await appUpdateService.checkForUpdates();
+      if (found) {
+        toast({
+          title: "Update Available!",
+          description: "A newer version of the application was found on the server.",
+        });
+      } else {
+        toast({
+          title: "Application is Up to Date",
+          description: "You are running the latest version deployed to GitHub.",
+        });
+      }
+    } catch {
+      toast({
+        title: "Check Failed",
+        description: "Could not reach server to verify version.",
+        variant: "destructive",
+      });
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
+  const handleForceReload = () => {
+    toast({
+      title: "Reloading App...",
+      description: "Clearing local caches and pulling the newest version.",
+    });
+    setTimeout(() => {
+      appUpdateService.applyUpdate();
+    }, 300);
+  };
 
   // Portal Comparison Chart Visibility State
   const [portalsList, setPortalsList] = useState<Array<{ id: string; name: string }>>([]);
@@ -938,6 +988,78 @@ const Settings = () => {
                       <RotateCcw className="h-3.5 w-3.5" />
                       Reset to Factory Defaults
                     </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Version & Real-Time Deployment Updates */}
+            <Card className="border shadow-sm">
+              <CardHeader className="pb-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                      <RefreshCw className="h-4 w-4 text-primary" />
+                      App Updates & Live Deployment Sync
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Automatically detects and reloads new versions pushed to GitHub. All open client tabs receive instant notifications.
+                    </CardDescription>
+                  </div>
+                  {hasNewUpdate && (
+                    <Badge variant="destructive" className="animate-pulse self-start sm:self-auto text-xs py-1 px-2.5">
+                      New Update Ready
+                    </Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-xl border bg-muted/20 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-semibold text-sm">Installed Version</h4>
+                      <Badge variant="outline" className="font-mono text-[11px]">
+                        {appUpdateService.getLocalBuildTime() && !isNaN(Number(appUpdateService.getLocalBuildTime()))
+                          ? new Date(Number(appUpdateService.getLocalBuildTime())).toLocaleString()
+                          : "Development Build"}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Continuous polling is running every 30 seconds. Tab focus, network reconnection, and route navigation also trigger checks.
+                    </p>
+                    <div className="pt-1 flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={checkingUpdate}
+                        onClick={handleCheckForUpdates}
+                        className="text-xs gap-1.5"
+                      >
+                        <RefreshCw className={cn("h-3.5 w-3.5", checkingUpdate && "animate-spin")} />
+                        {checkingUpdate ? "Checking..." : "Check for Updates"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-xl border bg-muted/20 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-semibold text-sm">Force Reload / Purge Cache</h4>
+                      <Badge variant="secondary" className="text-[11px]">PWA & Service Worker</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Clears local browser cache storage, requests service workers to skip waiting, and performs a clean reload.
+                    </p>
+                    <div className="pt-1 flex items-center gap-2">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={handleForceReload}
+                        className="text-xs gap-1.5"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Reload App Now
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>
