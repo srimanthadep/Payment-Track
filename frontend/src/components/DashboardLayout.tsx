@@ -359,7 +359,7 @@ export const DashboardLayout = ({ children, headerAction }: DashboardLayoutProps
           {/* Sidebar Nav items */}
           <div className="flex-1 flex flex-col justify-between py-4 px-3.5 overflow-y-auto sleek-scrollbar">
             <div className="space-y-3">
-              {/* Daily Profit Tracker for Chummi Portal */}
+              {/* Daily Profit Tracker for Self Portal */}
               <div className="px-1">
                 <DailyProfitTracker />
               </div>

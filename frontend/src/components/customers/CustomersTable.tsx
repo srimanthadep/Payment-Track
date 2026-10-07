@@ -183,7 +183,7 @@ export const CustomersTable = ({
           <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto mt-1 mb-4">
             {searchQuery
               ? "Try adjusting your search terms or filter."
-              : "When you add a transaction with the Chummi portal, customer name and phone number entries will automatically build your customer CRM directory here."}
+              : "When you add a transaction with the Self portal, customer name and phone number entries will automatically build your customer CRM directory here."}
           </p>
           {onAddCustomerClick && (
             <Button

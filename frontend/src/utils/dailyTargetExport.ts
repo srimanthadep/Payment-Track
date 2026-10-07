@@ -240,7 +240,7 @@ export function exportDailyTargetToExcel(
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Daily Targets");
 
-  const defaultName = `Chummi-Daily-Targets-${days[days.length - 1]?.dateStr || "start"}_to_${days[0]?.dateStr || "end"}.xlsx`;
+  const defaultName = `Self-Daily-Targets-${days[days.length - 1]?.dateStr || "start"}_to_${days[0]?.dateStr || "end"}.xlsx`;
   XLSX.writeFile(wb, filename || defaultName);
 }
 
@@ -297,7 +297,7 @@ export async function exportDailyTargetToPDF(
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(148, 163, 184); // slate-400
-  doc.text("PORTAL: CHUMMI PORTAL  •  EXECUTIVE FINANCIAL AUDIT LEDGER", margin + 24, 16.5);
+  doc.text("PORTAL: SELF PORTAL  •  EXECUTIVE FINANCIAL AUDIT LEDGER", margin + 24, 16.5);
 
   doc.setFontSize(7.5);
   doc.setTextColor(203, 213, 225); // slate-300
@@ -534,7 +534,7 @@ export async function exportDailyTargetToPDF(
     doc.setFont("helvetica", "normal");
     doc.setTextColor(148, 163, 184);
     doc.text(
-      "Payment Tracker  •  Chummi Portal Daily Target & Financial Performance  •  Strictly Confidential",
+      "Payment Tracker  •  Self Portal Daily Target & Financial Performance  •  Strictly Confidential",
       margin,
       pHeight - 4.5
     );
@@ -542,6 +542,6 @@ export async function exportDailyTargetToPDF(
     doc.text(`Page ${i} of ${totalPages}`, pWidth - margin, pHeight - 4.5, { align: "right" });
   }
 
-  const defaultName = `Chummi-Daily-Targets-${days[days.length - 1]?.dateStr || "start"}_to_${days[0]?.dateStr || "end"}.pdf`;
+  const defaultName = `Self-Daily-Targets-${days[days.length - 1]?.dateStr || "start"}_to_${days[0]?.dateStr || "end"}.pdf`;
   doc.save(options?.filename || defaultName);
 }

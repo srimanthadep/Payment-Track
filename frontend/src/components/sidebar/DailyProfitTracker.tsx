@@ -50,7 +50,7 @@ export const DailyProfitTracker = ({ variant = "default" }: DailyProfitTrackerPr
   const { toast } = useToast();
   const [profit, setProfit] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [chummiPortalId, setChummiPortalId] = useState<string | null>(null);
+  const [selfPortalId, setSelfPortalId] = useState<string | null>(null);
   const [activeDate, setActiveDate] = useState<Date | null>(() => dateSyncService.getActiveDate());
 
   // Export Dialog State
@@ -70,19 +70,27 @@ export const DailyProfitTracker = ({ variant = "default" }: DailyProfitTrackerPr
     });
   }, []);
 
-  // 1. Fetch Chummi portal ID once
+  // 1. Fetch Self portal ID once (fallback to chummi if any legacy records)
   useEffect(() => {
     let cancelled = false;
     const fetchPortalId = async () => {
-      const { data, error } = await supabase
-        .from("portals")
-        .select("id")
-        .ilike("name", "chummi")
-        .limit(1)
-        .maybeSingle();
+      try {
+        const { data, error } = await supabase
+          .from("portals")
+          .select("id")
+          .or("name.ilike.%self%,name.ilike.%chummi%")
+          .limit(1)
+          .maybeSingle();
 
-      if (!cancelled && !error && data) {
-        setChummiPortalId(data.id);
+        if (!cancelled) {
+          if (!error && data) {
+            setSelfPortalId(data.id);
+          } else {
+            setIsLoading(false);
+          }
+        }
+      } catch {
+        if (!cancelled) setIsLoading(false);
       }
     };
     fetchPortalId();
@@ -91,9 +99,13 @@ export const DailyProfitTracker = ({ variant = "default" }: DailyProfitTrackerPr
     };
   }, []);
 
-  // 2. Fetch profit for Chummi portal for active date (today or past date)
+  // 2. Fetch profit for Self portal for active date (today or past date)
   const fetchProfit = useCallback(async () => {
-    if (!effectiveUserId || !chummiPortalId) return;
+    if (!effectiveUserId) return;
+    if (!selfPortalId) {
+      setIsLoading(false);
+      return;
+    }
 
     const target = activeDate || new Date();
     const dayStart = new Date(target);
@@ -105,7 +117,7 @@ export const DailyProfitTracker = ({ variant = "default" }: DailyProfitTrackerPr
       .from("transactions")
       .select("commission, site_fee")
       .eq("user_id", effectiveUserId)
-      .eq("portal_id", chummiPortalId)
+      .eq("portal_id", selfPortalId)
       .gte("transaction_date", dayStart.toISOString())
       .lte("transaction_date", dayEnd.toISOString());
 
@@ -117,7 +129,7 @@ export const DailyProfitTracker = ({ variant = "default" }: DailyProfitTrackerPr
       setProfit(totalProfit);
     }
     setIsLoading(false);
-  }, [effectiveUserId, chummiPortalId, activeDate]);
+  }, [effectiveUserId, selfPortalId, activeDate]);
 
   useEffect(() => {
     fetchProfit();
@@ -125,7 +137,7 @@ export const DailyProfitTracker = ({ variant = "default" }: DailyProfitTrackerPr
 
   // 3. Subscribe to realtime transaction changes
   useEffect(() => {
-    if (!effectiveUserId || !chummiPortalId) return;
+    if (!effectiveUserId || !selfPortalId) return;
 
     const channel = supabase
       .channel("daily-profit-tracker")
@@ -146,7 +158,7 @@ export const DailyProfitTracker = ({ variant = "default" }: DailyProfitTrackerPr
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [effectiveUserId, chummiPortalId, fetchProfit]);
+  }, [effectiveUserId, selfPortalId, fetchProfit]);
 
   // Resolve current active date range
   const getSelectedDates = (): { start: Date; end: Date } => {
@@ -240,7 +252,7 @@ export const DailyProfitTracker = ({ variant = "default" }: DailyProfitTrackerPr
             Download Daily Target Reports
           </DialogTitle>
           <DialogDescription className="text-xs">
-            Export Chummi portal daily profit performance against the ₹{DAILY_TARGET.toLocaleString("en-IN")} daily target
+            Export Self portal daily profit performance against the ₹{DAILY_TARGET.toLocaleString("en-IN")} daily target
           </DialogDescription>
         </DialogHeader>
 
@@ -399,7 +411,7 @@ export const DailyProfitTracker = ({ variant = "default" }: DailyProfitTrackerPr
         <div
           className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-border/60 bg-muted/30 min-w-0 cursor-pointer hover:bg-muted/50 transition-colors"
           onClick={() => setExportDialogOpen(true)}
-          title={`Chummi (${isCurrentDay ? "Today" : dateLabel}): ₹${Math.round(profit).toLocaleString("en-IN")} / ₹${DAILY_TARGET.toLocaleString("en-IN")} — Click to download reports`}
+          title={`Self (${isCurrentDay ? "Today" : dateLabel}): ₹${Math.round(profit).toLocaleString("en-IN")} / ₹${DAILY_TARGET.toLocaleString("en-IN")} — Click to download reports`}
         >
           <TrendingUp className={cn("h-3.5 w-3.5 shrink-0", color.text)} strokeWidth={2.2} />
           <div className="flex items-center gap-1.5 min-w-0">
