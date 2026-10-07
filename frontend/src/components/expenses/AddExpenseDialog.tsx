@@ -129,6 +129,9 @@ export const AddExpenseDialog = ({
           category: formData.category,
         }
       );
+      if (formData.category) {
+        settingsService.recordDropdownSelection("expenseCategories", formData.category);
+      }
       toast({
         title: "Expense Added",
         description: `₹${amt.toLocaleString("en-IN")} recorded under ${formData.category}`,
@@ -189,7 +192,10 @@ export const AddExpenseDialog = ({
               </Label>
               <Select
                 value={formData.category}
-                onValueChange={(val) => setFormData({ ...formData, category: val })}
+                onValueChange={(val) => {
+                  setFormData({ ...formData, category: val });
+                  settingsService.recordDropdownSelection("expenseCategories", val);
+                }}
                 required
               >
                 <SelectTrigger id="exp-category" className="h-10 rounded-xl">

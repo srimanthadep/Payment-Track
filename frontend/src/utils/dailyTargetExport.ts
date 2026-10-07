@@ -70,11 +70,11 @@ export async function fetchDailyTargetData(
   endDate: Date,
   dailyTarget: number = 5000
 ): Promise<DailyTargetExportResult> {
-  // 1. Resolve Chummi portal ID
+  // 1. Resolve Self / Chummi portal ID
   const { data: portalData } = await supabase
     .from("portals")
     .select("id, name")
-    .ilike("name", "chummi")
+    .or("name.ilike.%self%,name.ilike.%chummi%")
     .limit(1)
     .maybeSingle();
 

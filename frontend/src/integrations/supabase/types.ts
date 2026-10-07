@@ -379,6 +379,7 @@ export type Database = {
           profit: number | null
           site_fee: number | null
           site_fee_percent: number | null
+          site_name: string | null
           transaction_date: string
           transaction_type: string
           updated_at: string
@@ -402,6 +403,7 @@ export type Database = {
           profit?: number | null
           site_fee?: number | null
           site_fee_percent?: number | null
+          site_name?: string | null
           transaction_date?: string
           transaction_type: string
           updated_at?: string
@@ -425,6 +427,7 @@ export type Database = {
           profit?: number | null
           site_fee?: number | null
           site_fee_percent?: number | null
+          site_name?: string | null
           transaction_date?: string
           transaction_type?: string
           updated_at?: string

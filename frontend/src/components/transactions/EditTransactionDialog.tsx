@@ -30,7 +30,7 @@ import {
   calculateCommission,
   type CardType,
 } from "@/utils/commissionCalculator";
-import { settingsService, CardTypeOption, BankOption } from "@/services/settingsService";
+import { settingsService, CardTypeOption, BankOption, SiteOption } from "@/services/settingsService";
 import { activityLogService } from "@/services/activityLogService";
 import { CustomerCombobox, CustomerValue } from "@/components/customers/CustomerCombobox";
 import { customerService } from "@/services/customerService";
@@ -52,6 +52,7 @@ interface EditTransactionDialogProps {
     card_type: string | null;
     customer_mode?: string | null;
     bank_name?: string | null;
+    site_name?: string | null;
     customer_id?: string | null;
     customer_name?: string | null;
     customer_phone?: string | null;
@@ -81,6 +82,7 @@ export const EditTransactionDialog = ({
   const [portals, setPortals] = useState<Portal[]>([]);
   const [customCards, setCustomCards] = useState<CardTypeOption[]>([]);
   const [banks, setBanks] = useState<BankOption[]>([]);
+  const [sites, setSites] = useState<SiteOption[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [customerValue, setCustomerValue] = useState<CustomerValue | null>(null);
 
@@ -94,6 +96,7 @@ export const EditTransactionDialog = ({
     const updateDropdowns = () => {
       setCustomCards(settingsService.getCardTypes());
       setBanks(settingsService.getBanks());
+      setSites(settingsService.getSites());
     };
     updateDropdowns();
     return settingsService.subscribe(updateDropdowns);
@@ -108,6 +111,7 @@ export const EditTransactionDialog = ({
     site_fee_percent: "",
     customer_mode: "Offline" as "Online" | "Offline",
     bank_name: "",
+    site_name: "",
     customer_name: "",
     customer_phone: "",
     transaction_date: new Date(),
@@ -210,6 +214,13 @@ export const EditTransactionDialog = ({
         if (bankMatch) bank = bankMatch[1].trim();
       }
 
+      // 4. Parse Site Name
+      let site = (transaction as any).site_name || "";
+      if (!site && transaction.notes) {
+        const siteMatch = transaction.notes.match(/Site:\s*([^|]+)/i);
+        if (siteMatch) site = siteMatch[1].trim();
+      }
+
       setFormData({
         portal_id: transaction.portal_id || "",
         card_type: cardType,
@@ -219,6 +230,7 @@ export const EditTransactionDialog = ({
         site_fee_percent: feePct,
         customer_mode: custMode,
         bank_name: bank,
+        site_name: site,
         customer_name: custName,
         customer_phone: custPhone,
         transaction_date: transaction.transaction_date
@@ -263,6 +275,9 @@ export const EditTransactionDialog = ({
   };
 
   const handleCardTypeChange = (cardType: string) => {
+    if (cardType) {
+      settingsService.recordDropdownSelection("cardTypes", cardType);
+    }
     setFormData((prev) => ({
       ...prev,
       card_type: cardType,
@@ -270,6 +285,7 @@ export const EditTransactionDialog = ({
   };
 
   const handleTransactionTypeChange = (transactionType: "withdrawal" | "repayment") => {
+    settingsService.recordDropdownSelection("transactionTypes", transactionType);
     setFormData((prev) => ({
       ...prev,
       transaction_type: transactionType,
@@ -309,7 +325,7 @@ export const EditTransactionDialog = ({
     setIsLoading(true);
 
     const selectedPortal = portals.find((p) => p.id === formData.portal_id);
-    const isChummi = selectedPortal?.name?.trim().toLowerCase() === "chummi";
+    const isChummi = ["self", "chummi"].includes(selectedPortal?.name?.trim().toLowerCase() || "");
 
     let customerId: string | null = null;
     let customerName: string | null = null;
@@ -347,6 +363,8 @@ export const EditTransactionDialog = ({
     const profitAmount = commAmount - feeAmount;
 
     let notesStr = `Sent to: ${selectedPortal?.name || "Portal"} | Mode: ${formData.customer_mode}${
+      formData.site_name ? ` | Site: ${formData.site_name}` : ""
+    }${
       formData.bank_name ? ` | Bank: ${formData.bank_name}` : ""
     } | Commission: ${commPercent}%${
       formData.site_fee_percent ? ` | Site Fee: ${formData.site_fee_percent}%` : ""
@@ -369,14 +387,15 @@ export const EditTransactionDialog = ({
       commission_percent: commPercent,
       site_fee: feeAmount,
       site_fee_percent: feePercent,
-      profit: profitAmount,
       transaction_date: formData.transaction_date.toISOString(),
       customer_id: customerId,
       customer_name: customerName,
       customer_phone: customerPhone,
       customer_mode: formData.customer_mode,
       bank_name: formData.bank_name || null,
+      site_name: formData.site_name || null,
       notes: notesStr,
+      updated_at: new Date().toISOString(),
     };
 
     const { error } = await supabase
@@ -396,7 +415,7 @@ export const EditTransactionDialog = ({
       activityLogService.log(
         "transaction.updated",
         "transaction",
-        `Edited transaction — Amount: ₹${parseFloat(formData.amount).toLocaleString("en-IN")}, Type: ${formData.transaction_type}, Mode: ${formData.customer_mode}${formData.bank_name ? `, Bank: ${formData.bank_name}` : ""}${commPercent ? `, Commission: ${commPercent}%` : ""}${feePercent ? `, Site Fee: ${feePercent}%` : ""}${isChummi && customerName ? `, Customer: ${customerName}` : ""}`,
+        `Edited transaction — Amount: ₹${parseFloat(formData.amount).toLocaleString("en-IN")}, Type: ${formData.transaction_type}, Mode: ${formData.customer_mode}${formData.site_name ? `, Site: ${formData.site_name}` : ""}${formData.bank_name ? `, Bank: ${formData.bank_name}` : ""}${commPercent ? `, Commission: ${commPercent}%` : ""}${feePercent ? `, Site Fee: ${feePercent}%` : ""}${isChummi && customerName ? `, Customer: ${customerName}` : ""}`,
         {
           transaction_id: transaction.id,
           old_amount: transaction.amount,
@@ -405,6 +424,7 @@ export const EditTransactionDialog = ({
           card_type: formData.card_type,
           customer_mode: formData.customer_mode,
           bank_name: formData.bank_name,
+          site_name: formData.site_name,
           commission_percent: commPercent,
           site_fee_percent: feePercent,
           customer_name: isChummi ? customerName : null,
@@ -427,6 +447,12 @@ export const EditTransactionDialog = ({
         transaction_date: formData.transaction_date,
       });
 
+      // Record dropdown selections for updated transaction
+      if (formData.site_name) settingsService.recordDropdownSelection("sites", formData.site_name);
+      if (formData.bank_name) settingsService.recordDropdownSelection("banks", formData.bank_name);
+      if (formData.card_type) settingsService.recordDropdownSelection("cardTypes", formData.card_type);
+      if (formData.transaction_type) settingsService.recordDropdownSelection("transactionTypes", formData.transaction_type);
+
       toast({
         title: "Success",
         description: "Transaction updated successfully",
@@ -440,7 +466,7 @@ export const EditTransactionDialog = ({
 
   const hasEnteredCommission = Boolean(formData.amount && formData.commission_percent);
   const selectedPortal = portals.find((p) => p.id === formData.portal_id);
-  const isChummi = selectedPortal?.name?.trim().toLowerCase() === "chummi";
+  const isChummi = ["self", "chummi"].includes(selectedPortal?.name?.trim().toLowerCase() || "");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -587,8 +613,38 @@ export const EditTransactionDialog = ({
             </div>
           </div>
 
-          {/* 3. Customer Mode (Online/Offline) & Bank Credit Card */}
+          {/* 3. Site & Customer Mode */}
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label
+                htmlFor="edit-site_name"
+                className="text-xs sm:text-sm font-medium truncate block"
+              >
+                Site <span className="text-[10px] font-normal text-muted-foreground"><span className="hidden sm:inline">(Optional)</span><span className="sm:hidden">(Opt)</span></span>
+              </Label>
+              <Select
+                value={formData.site_name || "none"}
+                onValueChange={(val) => {
+                  if (val && val !== "none") {
+                    settingsService.recordDropdownSelection("sites", val);
+                  }
+                  setFormData((prev) => ({ ...prev, site_name: val === "none" ? "" : val }));
+                }}
+              >
+                <SelectTrigger id="edit-site_name">
+                  <SelectValue placeholder="Select site (Optional)" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  <SelectItem value="none">-- None / Direct --</SelectItem>
+                  {sites.map((s) => (
+                    <SelectItem key={s.id} value={s.name}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-1.5 sm:space-y-2">
               <Label
                 htmlFor="edit-customer_mode"
@@ -611,33 +667,36 @@ export const EditTransactionDialog = ({
                 </SelectContent>
               </Select>
             </div>
+          </div>
 
-            <div className="space-y-1.5 sm:space-y-2">
-              <Label
-                htmlFor="edit-bank_name"
-                className="text-xs sm:text-sm font-medium truncate block"
-              >
-                Bank Credit Card <span className="text-[10px] font-normal text-muted-foreground"><span className="hidden sm:inline">(Optional)</span><span className="sm:hidden">(Opt)</span></span>
-              </Label>
-              <Select
-                value={formData.bank_name || "none"}
-                onValueChange={(val) =>
-                  setFormData((prev) => ({ ...prev, bank_name: val === "none" ? "" : val }))
+          <div className="space-y-1.5 sm:space-y-2">
+            <Label
+              htmlFor="edit-bank_name"
+              className="text-xs sm:text-sm font-medium truncate block"
+            >
+              Bank Credit Card <span className="text-[10px] font-normal text-muted-foreground"><span className="hidden sm:inline">(Optional)</span><span className="sm:hidden">(Opt)</span></span>
+            </Label>
+            <Select
+              value={formData.bank_name || "none"}
+              onValueChange={(val) => {
+                if (val && val !== "none") {
+                  settingsService.recordDropdownSelection("banks", val);
                 }
-              >
-                <SelectTrigger id="edit-bank_name">
-                  <SelectValue placeholder="Select bank (Optional)" />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  <SelectItem value="none">-- None / General --</SelectItem>
-                  {banks.map((b) => (
-                    <SelectItem key={b.id} value={b.name}>
-                      {b.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                setFormData((prev) => ({ ...prev, bank_name: val === "none" ? "" : val }));
+              }}
+            >
+              <SelectTrigger id="edit-bank_name">
+                <SelectValue placeholder="Select bank (Optional)" />
+              </SelectTrigger>
+              <SelectContent className="max-h-60">
+                <SelectItem value="none">-- None / General --</SelectItem>
+                {banks.map((b) => (
+                  <SelectItem key={b.id} value={b.name}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* 4. Commission (%) & Site Fee (%) */}
@@ -733,7 +792,7 @@ export const EditTransactionDialog = ({
             </Select>
           </div>
 
-          {/* 7. Conditional Customer Info for Chummi Portal */}
+          {/* 7. Conditional Customer Info for Self Portal */}
           {isChummi && (
             <div className="animate-in fade-in slide-in-from-top-2 duration-200">
               <CustomerCombobox

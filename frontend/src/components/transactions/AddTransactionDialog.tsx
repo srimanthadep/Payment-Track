@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Calendar as CalendarIcon } from "lucide-react";
+import { Loader2, Calendar as CalendarIcon, ArrowUpDown } from "lucide-react";
 import { AiIcon } from "@/components/icons/AiIcon";
 import { format, isToday } from "date-fns";
 import {
@@ -34,7 +34,10 @@ import {
   RecipientOption,
   TransactionTypeOption,
   BankOption,
+  SiteOption,
+  DropdownOrderingKey,
 } from "@/services/settingsService";
+import { ManageDropdownOrderDialog } from "../settings/ManageDropdownOrderDialog";
 import { transactionLearningService } from "@/services/transactionLearningService";
 import { activityLogService } from "@/services/activityLogService";
 import { predictionTrackingService } from "@/services/predictionTrackingService";
@@ -61,6 +64,7 @@ interface AddTransactionDialogProps {
     portal_id?: string;
     customer_mode?: "Online" | "Offline";
     bank_name?: string;
+    site_name?: string;
   } | null;
 }
 
@@ -80,6 +84,24 @@ export const AddTransactionDialog = ({
   const [recipients, setRecipients] = useState<RecipientOption[]>([]);
   const [txTypes, setTxTypes] = useState<TransactionTypeOption[]>([]);
   const [banks, setBanks] = useState<BankOption[]>([]);
+  const [sites, setSites] = useState<SiteOption[]>([]);
+
+  // Order & Ranking Dialog state for quick adjustments
+  const [orderModalOpen, setOrderModalOpen] = useState(false);
+  const [orderModalKey, setOrderModalKey] = useState<DropdownOrderingKey>("recipients");
+  const [orderModalTitle, setOrderModalTitle] = useState("");
+  const [orderModalItems, setOrderModalItems] = useState<{ id: string; name: string }[]>([]);
+
+  const handleOpenOrderModal = (
+    key: DropdownOrderingKey,
+    title: string,
+    items: { id: string; name: string }[]
+  ) => {
+    setOrderModalKey(key);
+    setOrderModalTitle(title);
+    setOrderModalItems(items);
+    setOrderModalOpen(true);
+  };
 
   useEffect(() => {
     const updateDropdowns = () => {
@@ -87,6 +109,7 @@ export const AddTransactionDialog = ({
       setRecipients(settingsService.getRecipients());
       setTxTypes(settingsService.getTransactionTypes());
       setBanks(settingsService.getBanks());
+      setSites(settingsService.getSites());
     };
     updateDropdowns();
     return settingsService.subscribe(updateDropdowns);
@@ -103,6 +126,7 @@ export const AddTransactionDialog = ({
     customer_phone: "",
     customer_mode: "Offline" as "Online" | "Offline",
     bank_name: "",
+    site_name: "",
     transaction_date: new Date(),
   });
 
@@ -207,6 +231,7 @@ export const AddTransactionDialog = ({
         customer_phone: initialData.customer_phone || prev.customer_phone,
         customer_mode: initialData.customer_mode || prev.customer_mode || "Offline",
         bank_name: initialData.bank_name || prev.bank_name || "",
+        site_name: (initialData as any).site_name || prev.site_name || "",
       }));
 
       if (initialData.customer_name || initialData.customer_phone || (initialData as any).customer_id) {
@@ -257,6 +282,7 @@ export const AddTransactionDialog = ({
       customer_phone: "",
       customer_mode: "Offline",
       bank_name: "",
+      site_name: "",
       transaction_date: new Date(),
     });
     setCustomerValue(null);
@@ -331,7 +357,7 @@ export const AddTransactionDialog = ({
     }
 
     const commPercent = parseFloat(formData.commission_percent) || 0;
-    const isChummi = formData.sent_to?.trim().toLowerCase() === "chummi";
+    const isChummi = ["self", "chummi"].includes(formData.sent_to?.trim().toLowerCase());
 
     let customerId: string | null = null;
     let customerName: string | null = null;
@@ -364,6 +390,8 @@ export const AddTransactionDialog = ({
     }
 
     let notesStr = `Sent to: ${formData.sent_to} | Mode: ${formData.customer_mode}${
+      formData.site_name ? ` | Site: ${formData.site_name}` : ""
+    }${
       formData.bank_name ? ` | Bank: ${formData.bank_name}` : ""
     } | Commission: ${commPercent}%${
       formData.site_fee_percent ? ` | Site Fee: ${formData.site_fee_percent}%` : ""
@@ -396,6 +424,7 @@ export const AddTransactionDialog = ({
       customer_phone: customerPhone,
       customer_mode: formData.customer_mode,
       bank_name: formData.bank_name || null,
+      site_name: formData.site_name || null,
       notes: notesStr,
     };
 
@@ -481,7 +510,7 @@ export const AddTransactionDialog = ({
       activityLogService.log(
         "transaction.created",
         "transaction",
-        `Added ${formData.transaction_type} of ₹${parseFloat(formData.amount).toLocaleString("en-IN")} to ${formData.sent_to} (${formData.card_type}, ${formData.customer_mode}${formData.bank_name ? `, Bank: ${formData.bank_name}` : ""}${commPct ? `, Commission: ${commPct}%` : ""}${feePct ? `, Site Fee: ${feePct}%` : ""}${isChummi && formData.customer_name.trim() ? `, Customer: ${formData.customer_name.trim()}` : ""})`,
+        `Added ${formData.transaction_type} of ₹${parseFloat(formData.amount).toLocaleString("en-IN")} to ${formData.sent_to} (${formData.card_type}, ${formData.customer_mode}${formData.site_name ? `, Site: ${formData.site_name}` : ""}${formData.bank_name ? `, Bank: ${formData.bank_name}` : ""}${commPct ? `, Commission: ${commPct}%` : ""}${feePct ? `, Site Fee: ${feePct}%` : ""}${isChummi && formData.customer_name.trim() ? `, Customer: ${formData.customer_name.trim()}` : ""})`,
         {
           amount: parseFloat(formData.amount),
           card_type: formData.card_type,
@@ -489,12 +518,20 @@ export const AddTransactionDialog = ({
           sent_to: formData.sent_to,
           customer_mode: formData.customer_mode,
           bank_name: formData.bank_name,
+          site_name: formData.site_name,
           commission_percent: commPct,
           site_fee_percent: feePct,
           customer_name: isChummi ? formData.customer_name.trim() || null : null,
           customer_phone: isChummi ? formData.customer_phone.trim() || null : null,
         }
       );
+
+      // Track dropdown selections for confirmed transaction
+      if (formData.sent_to) settingsService.recordDropdownSelection("recipients", formData.sent_to);
+      if (formData.site_name) settingsService.recordDropdownSelection("sites", formData.site_name);
+      if (formData.bank_name) settingsService.recordDropdownSelection("banks", formData.bank_name);
+      if (formData.card_type) settingsService.recordDropdownSelection("cardTypes", formData.card_type);
+      if (formData.transaction_type) settingsService.recordDropdownSelection("transactionTypes", formData.transaction_type);
 
       toast({
         title: "Success",
@@ -554,12 +591,13 @@ export const AddTransactionDialog = ({
       formData.site_fee_percent
   );
 
-  const isChummi = formData.sent_to?.trim().toLowerCase() === "chummi";
+  const isChummi = ["self", "chummi"].includes(formData.sent_to?.trim().toLowerCase());
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(val) => {
+    <>
+      <Dialog
+        open={open}
+        onOpenChange={(val) => {
         if (!val) resetForm();
         onOpenChange(val);
       }}
@@ -670,11 +708,23 @@ export const AddTransactionDialog = ({
           {/* 2. Repayment or Withdrawals & 3. Card Type */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="type">Transaction Type</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="type">Transaction Type</Label>
+                <button
+                  type="button"
+                  onClick={() => handleOpenOrderModal("transactionTypes", "Transaction Types", txTypes)}
+                  className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors px-1 py-0.5 rounded hover:bg-muted/50"
+                  title="Reorder or change ranking mode"
+                >
+                  <ArrowUpDown className="h-3 w-3" />
+                  <span>Order</span>
+                </button>
+              </div>
               <Select
                 value={formData.transaction_type}
                 onValueChange={(val) => {
                   const newType = val as "withdrawal" | "repayment";
+                  settingsService.recordDropdownSelection("transactionTypes", newType);
                   setFormData((prev) => ({
                     ...prev,
                     transaction_type: newType,
@@ -704,10 +754,22 @@ export const AddTransactionDialog = ({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="card_type">Card Type</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="card_type">Card Type</Label>
+                <button
+                  type="button"
+                  onClick={() => handleOpenOrderModal("cardTypes", "Card Types", cardTypes)}
+                  className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors px-1 py-0.5 rounded hover:bg-muted/50"
+                  title="Reorder or change ranking mode"
+                >
+                  <ArrowUpDown className="h-3 w-3" />
+                  <span>Order</span>
+                </button>
+              </div>
               <Select
                 value={formData.card_type}
                 onValueChange={(val) => {
+                  settingsService.recordDropdownSelection("cardTypes", val);
                   setFormData((prev) => ({
                     ...prev,
                     card_type: val,
@@ -737,8 +799,49 @@ export const AddTransactionDialog = ({
             </div>
           </div>
 
-          {/* 4. Customer Mode (Online/Offline) & Bank Credit Card */}
+          {/* 4. Site, Customer Mode & Bank Credit Card */}
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-1.5 sm:space-y-2">
+              <div className="flex items-center justify-between">
+                <Label
+                  htmlFor="site_name"
+                  className="text-xs sm:text-sm font-medium truncate block"
+                >
+                  Site <span className="text-[10px] font-normal text-muted-foreground"><span className="hidden sm:inline">(Optional)</span><span className="sm:hidden">(Opt)</span></span>
+                </Label>
+                <button
+                  type="button"
+                  onClick={() => handleOpenOrderModal("sites", "Sites Dropdown", sites)}
+                  className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors px-1 py-0.5 rounded hover:bg-muted/50"
+                  title="Reorder or change ranking mode"
+                >
+                  <ArrowUpDown className="h-3 w-3" />
+                  <span>Order</span>
+                </button>
+              </div>
+              <Select
+                value={formData.site_name || "none"}
+                onValueChange={(val) => {
+                  if (val && val !== "none") {
+                    settingsService.recordDropdownSelection("sites", val);
+                  }
+                  setFormData((prev) => ({ ...prev, site_name: val === "none" ? "" : val }));
+                }}
+              >
+                <SelectTrigger id="site_name">
+                  <SelectValue placeholder="Select site" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  <SelectItem value="none">None / Direct</SelectItem>
+                  {sites.map((s) => (
+                    <SelectItem key={s.id} value={s.name}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-1.5 sm:space-y-2">
               <Label
                 htmlFor="customer_mode"
@@ -769,40 +872,54 @@ export const AddTransactionDialog = ({
                 </SelectContent>
               </Select>
             </div>
+          </div>
 
-            <div className="space-y-1.5 sm:space-y-2">
+          <div className="space-y-1.5 sm:space-y-2">
+            <div className="flex items-center justify-between">
               <Label
                 htmlFor="bank_name"
                 className="text-xs sm:text-sm font-medium truncate block"
               >
                 Bank Credit Card <span className="text-[10px] font-normal text-muted-foreground"><span className="hidden sm:inline">(Optional)</span><span className="sm:hidden">(Opt)</span></span>
               </Label>
-              <Select
-                value={formData.bank_name}
-                onValueChange={(val) => {
-                  setFormData((prev) => ({ ...prev, bank_name: val }));
-                  applyLearningRecommendation(
-                    formData.transaction_type,
-                    formData.card_type,
-                    formData.sent_to,
-                    val,
-                    formData.customer_mode,
-                    customerValue
-                  );
-                }}
+              <button
+                type="button"
+                onClick={() => handleOpenOrderModal("banks", "Bank Credit Cards", banks)}
+                className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors px-1 py-0.5 rounded hover:bg-muted/50"
+                title="Reorder or change ranking mode"
               >
-                <SelectTrigger id="bank_name">
-                  <SelectValue placeholder="Select bank" />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  {banks.map((b) => (
-                    <SelectItem key={b.id} value={b.name}>
-                      {b.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <ArrowUpDown className="h-3 w-3" />
+                <span>Order</span>
+              </button>
             </div>
+            <Select
+              value={formData.bank_name}
+              onValueChange={(val) => {
+                if (val) {
+                  settingsService.recordDropdownSelection("banks", val);
+                }
+                setFormData((prev) => ({ ...prev, bank_name: val }));
+                applyLearningRecommendation(
+                  formData.transaction_type,
+                  formData.card_type,
+                  formData.sent_to,
+                  val,
+                  formData.customer_mode,
+                  customerValue
+                );
+              }}
+            >
+              <SelectTrigger id="bank_name">
+                <SelectValue placeholder="Select bank" />
+              </SelectTrigger>
+              <SelectContent className="max-h-60">
+                {banks.map((b) => (
+                  <SelectItem key={b.id} value={b.name}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* 5. Commission (%) & Site Fee (%) */}
@@ -946,13 +1063,28 @@ export const AddTransactionDialog = ({
 
           {/* 8. Sent to (Portals / Recipients) */}
           <div className="space-y-2">
-            <Label htmlFor="sent_to">Sent To</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="sent_to">Sent To</Label>
+              <button
+                type="button"
+                onClick={() => handleOpenOrderModal("recipients", "Sent To (Portals / Persons)", recipients)}
+                className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors px-1 py-0.5 rounded hover:bg-muted/50"
+                title="Reorder or change ranking mode"
+              >
+                <ArrowUpDown className="h-3 w-3" />
+                <span>Order</span>
+              </button>
+            </div>
             <Select
               value={formData.sent_to}
               onValueChange={(val) => {
-                const nextCust = val.trim().toLowerCase() !== "chummi" ? null : customerValue;
+                if (val) {
+                  settingsService.recordDropdownSelection("recipients", val);
+                }
+                const isSelfRecipient = ["self", "chummi"].includes(val.trim().toLowerCase());
+                const nextCust = !isSelfRecipient ? null : customerValue;
                 setFormData((prev) => ({ ...prev, sent_to: val }));
-                if (val.trim().toLowerCase() !== "chummi") {
+                if (!isSelfRecipient) {
                   setCustomerValue(null);
                 }
                 applyLearningRecommendation(
@@ -979,7 +1111,7 @@ export const AddTransactionDialog = ({
             </Select>
           </div>
 
-          {/* Conditional Customer Info for Chummi Portal */}
+          {/* Conditional Customer Info for Self Portal */}
           {isChummi && (
             <div className="animate-in fade-in slide-in-from-top-2 duration-200">
               <CustomerCombobox
@@ -1031,5 +1163,22 @@ export const AddTransactionDialog = ({
         </form>
       </DialogContent>
     </Dialog>
+
+    {/* Dropdown Order & Ranking Dialog */}
+    <ManageDropdownOrderDialog
+      open={orderModalOpen}
+      onOpenChange={setOrderModalOpen}
+      dropdownKey={orderModalKey}
+      title={orderModalTitle}
+      items={orderModalItems}
+      onApplied={() => {
+        setCardTypes(settingsService.getCardTypes());
+        setRecipients(settingsService.getRecipients());
+        setTxTypes(settingsService.getTransactionTypes());
+        setBanks(settingsService.getBanks());
+        setSites(settingsService.getSites());
+      }}
+    />
+  </>
   );
 };

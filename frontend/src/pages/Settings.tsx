@@ -47,6 +47,9 @@ import {
   BrainCircuit,
   Sliders,
   PieChart,
+  Globe,
+  Zap,
+  SlidersHorizontal,
   Eye,
   EyeOff,
   MessageCircle,
@@ -66,10 +69,12 @@ import {
   RecipientOption,
   TransactionTypeOption,
   BankOption,
+  SiteOption,
   WhatsAppSettings,
 } from "@/services/settingsService";
 import { whatsappService } from "@/services/whatsappService";
 import { ProfileSettings } from "@/components/settings/ProfileSettings";
+import { ManageDropdownOrderDialog } from "@/components/settings/ManageDropdownOrderDialog";
 
 const COLOR_PRESETS = [
   { name: "Blue", class: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800" },
@@ -120,6 +125,53 @@ const Settings = () => {
   const [bankModalOpen, setBankModalOpen] = useState(false);
   const [editingBank, setEditingBank] = useState<BankOption | null>(null);
   const [bankName, setBankName] = useState("");
+
+  // Site Modals
+  const [siteModalOpen, setSiteModalOpen] = useState(false);
+  const [editingSite, setEditingSite] = useState<SiteOption | null>(null);
+  const [siteName, setSiteName] = useState("");
+
+  // Dropdown Order Management Dialog State
+  const [orderModalOpen, setOrderModalOpen] = useState(false);
+  const [orderModalKey, setOrderModalKey] = useState<string>("");
+  const [orderModalTitle, setOrderModalTitle] = useState<string>("");
+  const [orderModalItems, setOrderModalItems] = useState<any[]>([]);
+
+  const handleOpenOrderModal = (key: string, title: string, items: any[]) => {
+    setOrderModalKey(key);
+    setOrderModalTitle(title);
+    setOrderModalItems(items);
+    setOrderModalOpen(true);
+  };
+
+  const renderOrderModeBadge = (key: string) => {
+    const config = settings.dropdownOrdering?.[key];
+    const isAuto = config?.mode === "automatic";
+    return (
+      <Badge
+        variant="outline"
+        onClick={() => {
+          const nextMode = isAuto ? "manual" : "automatic";
+          settingsService.setDropdownOrderingConfig(key, { mode: nextMode });
+          toast({
+            title: nextMode === "automatic" ? "Automatic Ordering Enabled" : "Manual Ordering Enabled",
+            description:
+              nextMode === "automatic"
+                ? "Most used items will automatically stay on top forever."
+                : "Options will display according to your manual custom sequence.",
+          });
+        }}
+        className={`text-[10px] px-2 py-0.5 gap-1 font-semibold cursor-pointer select-none transition-all hover:scale-105 active:scale-95 ${isAuto
+          ? "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
+          : "bg-muted/60 text-muted-foreground border-border hover:bg-muted"
+          }`}
+        title={`Click to switch to ${isAuto ? "Manual Drag & Drop" : "Automatic"} mode`}
+      >
+        {isAuto ? <Zap className="h-2.5 w-2.5 fill-current" /> : <SlidersHorizontal className="h-2.5 w-2.5" />}
+        <span>{isAuto ? "Auto" : "Manual Order"}</span>
+      </Badge>
+    );
+  };
 
   // Reset dialog
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
@@ -297,6 +349,23 @@ const Settings = () => {
     setBankName("");
   };
 
+  // --- Site Handlers ---
+  const handleSaveSite = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!siteName.trim()) return;
+
+    if (editingSite) {
+      settingsService.updateSite(editingSite.id, siteName.trim());
+      toast({ title: "Updated", description: `Site "${siteName}" updated` });
+    } else {
+      settingsService.addSite(siteName.trim());
+      toast({ title: "Added", description: `Site "${siteName}" added to Sites dropdown` });
+    }
+    setSiteModalOpen(false);
+    setEditingSite(null);
+    setSiteName("");
+  };
+
   // --- Reset Handlers ---
   const handleResetDefaults = () => {
     settingsService.resetToDefaults();
@@ -407,19 +476,37 @@ const Settings = () => {
                     Categories available when adding or filtering expenses
                   </CardDescription>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setEditingCategory(null);
-                    setCategoryName("");
-                    setCategoryColor(COLOR_PRESETS[0].class);
-                    setCategoryModalOpen(true);
-                  }}
-                  className="h-8 text-xs gap-1 self-start sm:self-auto"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add Category
-                </Button>
+                <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+                  {renderOrderModeBadge("expenseCategories")}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      handleOpenOrderModal(
+                        "expenseCategories",
+                        "Expense Categories",
+                        settings.expenseCategories
+                      )
+                    }
+                    className="h-8 text-xs gap-1"
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                    Order & Ranking
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setEditingCategory(null);
+                      setCategoryName("");
+                      setCategoryColor(COLOR_PRESETS[0].class);
+                      setCategoryModalOpen(true);
+                    }}
+                    className="h-8 text-xs gap-1"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add Category
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -495,18 +582,36 @@ const Settings = () => {
                     Options for who transactions are sent to (Upender, Chummi, etc.)
                   </CardDescription>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setEditingRecipient(null);
-                    setRecipientName("");
-                    setRecipientModalOpen(true);
-                  }}
-                  className="h-8 text-xs gap-1 self-start sm:self-auto"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add Recipient
-                </Button>
+                <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+                  {renderOrderModeBadge("recipients")}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      handleOpenOrderModal(
+                        "recipients",
+                        "Sent To (Portals / Persons)",
+                        settings.transactionRecipients
+                      )
+                    }
+                    className="h-8 text-xs gap-1"
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                    Order & Ranking
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setEditingRecipient(null);
+                      setRecipientName("");
+                      setRecipientModalOpen(true);
+                    }}
+                    className="h-8 text-xs gap-1"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add Recipient
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -572,7 +677,23 @@ const Settings = () => {
                     Configure available credit card issuing banks (HDFC, SBI Card, ICICI, Axis, Kotak, etc.)
                   </CardDescription>
                 </div>
-                <div className="flex items-center gap-2 self-start sm:self-auto">
+                <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+                  {renderOrderModeBadge("banks")}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      handleOpenOrderModal(
+                        "banks",
+                        "Bank Credit Cards",
+                        settings.banks || []
+                      )
+                    }
+                    className="h-8 text-xs gap-1"
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                    Order & Ranking
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -640,6 +761,116 @@ const Settings = () => {
                             }
                             settingsService.deleteBank(bank.id);
                             toast({ title: "Deleted", description: `"${bank.name}" removed` });
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Sites Dropdown Card */}
+            <Card className="border shadow-sm">
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3">
+                <div className="space-y-0.5">
+                  <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                    <Globe className="h-4 w-4 text-primary shrink-0" />
+                    <span>Sites Dropdown</span>
+                    <span className="text-xs font-normal text-muted-foreground ml-1">
+                      ({(settings.sites || []).length} available)
+                    </span>
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Configure payment platforms and site options for the Add Transaction dialog (e.g. Finkeda, Indyapay, BankPay...)
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {renderOrderModeBadge("sites")}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      handleOpenOrderModal(
+                        "sites",
+                        "Sites Dropdown",
+                        settings.sites || []
+                      )
+                    }
+                    className="h-8 text-xs gap-1"
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                    Order & Ranking
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      settingsService.resetSites();
+                      toast({ title: "Restored", description: "Sites reset to standard site presets." });
+                    }}
+                    className="h-8 text-xs gap-1"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Reset
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setEditingSite(null);
+                      setSiteName("");
+                      setSiteModalOpen(true);
+                    }}
+                    className="h-8 text-xs gap-1"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add Site
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {(settings.sites || []).map((site) => (
+                    <div
+                      key={site.id}
+                      className="flex items-center justify-between p-3 rounded-xl border bg-card hover:bg-muted/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 min-w-0 pr-2">
+                        <span className="text-sm font-semibold truncate">{site.name}</span>
+                        {site.isDefault && (
+                          <span className="text-[10px] text-muted-foreground uppercase font-medium shrink-0 bg-muted/80 px-1.5 py-0.5 rounded">Default</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          onClick={() => {
+                            setEditingSite(site);
+                            setSiteName(site.name);
+                            setSiteModalOpen(true);
+                          }}
+                        >
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive/70 hover:text-destructive"
+                          onClick={() => {
+                            if ((settings.sites || []).length <= 1) {
+                              toast({
+                                title: "Cannot Delete",
+                                description: "At least 1 site option is required",
+                                variant: "destructive",
+                              });
+                              return;
+                            }
+                            settingsService.deleteSite(site.id);
+                            toast({ title: "Deleted", description: `"${site.name}" removed` });
                           }}
                         >
                           <Trash2 className="h-3 w-3" />
@@ -760,9 +991,8 @@ const Settings = () => {
                               settingsService.setPortalHidden(portal.id, !checked);
                               toast({
                                 title: checked ? "Portal Visible" : "Portal Hidden",
-                                description: `"${portal.name}" is now ${
-                                  checked ? "visible in" : "hidden from"
-                                } the Portal Comparison Chart.`,
+                                description: `"${portal.name}" is now ${checked ? "visible in" : "hidden from"
+                                  } the Portal Comparison Chart.`,
                               });
                             }}
                             aria-label={`Toggle visibility of ${portal.name}`}
@@ -787,7 +1017,23 @@ const Settings = () => {
                     Card types available for credit card transactions
                   </CardDescription>
                 </div>
-                <div className="flex items-center gap-2 self-start sm:self-auto">
+                <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+                  {renderOrderModeBadge("cardTypes")}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      handleOpenOrderModal(
+                        "cardTypes",
+                        "Card Types",
+                        settings.transactionCardTypes
+                      )
+                    }
+                    className="h-8 text-xs gap-1"
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                    Order & Ranking
+                  </Button>
                   <Button
                     size="sm"
                     onClick={() => {
@@ -861,18 +1107,36 @@ const Settings = () => {
                     Types available (Withdrawal, Repayment, etc.)
                   </CardDescription>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setEditingTxType(null);
-                    setTxTypeLabel("");
-                    setTransactionTypeModalOpen(true);
-                  }}
-                  className="h-8 text-xs gap-1 self-start sm:self-auto"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add Type
-                </Button>
+                <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+                  {renderOrderModeBadge("transactionTypes")}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      handleOpenOrderModal(
+                        "transactionTypes",
+                        "Transaction Types",
+                        settings.transactionTypes
+                      )
+                    }
+                    className="h-8 text-xs gap-1"
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                    Order & Ranking
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setEditingTxType(null);
+                      setTxTypeLabel("");
+                      setTransactionTypeModalOpen(true);
+                    }}
+                    className="h-8 text-xs gap-1"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add Type
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1196,9 +1460,8 @@ For any queries, feel free to reach out!
                     key={p.name}
                     type="button"
                     onClick={() => setCategoryColor(p.class)}
-                    className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all text-center truncate ${p.class} ${
-                      categoryColor === p.class ? "ring-2 ring-primary ring-offset-1 font-bold" : "opacity-70 hover:opacity-100"
-                    }`}
+                    className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all text-center truncate ${p.class} ${categoryColor === p.class ? "ring-2 ring-primary ring-offset-1 font-bold" : "opacity-70 hover:opacity-100"
+                      }`}
                   >
                     {p.name}
                   </button>
@@ -1274,6 +1537,37 @@ For any queries, feel free to reach out!
               </Button>
               <Button type="submit" size="sm">
                 Save Bank
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Site Modal */}
+      <Dialog open={siteModalOpen} onOpenChange={setSiteModalOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>{editingSite ? "Edit Site" : "Add Site"}</DialogTitle>
+            <DialogDescription>Add or update a site platform in the Sites dropdown</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSaveSite} className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="site-input-name" className="text-xs font-semibold">Site Name *</Label>
+              <Input
+                id="site-input-name"
+                placeholder="e.g. Finkeda, Indyapay, BankPay..."
+                value={siteName}
+                onChange={(e) => setSiteName(e.target.value)}
+                required
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button type="button" variant="outline" size="sm" onClick={() => setSiteModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" size="sm">
+                Save Site
               </Button>
             </div>
           </form>
@@ -1363,6 +1657,18 @@ For any queries, feel free to reach out!
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dropdown Order & Ranking Dialog */}
+      <ManageDropdownOrderDialog
+        open={orderModalOpen}
+        onOpenChange={setOrderModalOpen}
+        dropdownKey={orderModalKey}
+        title={orderModalTitle}
+        items={orderModalItems}
+        onApplied={() => {
+          setSettings(settingsService.getSettings());
+        }}
+      />
     </DashboardLayout>
   );
 };

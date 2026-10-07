@@ -8,6 +8,8 @@ export interface ExportTransaction {
   card_type: string | null;
   customer_mode?: string | null;
   bank_name?: string | null;
+  site_name?: string | null;
+  notes?: string | null;
   amount: number;
   commission: number;
   site_fee: number;
@@ -15,6 +17,15 @@ export interface ExportTransaction {
   reference_number?: string | null;
   status?: string;
 }
+
+const getTxSite = (t: ExportTransaction): string => {
+  if (t.site_name) return t.site_name;
+  if (t.notes) {
+    const match = t.notes.match(/Site:\s*([^|]+)/i);
+    if (match) return match[1].trim();
+  }
+  return "-";
+};
 
 const formatDate = (dateStr: string): string => {
   const d = new Date(dateStr);
@@ -50,6 +61,7 @@ export const exportTransactionsToCSV = (
     "Date & Time",
     "Portal",
     "Customer Mode",
+    "Site",
     "Type",
     "Card Type",
     "Bank",
@@ -71,6 +83,7 @@ export const exportTransactionsToCSV = (
       escapeCSV(formatDate(t.transaction_date)),
       escapeCSV(t.portals?.name || "General"),
       escapeCSV(t.customer_mode || "Offline"),
+      escapeCSV(getTxSite(t)),
       escapeCSV(t.transaction_type || "Withdrawal"),
       escapeCSV(t.card_type ? getCardTypeDisplayName(t.card_type as CardType) : "-"),
       escapeCSV(t.bank_name || "-"),
@@ -140,6 +153,7 @@ export const exportTransactionsToExcel = (
       "Date & Time": formatDate(t.transaction_date),
       Portal: t.portals?.name || "General",
       "Customer Mode": t.customer_mode || "Offline",
+      Site: getTxSite(t),
       Type: t.transaction_type || "Withdrawal",
       "Card Type": t.card_type ? getCardTypeDisplayName(t.card_type as CardType) : "-",
       Bank: t.bank_name || "-",
