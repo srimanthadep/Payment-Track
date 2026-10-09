@@ -405,7 +405,7 @@ export type Database = {
           imps_charges?: number | null
           notes?: string | null
           portal_id: string
-          profit?: number | null
+          profit?: never
           site_fee?: number | null
           site_fee_percent?: number | null
           site_name?: string | null
@@ -430,7 +430,7 @@ export type Database = {
           imps_charges?: number | null
           notes?: string | null
           portal_id?: string
-          profit?: number | null
+          profit?: never
           site_fee?: number | null
           site_fee_percent?: number | null
           site_name?: string | null

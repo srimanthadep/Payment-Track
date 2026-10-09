@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Calendar as CalendarIcon, ArrowUpDown } from "lucide-react";
+import { Loader2, Calendar as CalendarIcon, ArrowUpDown, TrendingUp, TrendingDown, SlidersHorizontal } from "lucide-react";
 import { AiIcon } from "@/components/icons/AiIcon";
 import { format, isToday } from "date-fns";
 import {
@@ -492,7 +492,6 @@ export const AddTransactionDialog = ({
       site_fee: siteFeeAmount,
       site_fee_percent: parseFloat(formData.site_fee_percent) || 0,
       imps_charges: impsChargesAmount,
-      profit: profit,
       transaction_date: formData.transaction_date.toISOString(),
       customer_id: customerId,
       customer_name: customerName,
@@ -515,139 +514,146 @@ export const AddTransactionDialog = ({
       });
     } else {
       const addedDate = formData.transaction_date;
-      // Ingest newly added transaction into learning engine immediately
-      transactionLearningService.recordNewTransaction({
-        card_type: formData.card_type,
-        transaction_type: formData.transaction_type,
-        sent_to: formData.sent_to,
-        bank_name: formData.bank_name,
-        customer_mode: formData.customer_mode,
-        customer_name: customerName || undefined,
-        customer_id: customerId || undefined,
-        amount: parseFloat(formData.amount),
-        commission_percent: parseFloat(formData.commission_percent) || 0,
-        site_fee_percent: parseFloat(formData.site_fee_percent) || 0,
-        imps_charges: impsChargesAmount,
-        transaction_date: formData.transaction_date,
-      });
 
-      // Track prediction outcome for every transaction (fire-and-forget)
-      const actualComm = parseFloat(formData.commission_percent) || 0;
-      const actualFee = parseFloat(formData.site_fee_percent) || 0;
-      const hasPrediction = Boolean(aiPredictedValues && aiPredictedValues.source !== "none");
-      const predictedComm = hasPrediction ? aiPredictedValues?.commission ?? 0 : actualComm;
-      const predictedFee = hasPrediction ? aiPredictedValues?.siteFee ?? 0 : actualFee;
-      const commAccepted = hasPrediction ? Math.abs(actualComm - predictedComm) < 0.01 : true;
-      const feeAccepted = hasPrediction ? Math.abs(actualFee - predictedFee) < 0.01 : true;
-
-      predictionTrackingService.recordPrediction({
-        transactionId,
-        amount: parseFloat(formData.amount) || 0,
-        profit,
-        customerName: customerName || undefined,
-        customerPhone: customerPhone || undefined,
-        portalName: formData.sent_to,
-        notes: notesStr,
-        commissionAccepted: commAccepted,
-        siteFeeAccepted: feeAccepted,
-        predictedCommission: predictedComm,
-        predictedSiteFee: predictedFee,
-        actualCommission: actualComm,
-        actualSiteFee: actualFee,
-        predictionSource: hasPrediction ? aiPredictedValues!.source : "none",
-        predictionConfidence: hasPrediction ? aiPredictedValues!.confidence : 0,
-        cardType: formData.card_type,
-        transactionType: formData.transaction_type,
-        sentTo: formData.sent_to,
-        bankName: formData.bank_name || undefined,
-        customerMode: formData.customer_mode,
-      }).catch(() => {
-        // Silent — tracking should never break the main flow
-      });
-
-      // Closed-loop active learning: immediately penalize rejected prediction in-memory
-      if (hasPrediction && (!commAccepted || !feeAccepted)) {
-        transactionLearningService.recordOverrideFeedback({
-          cardType: formData.card_type,
-          transactionType: formData.transaction_type,
-          sentTo: formData.sent_to,
-          bankName: formData.bank_name || undefined,
-          customerMode: formData.customer_mode,
-          actualCommission: actualComm,
-          actualSiteFee: actualFee,
-          predictedCommission: predictedComm,
-          predictedSiteFee: predictedFee,
-          timestamp: Date.now(),
-        });
-      }
-
-      const commPct = parseFloat(formData.commission_percent) || 0;
-      const feePct = parseFloat(formData.site_fee_percent) || 0;
-      activityLogService.log(
-        "transaction.created",
-        "transaction",
-        `Added ${formData.transaction_type} of ₹${parseFloat(formData.amount).toLocaleString("en-IN")} to ${formData.sent_to} (${formData.card_type}, ${formData.customer_mode}${formData.site_name ? `, Site: ${formData.site_name}` : ""}${formData.bank_name ? `, Bank: ${formData.bank_name}` : ""}${commPct ? `, Commission: ${commPct}%` : ""}${feePct ? `, Site Fee: ${feePct}%` : ""}${isChummi && formData.customer_name.trim() ? `, Customer: ${formData.customer_name.trim()}` : ""})`,
-        {
-          amount: parseFloat(formData.amount),
-          card_type: formData.card_type,
-          transaction_type: formData.transaction_type,
-          sent_to: formData.sent_to,
-          customer_mode: formData.customer_mode,
-          bank_name: formData.bank_name,
-          site_name: formData.site_name,
-          commission_percent: commPct,
-          site_fee_percent: feePct,
-          customer_name: isChummi ? formData.customer_name.trim() || null : null,
-          customer_phone: isChummi ? formData.customer_phone.trim() || null : null,
-        }
-      );
-
-      // Track dropdown selections for confirmed transaction
-      if (formData.sent_to) settingsService.recordDropdownSelection("recipients", formData.sent_to);
-      if (formData.site_name) settingsService.recordDropdownSelection("sites", formData.site_name);
-      if (formData.bank_name) settingsService.recordDropdownSelection("banks", formData.bank_name);
-      if (formData.card_type) settingsService.recordDropdownSelection("cardTypes", formData.card_type);
-      if (formData.transaction_type) settingsService.recordDropdownSelection("transactionTypes", formData.transaction_type);
+      // Close dialog, reset form, and notify parent IMMEDIATELY
+      resetForm();
+      onOpenChange(false);
+      onSuccess?.(addedDate);
 
       toast({
         title: "Success",
         description: "Transaction added successfully",
       });
 
-      // Fire-and-forget WhatsApp receipt if customer has a phone number
-      const receiptPhone = customerPhone ? formatPhoneForWhatsApp(customerPhone) : null;
-      const waSettings = (settingsService.getSettings() as any).whatsapp;
-      const waEnabled = waSettings?.enabled !== false;
-
-      if (receiptPhone && waEnabled && customerName) {
-        whatsappService.sendReceipt({
-          customerName,
-          phone: customerPhone!,
-          userId,
-          customerId: customerId || undefined,
-          transaction: {
-            amount: parseFloat(formData.amount),
-            portalName: formData.sent_to,
-            transactionDate: formData.transaction_date.toISOString(),
-            transactionType: formData.transaction_type,
-            commission: commissionAmount,
-            cardType: formData.card_type,
-          },
-        }).then((result) => {
-          if (result.success) {
-            toast({
-              title: "WhatsApp ✅",
-              description: `Receipt sent to ${customerName} on WhatsApp`,
-            });
-          }
-        }).catch(() => {
-          // Silent — transaction was already saved
+      // Execute background logging and tracking safely without blocking UI
+      try {
+        // Ingest newly added transaction into learning engine immediately
+        transactionLearningService.recordNewTransaction({
+          card_type: formData.card_type,
+          transaction_type: formData.transaction_type,
+          sent_to: formData.sent_to,
+          bank_name: formData.bank_name,
+          customer_mode: formData.customer_mode,
+          customer_name: customerName || undefined,
+          customer_id: customerId || undefined,
+          amount: parseFloat(formData.amount),
+          commission_percent: parseFloat(formData.commission_percent) || 0,
+          site_fee_percent: parseFloat(formData.site_fee_percent) || 0,
+          imps_charges: impsChargesAmount,
+          transaction_date: formData.transaction_date,
         });
-      }
 
-      resetForm();
-      onOpenChange(false);
-      onSuccess?.(addedDate);
+        // Track prediction outcome for every transaction (fire-and-forget)
+        const actualComm = parseFloat(formData.commission_percent) || 0;
+        const actualFee = parseFloat(formData.site_fee_percent) || 0;
+        const hasPrediction = Boolean(aiPredictedValues && aiPredictedValues.source !== "none");
+        const predictedComm = hasPrediction ? aiPredictedValues?.commission ?? 0 : actualComm;
+        const predictedFee = hasPrediction ? aiPredictedValues?.siteFee ?? 0 : actualFee;
+        const commAccepted = hasPrediction ? Math.abs(actualComm - predictedComm) < 0.01 : true;
+        const feeAccepted = hasPrediction ? Math.abs(actualFee - predictedFee) < 0.01 : true;
+
+        predictionTrackingService.recordPrediction({
+          transactionId,
+          amount: parseFloat(formData.amount) || 0,
+          profit,
+          customerName: customerName || undefined,
+          customerPhone: customerPhone || undefined,
+          portalName: formData.sent_to,
+          notes: notesStr,
+          commissionAccepted: commAccepted,
+          siteFeeAccepted: feeAccepted,
+          predictedCommission: predictedComm,
+          predictedSiteFee: predictedFee,
+          actualCommission: actualComm,
+          actualSiteFee: actualFee,
+          predictionSource: hasPrediction ? aiPredictedValues!.source : "none",
+          predictionConfidence: hasPrediction ? aiPredictedValues!.confidence : 0,
+          cardType: formData.card_type,
+          transactionType: formData.transaction_type,
+          sentTo: formData.sent_to,
+          bankName: formData.bank_name || undefined,
+          customerMode: formData.customer_mode,
+        }).catch(() => {
+          // Silent — tracking should never break the main flow
+        });
+
+        // Closed-loop active learning: immediately penalize rejected prediction in-memory
+        if (hasPrediction && (!commAccepted || !feeAccepted)) {
+          transactionLearningService.recordOverrideFeedback({
+            cardType: formData.card_type,
+            transactionType: formData.transaction_type,
+            sentTo: formData.sent_to,
+            bankName: formData.bank_name || undefined,
+            customerMode: formData.customer_mode,
+            actualCommission: actualComm,
+            actualSiteFee: actualFee,
+            predictedCommission: predictedComm,
+            predictedSiteFee: predictedFee,
+            timestamp: Date.now(),
+          });
+        }
+
+        const commPct = parseFloat(formData.commission_percent) || 0;
+        const feePct = parseFloat(formData.site_fee_percent) || 0;
+        activityLogService.log(
+          "transaction.created",
+          "transaction",
+          `Added ${formData.transaction_type} of ₹${parseFloat(formData.amount).toLocaleString("en-IN")} to ${formData.sent_to} (${formData.card_type}, ${formData.customer_mode}${formData.site_name ? `, Site: ${formData.site_name}` : ""}${formData.bank_name ? `, Bank: ${formData.bank_name}` : ""}${commPct ? `, Commission: ${commPct}%` : ""}${feePct ? `, Site Fee: ${feePct}%` : ""}${customerName ? `, Customer: ${customerName}` : ""})`,
+          {
+            amount: parseFloat(formData.amount),
+            card_type: formData.card_type,
+            transaction_type: formData.transaction_type,
+            sent_to: formData.sent_to,
+            customer_mode: formData.customer_mode,
+            bank_name: formData.bank_name,
+            site_name: formData.site_name,
+            commission_percent: commPct,
+            site_fee_percent: feePct,
+            customer_name: customerName,
+            customer_phone: customerPhone,
+          }
+        );
+
+        // Track dropdown selections for confirmed transaction
+        if (formData.sent_to) settingsService.recordDropdownSelection("recipients", formData.sent_to);
+        if (formData.site_name) settingsService.recordDropdownSelection("sites", formData.site_name);
+        if (formData.bank_name) settingsService.recordDropdownSelection("banks", formData.bank_name);
+        if (formData.card_type) settingsService.recordDropdownSelection("cardTypes", formData.card_type);
+        if (formData.transaction_type) settingsService.recordDropdownSelection("transactionTypes", formData.transaction_type);
+
+        // Fire-and-forget WhatsApp receipt if customer has a phone number
+        const receiptPhone = customerPhone ? formatPhoneForWhatsApp(customerPhone) : null;
+        const waSettings = (settingsService.getSettings() as any).whatsapp;
+        const waEnabled = waSettings?.enabled !== false;
+
+        if (receiptPhone && waEnabled && customerName) {
+          whatsappService.sendReceipt({
+            customerName,
+            phone: customerPhone!,
+            userId,
+            customerId: customerId || undefined,
+            transaction: {
+              amount: parseFloat(formData.amount),
+              portalName: formData.sent_to,
+              transactionDate: formData.transaction_date.toISOString(),
+              transactionType: formData.transaction_type,
+              commission: commissionAmount,
+              cardType: formData.card_type,
+            },
+          }).then((result) => {
+            if (result.success) {
+              toast({
+                title: "WhatsApp ✅",
+                description: `Receipt sent to ${customerName} on WhatsApp`,
+              });
+            }
+          }).catch(() => {
+            // Silent — transaction was already saved
+          });
+        }
+      } catch (postErr) {
+        console.warn("Post-transaction processing error (non-fatal):", postErr);
+      }
     }
   };
 
@@ -1035,14 +1041,16 @@ export const AddTransactionDialog = ({
             </Select>
           </div>
 
-          {/* 5. Commission (%), Site Fee (%) & IMPS/NEFT Charges (₹) */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-3.5">
-            <div className="space-y-1.5 sm:space-y-2">
+          {/* 5. Commission (%), Site Fee (%) & IMPS/NEFT Charges (₹) - Single row on all devices */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <div className="space-y-1 sm:space-y-1.5 min-w-0">
               <Label
                 htmlFor="commission_percent"
-                className="text-xs sm:text-sm font-medium truncate block"
+                className="text-[11px] sm:text-xs font-semibold text-foreground/90 truncate block"
+                title="Commission (%)"
               >
-                Commission (%)
+                <span className="sm:hidden">Comm %</span>
+                <span className="hidden sm:inline">Commission (%)</span>
               </Label>
               <div className="relative">
                 <Input
@@ -1051,12 +1059,12 @@ export const AddTransactionDialog = ({
                   step="0.01"
                   min="0"
                   max="100"
-                  placeholder="e.g. 2.0"
-                  className={
+                  placeholder="2.0"
+                  className={`h-9 sm:h-10 px-2 sm:px-3 text-xs sm:text-sm font-medium rounded-lg sm:rounded-xl ${
                     isCommissionAutoLearned
-                      ? "border-primary/40 bg-primary/[0.02] pr-8"
+                      ? "border-primary/50 bg-primary/[0.03] pr-6 sm:pr-8"
                       : ""
-                  }
+                  }`}
                   value={formData.commission_percent}
                   onChange={(e) => {
                     setIsCommissionManual(true);
@@ -1068,21 +1076,24 @@ export const AddTransactionDialog = ({
                 />
                 {isCommissionAutoLearned && (
                   <div
-                    className="absolute right-2.5 inset-y-0 flex items-center justify-center pointer-events-none transition-opacity duration-300 animate-in fade-in -translate-y-[1px]"
+                    className="absolute right-1.5 sm:right-2.5 inset-y-0 flex items-center justify-center pointer-events-none transition-opacity duration-300 animate-in fade-in"
                     title={recommendationInfo?.explanation || "AI Auto-learned"}
                   >
-                    <AiIcon className="h-4 w-4 animate-pulse block" />
+                    <AiIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-pulse block" />
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="space-y-1.5 sm:space-y-2">
+            <div className="space-y-1 sm:space-y-1.5 min-w-0">
               <Label
                 htmlFor="site_fee_percent"
-                className="text-xs sm:text-sm font-medium truncate block"
+                className="text-[11px] sm:text-xs font-semibold text-foreground/90 truncate block"
+                title="Site Fee (%) (Optional)"
               >
-                Site Fee (%) <span className="text-[10px] font-normal text-muted-foreground"><span className="hidden sm:inline">(Optional)</span><span className="sm:hidden">(Opt)</span></span>
+                <span className="sm:hidden">Fee %</span>
+                <span className="hidden sm:inline">Site Fee (%)</span>{" "}
+                <span className="text-[9px] sm:text-[10px] font-normal text-muted-foreground">(Opt)</span>
               </Label>
               <div className="relative">
                 <Input
@@ -1091,12 +1102,12 @@ export const AddTransactionDialog = ({
                   step="0.01"
                   min="0"
                   max="100"
-                  placeholder="e.g. 0.5"
-                  className={
+                  placeholder="0.5"
+                  className={`h-9 sm:h-10 px-2 sm:px-3 text-xs sm:text-sm font-medium rounded-lg sm:rounded-xl ${
                     isSiteFeeAutoLearned
-                      ? "border-primary/40 bg-primary/[0.02] pr-8"
+                      ? "border-primary/50 bg-primary/[0.03] pr-6 sm:pr-8"
                       : ""
-                  }
+                  }`}
                   value={formData.site_fee_percent}
                   onChange={(e) => {
                     setIsSiteFeeManual(true);
@@ -1108,21 +1119,24 @@ export const AddTransactionDialog = ({
                 />
                 {isSiteFeeAutoLearned && (
                   <div
-                    className="absolute right-2.5 inset-y-0 flex items-center justify-center pointer-events-none transition-opacity duration-300 animate-in fade-in -translate-y-[1px]"
+                    className="absolute right-1.5 sm:right-2.5 inset-y-0 flex items-center justify-center pointer-events-none transition-opacity duration-300 animate-in fade-in"
                     title={recommendationInfo?.explanation || "AI Auto-learned"}
                   >
-                    <AiIcon className="h-4 w-4 animate-pulse block" />
+                    <AiIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-pulse block" />
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="space-y-1.5 sm:space-y-2">
+            <div className="space-y-1 sm:space-y-1.5 min-w-0">
               <Label
                 htmlFor="imps_charges"
-                className="text-xs sm:text-sm font-medium truncate block"
+                className="text-[11px] sm:text-xs font-semibold text-foreground/90 truncate block"
+                title="IMPS / NEFT (₹) (Optional)"
               >
-                IMPS / NEFT (₹) <span className="text-[10px] font-normal text-muted-foreground"><span className="hidden sm:inline">(Optional)</span><span className="sm:hidden">(Opt)</span></span>
+                <span className="sm:hidden">IMPS ₹</span>
+                <span className="hidden sm:inline">IMPS/NEFT (₹)</span>{" "}
+                <span className="text-[9px] sm:text-[10px] font-normal text-muted-foreground">(Opt)</span>
               </Label>
               <div className="relative">
                 <Input
@@ -1130,12 +1144,12 @@ export const AddTransactionDialog = ({
                   type="number"
                   step="0.01"
                   min="0"
-                  placeholder="e.g. 5"
-                  className={
+                  placeholder="0"
+                  className={`h-9 sm:h-10 px-2 sm:px-3 text-xs sm:text-sm font-medium rounded-lg sm:rounded-xl ${
                     isImpsAutoLearned
-                      ? "border-primary/40 bg-primary/[0.02] pr-8"
+                      ? "border-primary/50 bg-primary/[0.03] pr-6 sm:pr-8"
                       : ""
-                  }
+                  }`}
                   value={formData.imps_charges}
                   onChange={(e) => {
                     setIsImpsManual(true);
@@ -1147,10 +1161,10 @@ export const AddTransactionDialog = ({
                 />
                 {isImpsAutoLearned && (
                   <div
-                    className="absolute right-2.5 inset-y-0 flex items-center justify-center pointer-events-none transition-opacity duration-300 animate-in fade-in -translate-y-[1px]"
+                    className="absolute right-1.5 sm:right-2.5 inset-y-0 flex items-center justify-center pointer-events-none transition-opacity duration-300 animate-in fade-in"
                     title={recommendationInfo?.explanation || "AI Auto-learned"}
                   >
-                    <AiIcon className="h-4 w-4 animate-pulse block" />
+                    <AiIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-pulse block" />
                   </div>
                 )}
               </div>
@@ -1159,55 +1173,86 @@ export const AddTransactionDialog = ({
 
           {/* 6. Auto display profit when commission percentage is entered (hidden for staff) */}
           {!isStaff && hasEnteredCommission && (
-            <div className="rounded-lg border bg-muted/40 p-3 space-y-1.5">
-              <div className="flex justify-between items-center text-sm font-medium">
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">Estimated Profit</span>
-                  {recommendationInfo?.isVolumeAdjusted && (
-                    <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4.5 font-normal text-muted-foreground border-border/80">
-                      Volume-calibrated
-                    </Badge>
+            <div
+              className={`rounded-xl border p-2.5 sm:p-3 space-y-2 shadow-xs transition-all ${
+                profit >= 0
+                  ? "border-emerald-500/25 bg-emerald-500/[0.04] dark:bg-emerald-950/20"
+                  : "border-rose-500/25 bg-rose-500/[0.04] dark:bg-rose-950/20"
+              }`}
+            >
+              {/* Header: Title + Net Profit */}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs sm:text-sm font-bold text-foreground/90">
+                  Estimated Profit
+                </span>
+                <span
+                  className={`text-base sm:text-lg font-bold font-mono tracking-tight shrink-0 ${
+                    profit >= 0
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-rose-600 dark:text-rose-400"
+                  }`}
+                >
+                  ₹{profit.toFixed(2)}
+                </span>
+              </div>
+
+              {/* Badges: Volume Calibration & Margin (Dedicated wrap row with no text truncation) */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {recommendationInfo?.isVolumeAdjusted && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-medium bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/25 whitespace-nowrap shadow-2xs">
+                    <SlidersHorizontal className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-blue-500 shrink-0" />
+                    <span>Volume calibrated</span>
+                  </span>
+                )}
+                {(() => {
+                  const commP = parseFloat(formData.commission_percent) || 0;
+                  const feeP = parseFloat(formData.site_fee_percent) || 0;
+                  const netMargin = Math.round((commP - feeP) * 100) / 100;
+                  if (netMargin < 0) {
+                    return (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30 whitespace-nowrap animate-pulse shadow-2xs">
+                        <TrendingDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
+                        <span>Loss: {netMargin}%</span>
+                      </span>
+                    );
+                  } else if (netMargin < 0.25) {
+                    return (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-medium bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 whitespace-nowrap shadow-2xs">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                        <span>Low Margin: +{netMargin}%</span>
+                      </span>
+                    );
+                  }
+                  return (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 whitespace-nowrap shadow-2xs">
+                      <TrendingUp className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
+                      <span>Margin: +{netMargin}%</span>
+                    </span>
+                  );
+                })()}
+              </div>
+
+              {/* Bottom Breakdown: 3 symmetrical columns matching the inputs above */}
+              <div className="grid grid-cols-3 gap-1 pt-1.5 border-t border-border/50 text-[10px] sm:text-xs">
+                <div className="text-muted-foreground truncate">
+                  <span>Comm: </span>
+                  <span className="font-semibold text-foreground/90">₹{commissionAmount.toFixed(2)}</span>
+                </div>
+                <div className="text-muted-foreground text-center truncate">
+                  <span>Fee: </span>
+                  <span className="font-semibold text-foreground/90">₹{siteFeeAmount.toFixed(2)}</span>
+                </div>
+                <div className="text-right truncate">
+                  {impsChargesAmount > 0 ? (
+                    <span className="text-rose-600 dark:text-rose-400 font-semibold">
+                      IMPS: -₹{impsChargesAmount.toFixed(2)}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground/60">
+                      IMPS: ₹0.00
+                    </span>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  {(() => {
-                    const commP = parseFloat(formData.commission_percent) || 0;
-                    const feeP = parseFloat(formData.site_fee_percent) || 0;
-                    const netMargin = Math.round((commP - feeP) * 100) / 100;
-                    if (netMargin < 0) {
-                      return (
-                        <Badge variant="destructive" className="text-[10px] py-0 px-1.5 h-4.5 animate-pulse font-semibold">
-                          Loss: {netMargin}%
-                        </Badge>
-                      );
-                    } else if (netMargin < 0.25) {
-                      return (
-                        <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 font-medium">
-                          Low Margin: +{netMargin}%
-                        </Badge>
-                      );
-                    }
-                    return (
-                      <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 font-semibold">
-                        Margin: +{netMargin}%
-                      </Badge>
-                    );
-                  })()}
-                  <span
-                    className={`text-base font-bold ${
-                      profit >= 0 ? "text-emerald-600" : "text-red-600"
-                    }`}
-                  >
-                    ₹{profit.toFixed(2)}
-                  </span>
-                </div>
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground pt-0.5 border-t border-border/50">
-                <span>Commission: ₹{commissionAmount.toFixed(2)}</span>
-                <span>Site Fee: ₹{siteFeeAmount.toFixed(2)}</span>
-                {impsChargesAmount > 0 && (
-                  <span className="text-rose-500 font-medium">IMPS/NEFT: -₹{impsChargesAmount.toFixed(2)}</span>
-                )}
               </div>
             </div>
           )}

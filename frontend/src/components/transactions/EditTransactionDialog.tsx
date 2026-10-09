@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Calendar as CalendarIcon } from "lucide-react";
+import { Loader2, Calendar as CalendarIcon, TrendingUp, TrendingDown } from "lucide-react";
 import { format, isToday } from "date-fns";
 import {
   calculateCommission,
@@ -443,7 +443,6 @@ export const EditTransactionDialog = ({
       site_fee: feeAmount,
       site_fee_percent: feePercent,
       imps_charges: impsAmount,
-      profit: profitAmount,
       transaction_date: formData.transaction_date.toISOString(),
       customer_id: customerId,
       customer_name: customerName,
@@ -469,54 +468,58 @@ export const EditTransactionDialog = ({
         variant: "destructive",
       });
     } else {
-      activityLogService.log(
-        "transaction.updated",
-        "transaction",
-        `Edited transaction — Amount: ₹${parseFloat(formData.amount).toLocaleString("en-IN")}, Type: ${formData.transaction_type}, Mode: ${formData.customer_mode}${formData.site_name ? `, Site: ${formData.site_name}` : ""}${formData.bank_name ? `, Bank: ${formData.bank_name}` : ""}${commPercent ? `, Commission: ${commPercent}%` : ""}${feePercent ? `, Site Fee: ${feePercent}%` : ""}${isChummi && customerName ? `, Customer: ${customerName}` : ""}`,
-        {
-          transaction_id: transaction.id,
-          old_amount: transaction.amount,
-          new_amount: parseFloat(formData.amount),
-          transaction_type: formData.transaction_type,
-          card_type: formData.card_type,
-          customer_mode: formData.customer_mode,
-          bank_name: formData.bank_name,
-          site_name: formData.site_name,
-          commission_percent: commPercent,
-          site_fee_percent: feePercent,
-          customer_name: isChummi ? customerName : null,
-          customer_phone: isChummi ? customerPhone : null,
-        }
-      );
-      // Update learning engine with edited transaction
-      transactionLearningService.recordNewTransaction({
-        id: transaction.id,
-        card_type: formData.card_type,
-        transaction_type: formData.transaction_type,
-        sent_to: selectedPortal?.name || "Portal",
-        bank_name: formData.bank_name,
-        customer_mode: formData.customer_mode,
-        customer_name: customerName || undefined,
-        customer_id: customerId || undefined,
-        amount: parseFloat(formData.amount),
-        commission_percent: commPercent,
-        site_fee_percent: feePercent,
-        imps_charges: impsAmount,
-        transaction_date: formData.transaction_date,
-      });
-
-      // Record dropdown selections for updated transaction
-      if (formData.site_name) settingsService.recordDropdownSelection("sites", formData.site_name);
-      if (formData.bank_name) settingsService.recordDropdownSelection("banks", formData.bank_name);
-      if (formData.card_type) settingsService.recordDropdownSelection("cardTypes", formData.card_type);
-      if (formData.transaction_type) settingsService.recordDropdownSelection("transactionTypes", formData.transaction_type);
-
       toast({
         title: "Success",
         description: "Transaction updated successfully",
       });
       onUpdated();
       onOpenChange(false);
+
+      try {
+        activityLogService.log(
+          "transaction.updated",
+          "transaction",
+          `Edited transaction — Amount: ₹${parseFloat(formData.amount).toLocaleString("en-IN")}, Type: ${formData.transaction_type}, Mode: ${formData.customer_mode}${formData.site_name ? `, Site: ${formData.site_name}` : ""}${formData.bank_name ? `, Bank: ${formData.bank_name}` : ""}${commPercent ? `, Commission: ${commPercent}%` : ""}${feePercent ? `, Site Fee: ${feePercent}%` : ""}${customerName ? `, Customer: ${customerName}` : ""}`,
+          {
+            transaction_id: transaction.id,
+            old_amount: transaction.amount,
+            new_amount: parseFloat(formData.amount),
+            transaction_type: formData.transaction_type,
+            card_type: formData.card_type,
+            customer_mode: formData.customer_mode,
+            bank_name: formData.bank_name,
+            site_name: formData.site_name,
+            commission_percent: commPercent,
+            site_fee_percent: feePercent,
+            customer_name: customerName,
+            customer_phone: customerPhone,
+          }
+        );
+        // Update learning engine with edited transaction
+        transactionLearningService.recordNewTransaction({
+          id: transaction.id,
+          card_type: formData.card_type,
+          transaction_type: formData.transaction_type,
+          sent_to: selectedPortal?.name || "Portal",
+          bank_name: formData.bank_name,
+          customer_mode: formData.customer_mode,
+          customer_name: customerName || undefined,
+          customer_id: customerId || undefined,
+          amount: parseFloat(formData.amount),
+          commission_percent: commPercent,
+          site_fee_percent: feePercent,
+          imps_charges: impsAmount,
+          transaction_date: formData.transaction_date,
+        });
+
+        // Record dropdown selections for updated transaction
+        if (formData.site_name) settingsService.recordDropdownSelection("sites", formData.site_name);
+        if (formData.bank_name) settingsService.recordDropdownSelection("banks", formData.bank_name);
+        if (formData.card_type) settingsService.recordDropdownSelection("cardTypes", formData.card_type);
+        if (formData.transaction_type) settingsService.recordDropdownSelection("transactionTypes", formData.transaction_type);
+      } catch (postErr) {
+        console.warn("Post-update processing error (non-fatal):", postErr);
+      }
     }
   };
 
@@ -772,14 +775,16 @@ export const EditTransactionDialog = ({
             </Select>
           </div>
 
-          {/* 4. Commission (%), Site Fee (%) & IMPS/NEFT Charges (₹) */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-            <div className="space-y-1.5 sm:space-y-2">
+          {/* 4. Commission (%), Site Fee (%) & IMPS/NEFT Charges (₹) - Single row on all devices */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <div className="space-y-1 sm:space-y-1.5 min-w-0">
               <Label
                 htmlFor="edit-commission_percent"
-                className="text-xs sm:text-sm font-medium truncate block"
+                className="text-[11px] sm:text-xs font-semibold text-foreground/90 truncate block"
+                title="Commission (%)"
               >
-                Commission (%)
+                <span className="sm:hidden">Comm %</span>
+                <span className="hidden sm:inline">Commission (%)</span>
               </Label>
               <Input
                 id="edit-commission_percent"
@@ -787,7 +792,8 @@ export const EditTransactionDialog = ({
                 step="0.01"
                 min="0"
                 max="100"
-                placeholder="e.g. 2.0"
+                placeholder="2.0"
+                className="h-9 sm:h-10 px-2 sm:px-3 text-xs sm:text-sm font-medium rounded-lg sm:rounded-xl"
                 value={formData.commission_percent}
                 onChange={(e) =>
                   setFormData({
@@ -799,12 +805,15 @@ export const EditTransactionDialog = ({
               />
             </div>
 
-            <div className="space-y-1.5 sm:space-y-2">
+            <div className="space-y-1 sm:space-y-1.5 min-w-0">
               <Label
                 htmlFor="edit-site_fee_percent"
-                className="text-xs sm:text-sm font-medium truncate block"
+                className="text-[11px] sm:text-xs font-semibold text-foreground/90 truncate block"
+                title="Site Fee (%) (Optional)"
               >
-                Site Fee (%) <span className="text-[10px] font-normal text-muted-foreground"><span className="hidden sm:inline">(Optional)</span><span className="sm:hidden">(Opt)</span></span>
+                <span className="sm:hidden">Fee %</span>
+                <span className="hidden sm:inline">Site Fee (%)</span>{" "}
+                <span className="text-[9px] sm:text-[10px] font-normal text-muted-foreground">(Opt)</span>
               </Label>
               <Input
                 id="edit-site_fee_percent"
@@ -812,7 +821,8 @@ export const EditTransactionDialog = ({
                 step="0.01"
                 min="0"
                 max="100"
-                placeholder="e.g. 0.5"
+                placeholder="0.5"
+                className="h-9 sm:h-10 px-2 sm:px-3 text-xs sm:text-sm font-medium rounded-lg sm:rounded-xl"
                 value={formData.site_fee_percent}
                 onChange={(e) =>
                   setFormData({
@@ -823,19 +833,23 @@ export const EditTransactionDialog = ({
               />
             </div>
 
-            <div className="space-y-1.5 sm:space-y-2">
+            <div className="space-y-1 sm:space-y-1.5 min-w-0">
               <Label
                 htmlFor="edit-imps_charges"
-                className="text-xs sm:text-sm font-medium truncate block"
+                className="text-[11px] sm:text-xs font-semibold text-foreground/90 truncate block"
+                title="IMPS / NEFT (₹) (Optional)"
               >
-                IMPS / NEFT (₹) <span className="text-[10px] font-normal text-muted-foreground"><span className="hidden sm:inline">(Optional)</span><span className="sm:hidden">(Opt)</span></span>
+                <span className="sm:hidden">IMPS ₹</span>
+                <span className="hidden sm:inline">IMPS/NEFT (₹)</span>{" "}
+                <span className="text-[9px] sm:text-[10px] font-normal text-muted-foreground">(Opt)</span>
               </Label>
               <Input
                 id="edit-imps_charges"
                 type="number"
                 step="0.01"
                 min="0"
-                placeholder="e.g. 5"
+                placeholder="0"
+                className="h-9 sm:h-10 px-2 sm:px-3 text-xs sm:text-sm font-medium rounded-lg sm:rounded-xl"
                 value={formData.imps_charges}
                 onChange={(e) =>
                   setFormData({
@@ -849,23 +863,80 @@ export const EditTransactionDialog = ({
 
           {/* 5. Estimated Profit summary box */}
           {hasEnteredCommission && (
-            <div className="rounded-lg border bg-muted/40 p-3 space-y-1.5">
-              <div className="flex justify-between items-center text-sm font-medium">
-                <span className="text-muted-foreground">Estimated Profit</span>
+            <div
+              className={`rounded-xl border p-2.5 sm:p-3 space-y-2 shadow-xs transition-all ${
+                profit >= 0
+                  ? "border-emerald-500/25 bg-emerald-500/[0.04] dark:bg-emerald-950/20"
+                  : "border-rose-500/25 bg-rose-500/[0.04] dark:bg-rose-950/20"
+              }`}
+            >
+              {/* Header: Title + Net Profit */}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs sm:text-sm font-bold text-foreground/90">
+                  Estimated Profit
+                </span>
                 <span
-                  className={`text-base font-bold ${
-                    profit >= 0 ? "text-emerald-600" : "text-red-600"
+                  className={`text-base sm:text-lg font-bold font-mono tracking-tight shrink-0 ${
+                    profit >= 0
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-rose-600 dark:text-rose-400"
                   }`}
                 >
                   ₹{profit.toFixed(2)}
                 </span>
               </div>
-              <div className="flex justify-between text-xs text-muted-foreground pt-0.5 border-t border-border/50">
-                <span>Commission: ₹{commissionAmount.toFixed(2)}</span>
-                <span>Site Fee: ₹{siteFeeAmount.toFixed(2)}</span>
-                {impsChargesAmount > 0 && (
-                  <span className="text-rose-500 font-medium">IMPS/NEFT: -₹{impsChargesAmount.toFixed(2)}</span>
-                )}
+
+              {/* Badges: Net Margin Pill */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {(() => {
+                  const commP = parseFloat(formData.commission_percent) || 0;
+                  const feeP = parseFloat(formData.site_fee_percent) || 0;
+                  const netMargin = Math.round((commP - feeP) * 100) / 100;
+                  if (netMargin < 0) {
+                    return (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30 whitespace-nowrap animate-pulse shadow-2xs">
+                        <TrendingDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
+                        <span>Loss: {netMargin}%</span>
+                      </span>
+                    );
+                  } else if (netMargin < 0.25) {
+                    return (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-medium bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 whitespace-nowrap shadow-2xs">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                        <span>Low Margin: +{netMargin}%</span>
+                      </span>
+                    );
+                  }
+                  return (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 whitespace-nowrap shadow-2xs">
+                      <TrendingUp className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
+                      <span>Margin: +{netMargin}%</span>
+                    </span>
+                  );
+                })()}
+              </div>
+
+              {/* Bottom Breakdown: 3 symmetrical columns matching the inputs above */}
+              <div className="grid grid-cols-3 gap-1 pt-1.5 border-t border-border/50 text-[10px] sm:text-xs">
+                <div className="text-muted-foreground truncate">
+                  <span>Comm: </span>
+                  <span className="font-semibold text-foreground/90">₹{commissionAmount.toFixed(2)}</span>
+                </div>
+                <div className="text-muted-foreground text-center truncate">
+                  <span>Fee: </span>
+                  <span className="font-semibold text-foreground/90">₹{siteFeeAmount.toFixed(2)}</span>
+                </div>
+                <div className="text-right truncate">
+                  {impsChargesAmount > 0 ? (
+                    <span className="text-rose-600 dark:text-rose-400 font-semibold">
+                      IMPS: -₹{impsChargesAmount.toFixed(2)}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground/60">
+                      IMPS: ₹0.00
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           )}
