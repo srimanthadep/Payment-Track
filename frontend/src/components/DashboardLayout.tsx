@@ -26,6 +26,9 @@ import { activityLogService } from "@/services/activityLogService";
 import {
   Sheet,
   SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { motion, AnimatePresence } from "framer-motion";
@@ -268,6 +271,10 @@ export const DashboardLayout = ({ children, headerAction }: DashboardLayoutProps
                 </Button>
               </SheetTrigger>
             <SheetContent side="left" className="w-72 p-0 flex flex-col">
+              <SheetHeader className="sr-only">
+                <SheetTitle>Navigation Menu</SheetTitle>
+                <SheetDescription>Mobile navigation drawer for Payment Tracker</SheetDescription>
+              </SheetHeader>
               <div
                 className="p-5 border-b border-border/80 bg-muted/20 cursor-pointer"
                 onClick={() => navigate("/settings")}

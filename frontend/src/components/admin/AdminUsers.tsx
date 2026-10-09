@@ -4,8 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Shield, ShieldOff } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -261,6 +260,9 @@ export const AdminUsers = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit user</DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Modify user role, full name, or business credentials.
+            </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 gap-3">
             <div className="space-y-1"><Label>Full name</Label><Input value={editForm.full_name} onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })} /></div>
@@ -296,6 +298,9 @@ export const AdminUsers = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Invite user by email</DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Send an invitation to join this Payment Tracker workspace.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <Label>Email</Label>

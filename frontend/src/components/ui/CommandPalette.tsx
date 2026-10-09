@@ -1,7 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -327,6 +333,10 @@ export const CommandPalette = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[560px] p-0 gap-0 overflow-hidden">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Command Palette Search</DialogTitle>
+          <DialogDescription>Search transactions, expenses, customers, and navigation links</DialogDescription>
+        </DialogHeader>
         {/* Search Input */}
         <div className="flex items-center border-b border-border px-4 py-3">
           <Search className="h-5 w-5 text-muted-foreground mr-3 flex-shrink-0" />

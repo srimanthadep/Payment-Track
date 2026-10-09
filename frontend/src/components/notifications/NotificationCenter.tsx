@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Bell, CheckCheck, Trash2, Sparkles, TrendingUp, AlertTriangle, Info, Target, Wallet, X } from "lucide-react";
@@ -232,6 +232,7 @@ export const NotificationCenter = () => {
         <SheetHeader className="p-4 border-b border-border/80 flex flex-row items-center justify-between">
           <div className="flex items-center gap-2">
             <SheetTitle className="text-base font-bold">Notifications</SheetTitle>
+            <SheetDescription className="sr-only">Notifications and system alerts</SheetDescription>
             {unreadCount > 0 && (
               <Badge variant="secondary" className="text-xs">
                 {unreadCount} new
