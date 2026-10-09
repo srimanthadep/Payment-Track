@@ -535,4 +535,49 @@ describe('TransactionLearningService - 5-Tier Hierarchical Bayesian Cascade', ()
     expect(rec.siteFee).toBe(2.1);
     expect(rec.confidence).toBeGreaterThanOrEqual(0.3);
   });
+
+  it('Learns and predicts IMPS/NEFT charges accurately from historical records', () => {
+    const records: HistoricalTransactionRecord[] = [
+      {
+        id: '1',
+        card_type: 'rupay',
+        transaction_type: 'withdrawal',
+        sent_to: 'bharath',
+        bank_name: 'hdfc',
+        customer_mode: 'normal',
+        commission_percent: 2.0,
+        site_fee_percent: 0.5,
+        imps_charges: 5,
+        transaction_date: new Date(),
+        amount: 20000,
+      },
+      {
+        id: '2',
+        card_type: 'rupay',
+        transaction_type: 'withdrawal',
+        sent_to: 'bharath',
+        bank_name: 'hdfc',
+        customer_mode: 'normal',
+        commission_percent: 2.0,
+        site_fee_percent: 0.5,
+        imps_charges: 5,
+        transaction_date: new Date(),
+        amount: 25000,
+      },
+    ];
+
+    service.setRecordsForTesting(records);
+
+    const rec = service.getRecommendation({
+      cardType: 'rupay',
+      transactionType: 'withdrawal',
+      sentTo: 'bharath',
+      bankName: 'hdfc',
+      customerMode: 'normal',
+    });
+
+    expect(rec.impsCharges).toBe(5);
+    expect(rec.commission).toBe(2.0);
+    expect(rec.siteFee).toBe(0.5);
+  });
 });

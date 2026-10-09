@@ -1,10 +1,20 @@
 import { supabase } from "@/integrations/supabase/client";
 
+export interface CustomerSavedCard {
+  bank_name: string;
+  card_type: string;
+  transaction_type: string;
+  customer_mode: string;
+  last_used?: string;
+  usage_count?: number;
+}
+
 export interface CustomerRecord {
   id: string;
   user_id: string;
   name: string;
   phone: string | null;
+  saved_cards?: CustomerSavedCard[] | null;
   created_at: string;
   updated_at: string;
   transaction_count?: number;
@@ -18,6 +28,7 @@ export interface CustomerTransaction {
   amount: number;
   commission: number;
   site_fee: number;
+  imps_charges?: number;
   profit: number;
   transaction_type: string;
   card_type: string | null;
@@ -220,8 +231,21 @@ export const customerService = {
 
       const records: CustomerRecord[] = (customerRows || []).map((c) => {
         const stats = countMap.get(c.id);
+        const parsedCards: CustomerSavedCard[] = Array.isArray(c.saved_cards)
+          ? (c.saved_cards as any[])
+              .filter((card) => card && card.bank_name)
+              .map((card) => ({
+                bank_name: card.bank_name,
+                card_type: card.card_type || "Visa",
+                transaction_type: card.transaction_type || "withdrawal",
+                customer_mode: card.customer_mode || "Normal",
+                last_used: card.last_used,
+                usage_count: Number(card.usage_count || 1),
+              }))
+          : [];
         return {
           ...c,
+          saved_cards: parsedCards,
           transaction_count: stats?.count || 0,
           last_transaction_date: stats?.lastDate || null,
         };
@@ -385,6 +409,7 @@ export const customerService = {
           amount,
           commission,
           site_fee,
+          imps_charges,
           profit,
           transaction_date,
           card_type,
@@ -436,10 +461,11 @@ export const customerService = {
         const amount = Number(t.amount || 0);
         const commission = Number(t.commission || 0);
         const siteFee = Number(t.site_fee || 0);
+        const impsCharges = Number((t as any).imps_charges || 0);
         const profit =
           t.profit !== null && t.profit !== undefined
             ? Number(t.profit)
-            : commission - siteFee;
+            : commission - siteFee - impsCharges;
         const portalName = (t.portals as any)?.name || "Unknown Portal";
 
         const customerTxn: CustomerTransaction = {
@@ -449,6 +475,7 @@ export const customerService = {
           amount,
           commission,
           site_fee: siteFee,
+          imps_charges: impsCharges,
           profit,
           transaction_type: t.transaction_type || "withdrawal",
           card_type: t.card_type,
@@ -581,5 +608,164 @@ export const customerService = {
       avgCustomerLifetimeValue,
       topCustomer,
     };
+  },
+
+  /**
+   * Fetches saved cards for a customer from customer profile or historical transactions
+   */
+  async getCustomerCards(
+    customerId?: string | null,
+    phone?: string | null,
+    userId?: string
+  ): Promise<CustomerSavedCard[]> {
+    try {
+      let customer: any = null;
+      if (customerId) {
+        const { data } = await supabase
+          .from("customers")
+          .select("saved_cards")
+          .eq("id", customerId)
+          .maybeSingle();
+        customer = data;
+      } else if (phone) {
+        const norm = normalizePhone(phone);
+        if (norm) {
+          let q = supabase.from("customers").select("saved_cards, id").eq("phone", norm);
+          if (userId) q = q.eq("user_id", userId);
+          const { data } = await q.maybeSingle();
+          customer = data;
+        }
+      }
+
+      if (customer && Array.isArray(customer.saved_cards) && customer.saved_cards.length > 0) {
+        return (customer.saved_cards as any[])
+          .filter((c) => c && c.bank_name)
+          .map((c) => ({
+            bank_name: c.bank_name,
+            card_type: c.card_type || "Visa",
+            transaction_type: c.transaction_type || "withdrawal",
+            customer_mode: c.customer_mode || "Normal",
+            usage_count: Number(c.usage_count || 1),
+            last_used: c.last_used,
+          }))
+          .sort((a, b) => (b.usage_count || 1) - (a.usage_count || 1));
+      }
+
+      // Fallback: Query transactions for this customer to discover their cards
+      if (customerId || phone) {
+        let query = supabase
+          .from("transactions")
+          .select("bank_name, card_type, transaction_type, customer_mode, transaction_date")
+          .not("bank_name", "is", null);
+
+        if (customerId) {
+          query = query.eq("customer_id", customerId);
+        } else if (phone) {
+          query = query.eq("customer_phone", phone);
+        }
+
+        const { data: txns } = await query
+          .order("transaction_date", { ascending: false })
+          .limit(50);
+
+        if (txns && txns.length > 0) {
+          const cardMap = new Map<string, CustomerSavedCard>();
+          for (const t of txns) {
+            if (!t.bank_name) continue;
+            const key = `${t.bank_name.trim().toLowerCase()}_${(t.card_type || "").toLowerCase()}_${(t.transaction_type || "").toLowerCase()}_${(t.customer_mode || "").toLowerCase()}`;
+            if (!cardMap.has(key)) {
+              cardMap.set(key, {
+                bank_name: t.bank_name.trim(),
+                card_type: t.card_type || "Visa",
+                transaction_type: t.transaction_type || "withdrawal",
+                customer_mode: t.customer_mode || "Normal",
+                usage_count: 1,
+                last_used: t.transaction_date,
+              });
+            } else {
+              const existing = cardMap.get(key)!;
+              existing.usage_count = (existing.usage_count || 1) + 1;
+            }
+          }
+          return Array.from(cardMap.values()).sort(
+            (a, b) => (b.usage_count || 1) - (a.usage_count || 1)
+          );
+        }
+      }
+      return [];
+    } catch (err) {
+      console.error("Error fetching customer cards:", err);
+      return [];
+    }
+  },
+
+  /**
+   * Persists or updates a card in a customer's saved_cards array
+   */
+  async saveCustomerCard(
+    customerId: string,
+    card: {
+      bank_name?: string | null;
+      card_type?: string | null;
+      transaction_type?: string | null;
+      customer_mode?: string | null;
+    }
+  ): Promise<void> {
+    if (!customerId || !card.bank_name) return;
+    try {
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("saved_cards")
+        .eq("id", customerId)
+        .maybeSingle();
+
+      const rawList: any[] = Array.isArray(customer?.saved_cards)
+        ? (customer.saved_cards as any[])
+        : [];
+      const bName = card.bank_name.trim();
+      const cType = (card.card_type || "Visa").trim();
+      const tType = (card.transaction_type || "withdrawal").trim();
+      const cMode = (card.customer_mode || "Normal").trim();
+
+      const existingIdx = rawList.findIndex(
+        (item) =>
+          (item.bank_name || "").toLowerCase() === bName.toLowerCase() &&
+          (item.card_type || "").toLowerCase() === cType.toLowerCase() &&
+          (item.transaction_type || "").toLowerCase() === tType.toLowerCase() &&
+          (item.customer_mode || "").toLowerCase() === cMode.toLowerCase()
+      );
+
+      let updatedList: any[];
+      if (existingIdx >= 0) {
+        updatedList = [...rawList];
+        updatedList[existingIdx] = {
+          ...updatedList[existingIdx],
+          usage_count: (Number(updatedList[existingIdx].usage_count) || 1) + 1,
+          last_used: new Date().toISOString(),
+        };
+      } else {
+        updatedList = [
+          ...rawList,
+          {
+            bank_name: bName,
+            card_type: cType,
+            transaction_type: tType,
+            customer_mode: cMode,
+            usage_count: 1,
+            last_used: new Date().toISOString(),
+          },
+        ];
+      }
+
+      await supabase
+        .from("customers")
+        .update({
+          saved_cards: updatedList,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", customerId);
+    } catch (err) {
+      console.error("Error saving customer card:", err);
+    }
   },
 };

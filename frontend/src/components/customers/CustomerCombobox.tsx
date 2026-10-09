@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   customerService,
   CustomerRecord,
+  CustomerSavedCard,
   searchCustomers,
   normalizePhone,
 } from "@/services/customerService";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { X, Phone, User, Check, Search } from "lucide-react";
+import { X, Phone, User, Check, Search, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface CustomerValue {
@@ -21,6 +21,8 @@ interface CustomerComboboxProps {
   userId: string;
   value: CustomerValue | null;
   onChange: (customer: CustomerValue | null) => void;
+  onSelectCard?: (card: CustomerSavedCard) => void;
+  selectedCard?: { bank_name?: string; card_type?: string } | null;
   disabled?: boolean;
   className?: string;
 }
@@ -29,10 +31,13 @@ export const CustomerCombobox: React.FC<CustomerComboboxProps> = ({
   userId,
   value,
   onChange,
+  onSelectCard,
+  selectedCard,
   disabled = false,
   className,
 }) => {
   const [customers, setCustomers] = useState<CustomerRecord[]>([]);
+  const [savedCards, setSavedCards] = useState<CustomerSavedCard[]>([]);
 
   // Local inputs: Phone is primary, Name is secondary
   const [phoneInput, setPhoneInput] = useState(value?.phone || "");
@@ -65,6 +70,28 @@ export const CustomerCombobox: React.FC<CustomerComboboxProps> = ({
       isMounted = false;
     };
   }, [userId]);
+
+  // Load saved cards for currently selected customer or phone
+  useEffect(() => {
+    let isMounted = true;
+    const cleanDigits = (phoneInput || "").replace(/\D/g, "");
+    if (!selectedId && cleanDigits.length < 10) {
+      setSavedCards([]);
+      return;
+    }
+
+    const loadCards = async () => {
+      const cards = await customerService.getCustomerCards(selectedId, phoneInput, userId);
+      if (isMounted) {
+        setSavedCards(cards);
+      }
+    };
+
+    loadCards();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedId, phoneInput, userId]);
 
   // Sync when parent value changes
   useEffect(() => {
@@ -424,6 +451,67 @@ export const CustomerCombobox: React.FC<CustomerComboboxProps> = ({
               </button>
             );
           })}
+        </div>
+      )}
+
+      {/* Interactive Saved Cards Chips (Auto-Fill) */}
+      {savedCards.length > 0 && (
+        <div className="mt-2.5 pt-2 border-t border-border/40 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="flex items-center justify-between pb-1.5 px-0.5">
+            <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5">
+              <CreditCard className="h-3 w-3 text-primary" />
+              Saved Cards for {nameInput || "Customer"} ({savedCards.length})
+            </span>
+            <span className="text-[10px] text-muted-foreground/80">Click card to auto-fill</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {savedCards.map((c, idx) => {
+              const isCurrentMatch =
+                selectedCard &&
+                selectedCard.bank_name?.trim().toLowerCase() === c.bank_name.trim().toLowerCase() &&
+                selectedCard.card_type?.trim().toLowerCase() === c.card_type.trim().toLowerCase();
+
+              return (
+                <button
+                  key={`${c.bank_name}-${c.card_type}-${idx}`}
+                  type="button"
+                  onClick={() => onSelectCard?.(c)}
+                  className={cn(
+                    "group relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs border transition-all text-left cursor-pointer",
+                    isCurrentMatch
+                      ? "bg-primary/10 border-primary text-primary font-semibold shadow-xs"
+                      : "bg-muted/30 hover:bg-muted/70 border-border/70 hover:border-border text-foreground hover:shadow-xs"
+                  )}
+                  title={`Auto-fill: ${c.bank_name} • ${c.card_type} • ${c.customer_mode} • ${c.transaction_type}`}
+                >
+                  <CreditCard
+                    className={cn(
+                      "h-3.5 w-3.5 shrink-0",
+                      isCurrentMatch
+                        ? "text-primary"
+                        : "text-muted-foreground group-hover:text-primary transition-colors"
+                    )}
+                  />
+                  <span className="font-semibold truncate max-w-[140px] sm:max-w-[180px]">
+                    {c.bank_name}
+                  </span>
+                  <span className="text-[10px] bg-background/80 text-muted-foreground border border-border/50 px-1.5 py-0.2 rounded font-normal shrink-0">
+                    {c.card_type}
+                  </span>
+                  {c.customer_mode && (
+                    <span className="text-[10px] text-muted-foreground/80 shrink-0">
+                      • {c.customer_mode}
+                    </span>
+                  )}
+                  {(c.usage_count || 1) > 1 && (
+                    <span className="text-[9px] bg-primary/15 text-primary px-1 rounded-full font-bold ml-0.5 shrink-0">
+                      {c.usage_count}x
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

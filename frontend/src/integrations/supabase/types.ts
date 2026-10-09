@@ -50,6 +50,7 @@ export type Database = {
           id: string
           name: string
           phone: string | null
+          saved_cards: Json | null
           updated_at: string
           user_id: string
         }
@@ -58,6 +59,7 @@ export type Database = {
           id?: string
           name: string
           phone?: string | null
+          saved_cards?: Json | null
           updated_at?: string
           user_id: string
         }
@@ -66,6 +68,7 @@ export type Database = {
           id?: string
           name?: string
           phone?: string | null
+          saved_cards?: Json | null
           updated_at?: string
           user_id?: string
         }
@@ -374,6 +377,7 @@ export type Database = {
           customer_name: string | null
           customer_phone: string | null
           id: string
+          imps_charges: number | null
           notes: string | null
           portal_id: string
           profit: number | null
@@ -398,6 +402,7 @@ export type Database = {
           customer_name?: string | null
           customer_phone?: string | null
           id?: string
+          imps_charges?: number | null
           notes?: string | null
           portal_id: string
           profit?: number | null
@@ -422,6 +427,7 @@ export type Database = {
           customer_name?: string | null
           customer_phone?: string | null
           id?: string
+          imps_charges?: number | null
           notes?: string | null
           portal_id?: string
           profit?: number | null

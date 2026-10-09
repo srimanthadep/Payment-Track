@@ -13,6 +13,7 @@ export interface ExportTransaction {
   amount: number;
   commission: number;
   site_fee: number;
+  imps_charges?: number | null;
   profit?: number;
   reference_number?: string | null;
   status?: string;
@@ -68,15 +69,16 @@ export const exportTransactionsToCSV = (
     "Amount",
     "Commission",
     "Site Fee",
+    "IMPS Charges",
     "Profit",
     "Reference",
   ];
 
   const rows = transactions.map((t, index) => {
     const profit =
-      t.profit !== undefined
+      t.profit !== undefined && t.profit !== null
         ? Number(t.profit)
-        : Number(t.commission || 0) - Number(t.site_fee || 0);
+        : Number(t.commission || 0) - Number(t.site_fee || 0) - Number(t.imps_charges || 0);
 
     return [
       escapeCSV(index + 1),
@@ -90,6 +92,7 @@ export const exportTransactionsToCSV = (
       escapeCSV(Number(t.amount || 0).toFixed(2)),
       escapeCSV(Number(t.commission || 0).toFixed(2)),
       escapeCSV(Number(t.site_fee || 0).toFixed(2)),
+      escapeCSV(Number(t.imps_charges || 0).toFixed(2)),
       escapeCSV(profit.toFixed(2)),
       escapeCSV(t.reference_number || ""),
     ];
@@ -99,8 +102,9 @@ export const exportTransactionsToCSV = (
   const totalAmount = transactions.reduce((s, t) => s + Number(t.amount || 0), 0);
   const totalComm = transactions.reduce((s, t) => s + Number(t.commission || 0), 0);
   const totalFee = transactions.reduce((s, t) => s + Number(t.site_fee || 0), 0);
+  const totalImps = transactions.reduce((s, t) => s + Number(t.imps_charges || 0), 0);
   const totalProfit = transactions.reduce((s, t) => {
-    const p = t.profit !== undefined ? Number(t.profit) : Number(t.commission || 0) - Number(t.site_fee || 0);
+    const p = t.profit !== undefined && t.profit !== null ? Number(t.profit) : Number(t.commission || 0) - Number(t.site_fee || 0) - Number(t.imps_charges || 0);
     return s + p;
   }, 0);
 
@@ -112,9 +116,11 @@ export const exportTransactionsToCSV = (
     "",
     "",
     "",
+    "",
     totalAmount.toFixed(2),
     totalComm.toFixed(2),
     totalFee.toFixed(2),
+    totalImps.toFixed(2),
     totalProfit.toFixed(2),
     "",
   ]);
@@ -144,9 +150,9 @@ export const exportTransactionsToExcel = (
   // Build data rows
   const data = transactions.map((t, index) => {
     const profit =
-      t.profit !== undefined
+      t.profit !== undefined && t.profit !== null
         ? Number(t.profit)
-        : Number(t.commission || 0) - Number(t.site_fee || 0);
+        : Number(t.commission || 0) - Number(t.site_fee || 0) - Number(t.imps_charges || 0);
 
     return {
       "S.No": index + 1,
@@ -160,6 +166,7 @@ export const exportTransactionsToExcel = (
       Amount: Number(t.amount || 0),
       Commission: Number(t.commission || 0),
       "Site Fee": Number(t.site_fee || 0),
+      "IMPS Charges": Number(t.imps_charges || 0),
       Profit: profit,
       Reference: t.reference_number || "",
     };
@@ -169,8 +176,9 @@ export const exportTransactionsToExcel = (
   const totalAmount = transactions.reduce((s, t) => s + Number(t.amount || 0), 0);
   const totalComm = transactions.reduce((s, t) => s + Number(t.commission || 0), 0);
   const totalFee = transactions.reduce((s, t) => s + Number(t.site_fee || 0), 0);
+  const totalImps = transactions.reduce((s, t) => s + Number(t.imps_charges || 0), 0);
   const totalProfit = transactions.reduce((s, t) => {
-    const p = t.profit !== undefined ? Number(t.profit) : Number(t.commission || 0) - Number(t.site_fee || 0);
+    const p = t.profit !== undefined && t.profit !== null ? Number(t.profit) : Number(t.commission || 0) - Number(t.site_fee || 0) - Number(t.imps_charges || 0);
     return s + p;
   }, 0);
 
@@ -185,6 +193,7 @@ export const exportTransactionsToExcel = (
     Amount: totalAmount,
     Commission: totalComm,
     "Site Fee": totalFee,
+    "IMPS Charges": totalImps,
     Profit: totalProfit,
     Reference: "",
   });
@@ -204,6 +213,7 @@ export const exportTransactionsToExcel = (
     { wch: 14 },  // Amount
     { wch: 14 },  // Commission
     { wch: 12 },  // Site Fee
+    { wch: 14 },  // IMPS Charges
     { wch: 14 },  // Profit
     { wch: 16 },  // Reference
   ];

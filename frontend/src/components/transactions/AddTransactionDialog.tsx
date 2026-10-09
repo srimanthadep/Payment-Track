@@ -42,7 +42,7 @@ import { transactionLearningService } from "@/services/transactionLearningServic
 import { activityLogService } from "@/services/activityLogService";
 import { predictionTrackingService } from "@/services/predictionTrackingService";
 import { CustomerCombobox, CustomerValue } from "@/components/customers/CustomerCombobox";
-import { customerService } from "@/services/customerService";
+import { customerService, CustomerSavedCard } from "@/services/customerService";
 import { whatsappService, formatPhoneForWhatsApp } from "@/services/whatsappService";
 
 interface AddTransactionDialogProps {
@@ -121,6 +121,7 @@ export const AddTransactionDialog = ({
     card_type: "",
     commission_percent: "",
     site_fee_percent: "",
+    imps_charges: "",
     sent_to: "",
     customer_name: "",
     customer_phone: "",
@@ -134,9 +135,11 @@ export const AddTransactionDialog = ({
 
   const [isCommissionManual, setIsCommissionManual] = useState(false);
   const [isSiteFeeManual, setIsSiteFeeManual] = useState(false);
+  const [isImpsManual, setIsImpsManual] = useState(false);
   const [recommendationInfo, setRecommendationInfo] = useState<{
     commission: number | null;
     siteFee: number | null;
+    impsCharges?: number | null;
     confidence: number;
     source: string;
     explanation?: string;
@@ -146,6 +149,7 @@ export const AddTransactionDialog = ({
   const [aiPredictedValues, setAiPredictedValues] = useState<{
     commission: number | null;
     siteFee: number | null;
+    impsCharges: number | null;
     source: string;
     confidence: number;
   } | null>(null);
@@ -166,6 +170,7 @@ export const AddTransactionDialog = ({
     cust = customerValue,
     manualComm = isCommissionManual,
     manualFee = isSiteFeeManual,
+    manualImps = isImpsManual,
     amountVal = formData.amount ? parseFloat(formData.amount) : undefined
   ) => {
     if (!cType && !txType) return;
@@ -190,6 +195,9 @@ export const AddTransactionDialog = ({
         if (!manualFee && rec.siteFee !== null) {
           next.site_fee_percent = rec.siteFee > 0 ? rec.siteFee.toString() : "";
         }
+        if (!manualImps && rec.impsCharges !== null && rec.impsCharges !== undefined) {
+          next.imps_charges = rec.impsCharges > 0 ? rec.impsCharges.toString() : "0";
+        }
         return next;
       });
       setRecommendationInfo(rec);
@@ -198,6 +206,7 @@ export const AddTransactionDialog = ({
       setAiPredictedValues({
         commission: rec.commission,
         siteFee: rec.siteFee,
+        impsCharges: rec.impsCharges ?? 0,
         source: rec.source,
         confidence: rec.confidence,
       });
@@ -206,10 +215,50 @@ export const AddTransactionDialog = ({
       setAiPredictedValues({
         commission: null,
         siteFee: null,
+        impsCharges: null,
         source: "none",
         confidence: 0,
       });
     }
+  };
+
+  // Handler for clicking a saved card chip: auto-fills all 4 fields & triggers learning
+  const handleSelectCustomerCard = (card: CustomerSavedCard) => {
+    const tType = (card.transaction_type?.toLowerCase() === "repayment" ? "repayment" : "withdrawal") as "withdrawal" | "repayment";
+    const cType = card.card_type || formData.card_type;
+    const cMode = (card.customer_mode === "Online" || card.customer_mode === "Offline" ? card.customer_mode : "Offline") as "Online" | "Offline";
+    const bName = card.bank_name || formData.bank_name;
+
+    settingsService.recordDropdownSelection("transactionTypes", tType);
+    if (cType) settingsService.recordDropdownSelection("cardTypes", cType);
+    if (bName) settingsService.recordDropdownSelection("banks", bName);
+
+    setFormData((prev) => ({
+      ...prev,
+      transaction_type: tType,
+      card_type: cType,
+      customer_mode: cMode,
+      bank_name: bName,
+    }));
+
+    // Auto-predict rates for the newly selected card
+    applyLearningRecommendation(
+      tType,
+      cType,
+      formData.sent_to,
+      bName,
+      cMode,
+      customerValue,
+      isCommissionManual,
+      isSiteFeeManual,
+      isImpsManual,
+      formData.amount ? parseFloat(formData.amount) : undefined
+    );
+
+    toast({
+      title: "Card Selected 💳",
+      description: `${bName} (${cType}) auto-filled with rates.`,
+    });
   };
 
   useEffect(() => {
@@ -226,6 +275,10 @@ export const AddTransactionDialog = ({
             ? String(initialData.commission_percent)
             : "",
         site_fee_percent: initialData.site_fee_percent !== undefined ? String(initialData.site_fee_percent) : prev.site_fee_percent,
+        imps_charges:
+          (initialData as any).imps_charges !== undefined && (initialData as any).imps_charges !== null
+            ? String((initialData as any).imps_charges)
+            : prev.imps_charges,
         sent_to: initialData.sent_to || prev.sent_to,
         customer_name: initialData.customer_name || prev.customer_name,
         customer_phone: initialData.customer_phone || prev.customer_phone,
@@ -265,10 +318,19 @@ export const AddTransactionDialog = ({
     return 0;
   }, [formData.amount, formData.site_fee_percent]);
 
-  // Auto calculate profit
+  // Calculate IMPS / NEFT charges amount
+  const impsChargesAmount = useMemo(() => {
+    const imps = parseFloat(formData.imps_charges);
+    if (!isNaN(imps) && imps > 0) {
+      return imps;
+    }
+    return 0;
+  }, [formData.imps_charges]);
+
+  // Auto calculate profit: Commission - Site Fee - IMPS Charges
   const profit = useMemo(() => {
-    return commissionAmount - siteFeeAmount;
-  }, [commissionAmount, siteFeeAmount]);
+    return commissionAmount - siteFeeAmount - impsChargesAmount;
+  }, [commissionAmount, siteFeeAmount, impsChargesAmount]);
 
   const resetForm = () => {
     setFormData({
@@ -277,6 +339,7 @@ export const AddTransactionDialog = ({
       card_type: "",
       commission_percent: "",
       site_fee_percent: "",
+      imps_charges: "",
       sent_to: "",
       customer_name: "",
       customer_phone: "",
@@ -288,6 +351,7 @@ export const AddTransactionDialog = ({
     setCustomerValue(null);
     setIsCommissionManual(false);
     setIsSiteFeeManual(false);
+    setIsImpsManual(false);
     setRecommendationInfo(null);
     setAiPredictedValues(null);
   };
@@ -357,13 +421,12 @@ export const AddTransactionDialog = ({
     }
 
     const commPercent = parseFloat(formData.commission_percent) || 0;
-    const isChummi = ["self", "chummi"].includes(formData.sent_to?.trim().toLowerCase());
 
     let customerId: string | null = null;
     let customerName: string | null = null;
     let customerPhone: string | null = null;
 
-    if (isChummi && customerValue && (customerValue.name.trim() || customerValue.phone.trim())) {
+    if (customerValue && (customerValue.name?.trim() || customerValue.phone?.trim())) {
       customerName = customerValue.name.trim() || null;
       customerPhone = customerValue.phone.trim() || null;
 
@@ -389,20 +452,30 @@ export const AddTransactionDialog = ({
       }
     }
 
+    // Auto-save card to customer profile if bank_name is provided
+    if (customerId && formData.bank_name) {
+      customerService.saveCustomerCard(customerId, {
+        bank_name: formData.bank_name,
+        card_type: formData.card_type,
+        transaction_type: formData.transaction_type,
+        customer_mode: formData.customer_mode,
+      }).catch((err) => console.warn("Failed to save customer card:", err));
+    }
+
     let notesStr = `Sent to: ${formData.sent_to} | Mode: ${formData.customer_mode}${
       formData.site_name ? ` | Site: ${formData.site_name}` : ""
     }${
       formData.bank_name ? ` | Bank: ${formData.bank_name}` : ""
     } | Commission: ${commPercent}%${
       formData.site_fee_percent ? ` | Site Fee: ${formData.site_fee_percent}%` : ""
+    }${
+      impsChargesAmount > 0 ? ` | IMPS Charges: ₹${impsChargesAmount}` : ""
     }`;
-    if (isChummi) {
-      if (customerName) {
-        notesStr += ` | Customer: ${customerName}`;
-      }
-      if (customerPhone) {
-        notesStr += ` | Phone: ${customerPhone}`;
-      }
+    if (customerName) {
+      notesStr += ` | Customer: ${customerName}`;
+    }
+    if (customerPhone) {
+      notesStr += ` | Phone: ${customerPhone}`;
     }
 
     const transactionId = crypto.randomUUID();
@@ -418,6 +491,8 @@ export const AddTransactionDialog = ({
       commission_percent: commPercent,
       site_fee: siteFeeAmount,
       site_fee_percent: parseFloat(formData.site_fee_percent) || 0,
+      imps_charges: impsChargesAmount,
+      profit: profit,
       transaction_date: formData.transaction_date.toISOString(),
       customer_id: customerId,
       customer_name: customerName,
@@ -447,11 +522,12 @@ export const AddTransactionDialog = ({
         sent_to: formData.sent_to,
         bank_name: formData.bank_name,
         customer_mode: formData.customer_mode,
-        customer_name: customerName,
+        customer_name: customerName || undefined,
         customer_id: customerId || undefined,
         amount: parseFloat(formData.amount),
         commission_percent: parseFloat(formData.commission_percent) || 0,
         site_fee_percent: parseFloat(formData.site_fee_percent) || 0,
+        imps_charges: impsChargesAmount,
         transaction_date: formData.transaction_date,
       });
 
@@ -591,7 +667,13 @@ export const AddTransactionDialog = ({
       formData.site_fee_percent
   );
 
-  const isChummi = ["self", "chummi"].includes(formData.sent_to?.trim().toLowerCase());
+  const isImpsAutoLearned = Boolean(
+    recommendationInfo &&
+      !isImpsManual &&
+      recommendationInfo.impsCharges !== null &&
+      recommendationInfo.impsCharges !== undefined &&
+      formData.imps_charges
+  );
 
   return (
     <>
@@ -612,7 +694,38 @@ export const AddTransactionDialog = ({
 
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <div className="flex-1 overflow-y-auto px-5 py-3.5 space-y-3.5 sleek-scrollbar">
-            {/* 1. Date & Amount */}
+            {/* 1. Customer Details & Saved Cards (TOP for all transactions) */}
+            <div className="bg-muted/30 border border-border/70 rounded-xl p-3 space-y-2">
+              <CustomerCombobox
+                userId={userId}
+                value={customerValue}
+                onChange={(val) => {
+                  setCustomerValue(val);
+                  if (val) {
+                    applyLearningRecommendation(
+                      formData.transaction_type,
+                      formData.card_type,
+                      formData.sent_to,
+                      formData.bank_name,
+                      formData.customer_mode,
+                      val,
+                      isCommissionManual,
+                      isSiteFeeManual,
+                      isImpsManual,
+                      formData.amount ? parseFloat(formData.amount) : undefined
+                    );
+                  }
+                }}
+                onSelectCard={handleSelectCustomerCard}
+                selectedCard={{
+                  bank_name: formData.bank_name,
+                  card_type: formData.card_type,
+                }}
+                disabled={isLoading}
+              />
+            </div>
+
+            {/* 2. Date & Amount */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="tx-date">Date</Label>
@@ -922,8 +1035,8 @@ export const AddTransactionDialog = ({
             </Select>
           </div>
 
-          {/* 5. Commission (%) & Site Fee (%) */}
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          {/* 5. Commission (%), Site Fee (%) & IMPS/NEFT Charges (₹) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-3.5">
             <div className="space-y-1.5 sm:space-y-2">
               <Label
                 htmlFor="commission_percent"
@@ -1003,6 +1116,45 @@ export const AddTransactionDialog = ({
                 )}
               </div>
             </div>
+
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label
+                htmlFor="imps_charges"
+                className="text-xs sm:text-sm font-medium truncate block"
+              >
+                IMPS / NEFT (₹) <span className="text-[10px] font-normal text-muted-foreground"><span className="hidden sm:inline">(Optional)</span><span className="sm:hidden">(Opt)</span></span>
+              </Label>
+              <div className="relative">
+                <Input
+                  id="imps_charges"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="e.g. 5"
+                  className={
+                    isImpsAutoLearned
+                      ? "border-primary/40 bg-primary/[0.02] pr-8"
+                      : ""
+                  }
+                  value={formData.imps_charges}
+                  onChange={(e) => {
+                    setIsImpsManual(true);
+                    setFormData({
+                      ...formData,
+                      imps_charges: e.target.value,
+                    });
+                  }}
+                />
+                {isImpsAutoLearned && (
+                  <div
+                    className="absolute right-2.5 inset-y-0 flex items-center justify-center pointer-events-none transition-opacity duration-300 animate-in fade-in -translate-y-[1px]"
+                    title={recommendationInfo?.explanation || "AI Auto-learned"}
+                  >
+                    <AiIcon className="h-4 w-4 animate-pulse block" />
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* 6. Auto display profit when commission percentage is entered (hidden for staff) */}
@@ -1052,10 +1204,9 @@ export const AddTransactionDialog = ({
               </div>
               <div className="flex justify-between text-xs text-muted-foreground pt-0.5 border-t border-border/50">
                 <span>Commission: ₹{commissionAmount.toFixed(2)}</span>
-                {siteFeeAmount > 0 ? (
-                  <span>Site Fee: ₹{siteFeeAmount.toFixed(2)}</span>
-                ) : (
-                  <span>Site Fee: ₹0.00</span>
+                <span>Site Fee: ₹{siteFeeAmount.toFixed(2)}</span>
+                {impsChargesAmount > 0 && (
+                  <span className="text-rose-500 font-medium">IMPS/NEFT: -₹{impsChargesAmount.toFixed(2)}</span>
                 )}
               </div>
             </div>
@@ -1081,19 +1232,14 @@ export const AddTransactionDialog = ({
                 if (val) {
                   settingsService.recordDropdownSelection("recipients", val);
                 }
-                const isSelfRecipient = ["self", "chummi"].includes(val.trim().toLowerCase());
-                const nextCust = !isSelfRecipient ? null : customerValue;
                 setFormData((prev) => ({ ...prev, sent_to: val }));
-                if (!isSelfRecipient) {
-                  setCustomerValue(null);
-                }
                 applyLearningRecommendation(
                   formData.transaction_type,
                   formData.card_type,
                   val,
                   formData.bank_name,
                   formData.customer_mode,
-                  nextCust
+                  customerValue
                 );
               }}
               required
@@ -1110,30 +1256,6 @@ export const AddTransactionDialog = ({
               </SelectContent>
             </Select>
           </div>
-
-          {/* Conditional Customer Info for Self Portal */}
-          {isChummi && (
-            <div className="animate-in fade-in slide-in-from-top-2 duration-200">
-              <CustomerCombobox
-                userId={userId}
-                value={customerValue}
-                onChange={(val) => {
-                  setCustomerValue(val);
-                  if (val) {
-                    applyLearningRecommendation(
-                      formData.transaction_type,
-                      formData.card_type,
-                      formData.sent_to,
-                      formData.bank_name,
-                      formData.customer_mode,
-                      val
-                    );
-                  }
-                }}
-                disabled={isLoading}
-              />
-            </div>
-          )}
 
           </div>
 

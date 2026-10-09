@@ -33,7 +33,7 @@ import {
 import { settingsService, CardTypeOption, BankOption, SiteOption } from "@/services/settingsService";
 import { activityLogService } from "@/services/activityLogService";
 import { CustomerCombobox, CustomerValue } from "@/components/customers/CustomerCombobox";
-import { customerService } from "@/services/customerService";
+import { customerService, CustomerSavedCard } from "@/services/customerService";
 import { transactionLearningService } from "@/services/transactionLearningService";
 
 interface EditTransactionDialogProps {
@@ -45,6 +45,7 @@ interface EditTransactionDialogProps {
     amount: number;
     commission: number;
     site_fee: number;
+    imps_charges?: number | null;
     profit?: number;
     reference_number?: string | null;
     status?: string;
@@ -109,6 +110,7 @@ export const EditTransactionDialog = ({
     amount: "",
     commission_percent: "",
     site_fee_percent: "",
+    imps_charges: "",
     customer_mode: "Offline" as "Online" | "Offline",
     bank_name: "",
     site_name: "",
@@ -221,6 +223,15 @@ export const EditTransactionDialog = ({
         if (siteMatch) site = siteMatch[1].trim();
       }
 
+      // 5. Parse IMPS / NEFT Charges
+      let impsChargesStr = "";
+      if (transaction.imps_charges !== undefined && transaction.imps_charges !== null) {
+        impsChargesStr = transaction.imps_charges.toString();
+      } else if (transaction.notes) {
+        const impsMatch = transaction.notes.match(/IMPS(?:\s*\/\s*NEFT)?(?:\s*Charges)?:\s*₹?\s*([\d.]+)/i);
+        if (impsMatch) impsChargesStr = impsMatch[1];
+      }
+
       setFormData({
         portal_id: transaction.portal_id || "",
         card_type: cardType,
@@ -228,6 +239,7 @@ export const EditTransactionDialog = ({
         amount: transaction.amount ? transaction.amount.toString() : "",
         commission_percent: commPct,
         site_fee_percent: feePct,
+        imps_charges: impsChargesStr,
         customer_mode: custMode,
         bank_name: bank,
         site_name: site,
@@ -260,10 +272,43 @@ export const EditTransactionDialog = ({
     return 0;
   }, [formData.amount, formData.site_fee_percent]);
 
-  // Auto calculate profit
+  // Calculate IMPS / NEFT charges in rupees
+  const impsChargesAmount = useMemo(() => {
+    const imps = parseFloat(formData.imps_charges);
+    if (!isNaN(imps) && imps > 0) {
+      return imps;
+    }
+    return 0;
+  }, [formData.imps_charges]);
+
+  // Auto calculate profit: Commission - Site Fee - IMPS Charges
   const profit = useMemo(() => {
-    return commissionAmount - siteFeeAmount;
-  }, [commissionAmount, siteFeeAmount]);
+    return commissionAmount - siteFeeAmount - impsChargesAmount;
+  }, [commissionAmount, siteFeeAmount, impsChargesAmount]);
+
+  const handleSelectCustomerCard = (card: CustomerSavedCard) => {
+    const tType = (card.transaction_type?.toLowerCase() === "repayment" ? "repayment" : "withdrawal") as "withdrawal" | "repayment";
+    const cType = card.card_type || formData.card_type;
+    const cMode = (card.customer_mode === "Online" || card.customer_mode === "Offline" ? card.customer_mode : "Offline") as "Online" | "Offline";
+    const bName = card.bank_name || formData.bank_name;
+
+    settingsService.recordDropdownSelection("transactionTypes", tType);
+    if (cType) settingsService.recordDropdownSelection("cardTypes", cType);
+    if (bName) settingsService.recordDropdownSelection("banks", bName);
+
+    setFormData((prev) => ({
+      ...prev,
+      transaction_type: tType,
+      card_type: cType,
+      customer_mode: cMode,
+      bank_name: bName,
+    }));
+
+    toast({
+      title: "Card Selected 💳",
+      description: `${bName} (${cType}) auto-filled.`,
+    });
+  };
 
   const handlePortalChange = (portalId: string) => {
     const portal = portals.find((p) => p.id === portalId);
@@ -325,13 +370,12 @@ export const EditTransactionDialog = ({
     setIsLoading(true);
 
     const selectedPortal = portals.find((p) => p.id === formData.portal_id);
-    const isChummi = ["self", "chummi"].includes(selectedPortal?.name?.trim().toLowerCase() || "");
 
     let customerId: string | null = null;
     let customerName: string | null = null;
     let customerPhone: string | null = null;
 
-    if (isChummi && customerValue && (customerValue.name.trim() || customerValue.phone.trim())) {
+    if (customerValue && (customerValue.name?.trim() || customerValue.phone?.trim())) {
       customerName = customerValue.name.trim() || null;
       customerPhone = customerValue.phone.trim() || null;
 
@@ -356,11 +400,22 @@ export const EditTransactionDialog = ({
       }
     }
 
+    // Auto-save card to customer profile if bank_name is provided
+    if (customerId && formData.bank_name) {
+      customerService.saveCustomerCard(customerId, {
+        bank_name: formData.bank_name,
+        card_type: formData.card_type,
+        transaction_type: formData.transaction_type,
+        customer_mode: formData.customer_mode,
+      }).catch((err) => console.warn("Failed to save customer card:", err));
+    }
+
     const commPercent = parseFloat(formData.commission_percent) || 0;
     const feePercent = parseFloat(formData.site_fee_percent) || 0;
     const commAmount = (parseFloat(formData.amount) * commPercent) / 100;
     const feeAmount = (parseFloat(formData.amount) * feePercent) / 100;
-    const profitAmount = commAmount - feeAmount;
+    const impsAmount = parseFloat(formData.imps_charges) || 0;
+    const profitAmount = commAmount - feeAmount - impsAmount;
 
     let notesStr = `Sent to: ${selectedPortal?.name || "Portal"} | Mode: ${formData.customer_mode}${
       formData.site_name ? ` | Site: ${formData.site_name}` : ""
@@ -368,14 +423,14 @@ export const EditTransactionDialog = ({
       formData.bank_name ? ` | Bank: ${formData.bank_name}` : ""
     } | Commission: ${commPercent}%${
       formData.site_fee_percent ? ` | Site Fee: ${formData.site_fee_percent}%` : ""
+    }${
+      impsAmount > 0 ? ` | IMPS Charges: ₹${impsAmount}` : ""
     }`;
-    if (isChummi) {
-      if (customerName) {
-        notesStr += ` | Customer: ${customerName}`;
-      }
-      if (customerPhone) {
-        notesStr += ` | Phone: ${customerPhone}`;
-      }
+    if (customerName) {
+      notesStr += ` | Customer: ${customerName}`;
+    }
+    if (customerPhone) {
+      notesStr += ` | Phone: ${customerPhone}`;
     }
 
     const updatePayload = {
@@ -387,6 +442,8 @@ export const EditTransactionDialog = ({
       commission_percent: commPercent,
       site_fee: feeAmount,
       site_fee_percent: feePercent,
+      imps_charges: impsAmount,
+      profit: profitAmount,
       transaction_date: formData.transaction_date.toISOString(),
       customer_id: customerId,
       customer_name: customerName,
@@ -444,6 +501,7 @@ export const EditTransactionDialog = ({
         amount: parseFloat(formData.amount),
         commission_percent: commPercent,
         site_fee_percent: feePercent,
+        imps_charges: impsAmount,
         transaction_date: formData.transaction_date,
       });
 
@@ -480,7 +538,22 @@ export const EditTransactionDialog = ({
 
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <div className="flex-1 overflow-y-auto px-5 py-3.5 space-y-3.5 sleek-scrollbar">
-            {/* 1. Date & Amount (Side-by-side grid, matching Add Transaction) */}
+            {/* 1. Customer Details & Saved Cards (TOP for all transactions) */}
+            <div className="bg-muted/30 border border-border/70 rounded-xl p-3 space-y-2">
+              <CustomerCombobox
+                userId={transaction.user_id || currentUserId}
+                value={customerValue}
+                onChange={setCustomerValue}
+                onSelectCard={handleSelectCustomerCard}
+                selectedCard={{
+                  bank_name: formData.bank_name,
+                  card_type: formData.card_type,
+                }}
+                disabled={isLoading}
+              />
+            </div>
+
+            {/* 2. Date & Amount (Side-by-side grid, matching Add Transaction) */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="edit-tx-date">Date</Label>
@@ -699,8 +772,8 @@ export const EditTransactionDialog = ({
             </Select>
           </div>
 
-          {/* 4. Commission (%) & Site Fee (%) */}
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          {/* 4. Commission (%), Site Fee (%) & IMPS/NEFT Charges (₹) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div className="space-y-1.5 sm:space-y-2">
               <Label
                 htmlFor="edit-commission_percent"
@@ -749,6 +822,29 @@ export const EditTransactionDialog = ({
                 }
               />
             </div>
+
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label
+                htmlFor="edit-imps_charges"
+                className="text-xs sm:text-sm font-medium truncate block"
+              >
+                IMPS / NEFT (₹) <span className="text-[10px] font-normal text-muted-foreground"><span className="hidden sm:inline">(Optional)</span><span className="sm:hidden">(Opt)</span></span>
+              </Label>
+              <Input
+                id="edit-imps_charges"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="e.g. 5"
+                value={formData.imps_charges}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    imps_charges: e.target.value,
+                  })
+                }
+              />
+            </div>
           </div>
 
           {/* 5. Estimated Profit summary box */}
@@ -767,6 +863,9 @@ export const EditTransactionDialog = ({
               <div className="flex justify-between text-xs text-muted-foreground pt-0.5 border-t border-border/50">
                 <span>Commission: ₹{commissionAmount.toFixed(2)}</span>
                 <span>Site Fee: ₹{siteFeeAmount.toFixed(2)}</span>
+                {impsChargesAmount > 0 && (
+                  <span className="text-rose-500 font-medium">IMPS/NEFT: -₹{impsChargesAmount.toFixed(2)}</span>
+                )}
               </div>
             </div>
           )}
@@ -791,18 +890,6 @@ export const EditTransactionDialog = ({
               </SelectContent>
             </Select>
           </div>
-
-          {/* 7. Conditional Customer Info for Self Portal */}
-          {isChummi && (
-            <div className="animate-in fade-in slide-in-from-top-2 duration-200">
-              <CustomerCombobox
-                userId={transaction.user_id || currentUserId}
-                value={customerValue}
-                onChange={setCustomerValue}
-                disabled={isLoading}
-              />
-            </div>
-          )}
 
           </div>
 

@@ -23,6 +23,7 @@ export interface TransactionFeeRecommendation {
   commission: number | null;
   siteFee: number | null;
   margin?: number | null;
+  impsCharges?: number | null;
   confidence: number; // 0.0 to 1.0
   source:
     | "customer_history"
@@ -49,6 +50,7 @@ export interface HistoricalTransactionRecord {
   customer_id?: string;
   commission_percent: number;
   site_fee_percent: number;
+  imps_charges?: number;
   transaction_date: Date;
   amount: number;
 }
@@ -141,6 +143,7 @@ export class TransactionLearningService {
           commission_percent,
           site_fee,
           site_fee_percent,
+          imps_charges,
           notes,
           bank_name,
           customer_mode,
@@ -271,6 +274,17 @@ export class TransactionLearningService {
       }
     }
 
+    // Extract IMPS / NEFT Charges
+    let impsCharges = 0;
+    if (row.imps_charges !== undefined && row.imps_charges !== null) {
+      impsCharges = Number(row.imps_charges);
+    } else if (notes) {
+      const impsMatch = notes.match(/IMPS(?:\s*\/\s*NEFT)?(?:\s*Charges)?:\s*([0-9.]+)/i);
+      if (impsMatch && impsMatch[1]) {
+        impsCharges = parseFloat(impsMatch[1]);
+      }
+    }
+
     const txDate = row.transaction_date ? new Date(row.transaction_date) : new Date();
 
     return {
@@ -284,6 +298,7 @@ export class TransactionLearningService {
       customer_id: customerId,
       commission_percent: commPercent ?? 0,
       site_fee_percent: siteFeePercent ?? 0,
+      imps_charges: impsCharges,
       transaction_date: txDate,
       amount,
     };
@@ -304,6 +319,7 @@ export class TransactionLearningService {
     amount: number;
     commission_percent: number;
     site_fee_percent: number;
+    imps_charges?: number;
     transaction_date?: Date;
   }) {
     const record: HistoricalTransactionRecord = {
@@ -317,6 +333,7 @@ export class TransactionLearningService {
       customer_id: (tx.customer_id || "").trim(),
       commission_percent: Number(tx.commission_percent) || 0,
       site_fee_percent: Number(tx.site_fee_percent) || 0,
+      imps_charges: Number(tx.imps_charges) || 0,
       transaction_date: tx.transaction_date || new Date(),
       amount: Number(tx.amount) || 0,
     };
@@ -496,10 +513,30 @@ export class TransactionLearningService {
       explanation += ` • Calibrated for ₹${Number(queryAmount).toLocaleString("en-IN")}`;
     }
 
+    // Estimate IMPS / NEFT charges from matched records (weighted mode)
+    let recommendedImps: number | null = null;
+    const impsMap = new Map<number, number>();
+    for (const { rec, w } of weights) {
+      if (rec.imps_charges !== undefined && rec.imps_charges !== null) {
+        const val = Math.round(Number(rec.imps_charges));
+        impsMap.set(val, (impsMap.get(val) || 0) + w);
+      }
+    }
+    if (impsMap.size > 0) {
+      let maxImpsW = -1;
+      for (const [charge, w] of impsMap.entries()) {
+        if (w > maxImpsW) {
+          maxImpsW = w;
+          recommendedImps = charge;
+        }
+      }
+    }
+
     return {
       commission: bestPair.commission,
       siteFee: bestPair.siteFee,
       margin: bestPair.margin,
+      impsCharges: recommendedImps ?? 0,
       confidence,
       source: sourceName,
       sampleCount,
@@ -662,6 +699,7 @@ export class TransactionLearningService {
         commission: baseline.commission,
         siteFee: baseline.siteFee,
         margin,
+        impsCharges: 0,
         confidence: 0.5,
         source: "global_baseline",
         sampleCount: 0,
@@ -673,6 +711,7 @@ export class TransactionLearningService {
       commission: null,
       siteFee: null,
       margin: null,
+      impsCharges: null,
       confidence: 0,
       source: "none",
       sampleCount: 0,

@@ -76,6 +76,7 @@ interface Transaction {
   amount: number;
   commission: number;
   site_fee: number;
+  imps_charges?: number | null;
   profit: number;
   transaction_date: string;
   reference_number?: string | null;
@@ -141,9 +142,9 @@ export const TransactionsTable = ({
     const profit = filteredTransactions.reduce(
       (sum, t) =>
         sum +
-        (t.profit !== undefined
+        (t.profit !== undefined && t.profit !== null
           ? Number(t.profit)
-          : Number(t.commission || 0) - Number(t.site_fee || 0)),
+          : Number(t.commission || 0) - Number(t.site_fee || 0) - Number(t.imps_charges || 0)),
       0
     );
     return { amount, commission, siteFee, profit, count: filteredTransactions.length };
@@ -161,6 +162,7 @@ export const TransactionsTable = ({
           amount,
           commission,
           site_fee,
+          imps_charges,
           profit,
           transaction_date,
           card_type,
@@ -1212,13 +1214,18 @@ export const TransactionsTable = ({
                         {formatCurrency(transaction.commission)}
                       </TableCell>
                       <TableCell className="text-right text-destructive hidden sm:table-cell">
-                        {formatCurrency(transaction.site_fee)}
+                        <div>{formatCurrency(transaction.site_fee)}</div>
+                        {transaction.imps_charges && Number(transaction.imps_charges) > 0 ? (
+                          <div className="text-[10px] text-rose-500 font-medium">
+                            +₹{Number(transaction.imps_charges).toFixed(0)} IMPS
+                          </div>
+                        ) : null}
                       </TableCell>
                       <TableCell className="text-right font-semibold text-success hidden sm:table-cell">
                         {formatCurrency(
-                          transaction.profit !== undefined
+                          transaction.profit !== undefined && transaction.profit !== null
                             ? transaction.profit
-                            : transaction.commission - transaction.site_fee
+                            : transaction.commission - transaction.site_fee - Number(transaction.imps_charges || 0)
                         )}
                       </TableCell>
                       <TableCell className="text-right">
