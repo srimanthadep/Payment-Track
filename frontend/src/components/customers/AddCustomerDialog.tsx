@@ -139,33 +139,7 @@ export const AddCustomerDialog = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* 1. Phone Number (FIRST & IMPORTANT) */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="customer-phone" className="text-xs font-semibold flex items-center gap-1.5">
-                <Phone className="h-3.5 w-3.5 text-primary" />
-                Phone Number
-              </Label>
-              <span className="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                Primary / Important
-              </span>
-            </div>
-            <Input
-              id="customer-phone"
-              type="tel"
-              placeholder="e.g. 9876543210"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="h-10 text-sm"
-              autoFocus
-              disabled={isSubmitting}
-            />
-            <p className="text-[11px] text-muted-foreground">
-              Primary key for instant transaction lookup, WhatsApp receipts, and search.
-            </p>
-          </div>
-
-          {/* 2. Customer Name (SECOND) */}
+          {/* 1. Customer Name */}
           <div className="space-y-1.5">
             <Label htmlFor="customer-name" className="text-xs font-semibold flex items-center gap-1.5">
               <UserIcon className="h-3.5 w-3.5 text-muted-foreground" />
@@ -176,6 +150,24 @@ export const AddCustomerDialog = ({
               placeholder="e.g. Rahul Sharma"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              className="h-10 text-sm"
+              autoFocus
+              disabled={isSubmitting}
+            />
+          </div>
+
+          {/* 2. Phone Number */}
+          <div className="space-y-1.5">
+            <Label htmlFor="customer-phone" className="text-xs font-semibold flex items-center gap-1.5">
+              <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+              Phone Number <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+            </Label>
+            <Input
+              id="customer-phone"
+              type="tel"
+              placeholder="e.g. 9876543210"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
               className="h-10 text-sm"
               disabled={isSubmitting}
             />

@@ -733,26 +733,6 @@ export const CustomerDetailDialog = ({
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="customer-phone" className="text-xs font-semibold flex items-center gap-1.5">
-                  <Phone className="h-3.5 w-3.5 text-primary" />
-                  Phone Number
-                </Label>
-                <span className="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                  Primary / Important
-                </span>
-              </div>
-              <Input
-                id="customer-phone"
-                type="tel"
-                value={editForm.phone}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, phone: e.target.value }))}
-                placeholder="Phone number e.g. 9876543210"
-                className="rounded-xl"
-                autoFocus
-              />
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="customer-name" className="text-xs font-semibold">
                 Customer Name
               </Label>
@@ -761,6 +741,21 @@ export const CustomerDetailDialog = ({
                 value={editForm.name}
                 onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
                 placeholder="Customer name"
+                className="rounded-xl"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="customer-phone" className="text-xs font-semibold flex items-center gap-1.5">
+                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                Phone Number
+              </Label>
+              <Input
+                id="customer-phone"
+                type="tel"
+                value={editForm.phone}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, phone: e.target.value }))}
+                placeholder="Phone number e.g. 9876543210"
                 className="rounded-xl"
               />
             </div>

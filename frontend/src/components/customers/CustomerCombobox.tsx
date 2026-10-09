@@ -266,19 +266,14 @@ export const CustomerCombobox: React.FC<CustomerComboboxProps> = ({
   return (
     <div ref={containerRef} className={cn("relative", className)}>
       <div className="grid grid-cols-2 gap-3 sm:gap-4">
-        {/* 1. Phone Number (FIRST & IMPORTANT) */}
+        {/* 1. Phone Number (FIRST) */}
         <div className="space-y-1.5 sm:space-y-2 relative">
           <Label
             htmlFor="customer_phone"
-            className="text-xs sm:text-sm font-semibold flex items-center justify-between truncate"
+            className="text-xs sm:text-sm font-medium flex items-center gap-1.5 truncate"
           >
-            <span className="flex items-center gap-1.5 text-foreground">
-              <Phone className="h-3.5 w-3.5 text-primary" />
-              Phone Number
-            </span>
-            <span className="text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">
-              Important
-            </span>
+            <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+            Phone Number
           </Label>
 
           <div className="relative">
@@ -318,15 +313,10 @@ export const CustomerCombobox: React.FC<CustomerComboboxProps> = ({
         <div className="space-y-1.5 sm:space-y-2 relative">
           <Label
             htmlFor="customer_name"
-            className="text-xs sm:text-sm font-medium flex items-center justify-between truncate"
+            className="text-xs sm:text-sm font-medium flex items-center gap-1.5 truncate"
           >
-            <span className="flex items-center gap-1.5">
-              <User className="h-3.5 w-3.5 text-muted-foreground" />
-              Customer Name
-            </span>
-            <span className="text-[10px] font-normal text-muted-foreground">
-              Auto-fill / Optional
-            </span>
+            <User className="h-3.5 w-3.5 text-muted-foreground" />
+            Customer Name <span className="text-[10px] font-normal text-muted-foreground">(Optional)</span>
           </Label>
 
           <div className="relative">
