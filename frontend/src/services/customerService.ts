@@ -99,14 +99,27 @@ export const formatCustomerName = (name: string): string => {
 };
 
 /**
- * Multi-field, case-insensitive, prefix + contains in-memory search
+ * Multi-field, case-insensitive, robust phone and name search.
+ * Supports exact matching, prefix, last-4-digits/suffix, and substring matching on phone numbers,
+ * as well as prefix, token, and full name matching.
  */
 export const searchCustomers = (query: string, customers: CustomerRecord[]): CustomerRecord[] => {
   const q = query.trim().toLowerCase();
-  if (!q) return customers.slice(0, 8);
+  if (!q) {
+    return [...customers]
+      .sort((a, b) => {
+        const txA = a.transaction_count || 0;
+        const txB = b.transaction_count || 0;
+        if (txB !== txA) return txB - txA;
+        const dateA = a.last_transaction_date || a.updated_at || "";
+        const dateB = b.last_transaction_date || b.updated_at || "";
+        return dateB.localeCompare(dateA);
+      })
+      .slice(0, 8);
+  }
 
   const cleanDigits = q.replace(/\D/g, "");
-  const isPhoneQuery = cleanDigits.length >= 2;
+  const isDigitQuery = cleanDigits.length >= 1;
   const queryTokens = q.split(/\s+/).filter(Boolean);
 
   interface ScoredCustomer {
@@ -119,36 +132,42 @@ export const searchCustomers = (query: string, customers: CustomerRecord[]): Cus
   for (const c of customers) {
     let score = 0;
     const nameLower = (c.name || "").toLowerCase();
-    const phoneNorm = c.phone || "";
+    const phoneRaw = c.phone || "";
+    const phoneDigits = phoneRaw.replace(/\D/g, "");
+    const phoneNorm = normalizePhone(phoneRaw) || phoneDigits;
 
-    // 1. Phone matching
-    if (isPhoneQuery && phoneNorm) {
-      if (phoneNorm === cleanDigits) {
-        score += 120;
-      } else if (phoneNorm.startsWith(cleanDigits)) {
-        score += 90;
-      } else if (phoneNorm.includes(cleanDigits)) {
-        score += 50;
+    // 1. Phone matching (exact, prefix, suffix, contains)
+    if (isDigitQuery && phoneDigits) {
+      if (phoneDigits === cleanDigits || phoneNorm === cleanDigits) {
+        score += 150; // Exact phone match
+      } else if (phoneDigits.startsWith(cleanDigits) || phoneNorm.startsWith(cleanDigits)) {
+        score += 120; // Prefix phone match
+      } else if (phoneDigits.endsWith(cleanDigits) || phoneNorm.endsWith(cleanDigits)) {
+        score += 100; // Suffix phone match (e.g. last 4 digits)
+      } else if (phoneDigits.includes(cleanDigits) || phoneNorm.includes(cleanDigits)) {
+        score += 75; // Substring phone match
       }
     }
 
     // 2. Name matching
     if (nameLower === q) {
-      score += 100;
+      score += 130; // Exact name match
     } else if (nameLower.startsWith(q)) {
-      score += 80;
+      score += 100; // Prefix name match
+    } else if (nameLower.split(/\s+/).some((tok) => tok.startsWith(q))) {
+      score += 90; // Token prefix match
     } else if (nameLower.includes(q)) {
-      score += 60;
+      score += 65; // Contains name match
     } else if (queryTokens.length > 1) {
       const allTokensMatch = queryTokens.every((tok) => nameLower.includes(tok));
       if (allTokensMatch) {
-        score += 70;
+        score += 80;
       }
     }
 
     if (score > 0) {
-      // Small bonus for frequent customers
-      const txBonus = Math.min((c.transaction_count || 0) * 2, 10);
+      // Frequency bonus for active customers
+      const txBonus = Math.min((c.transaction_count || 0) * 2, 20);
       score += txBonus;
       scored.push({ customer: c, score });
     }

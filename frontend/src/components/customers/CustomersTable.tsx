@@ -66,12 +66,23 @@ export const CustomersTable = ({
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
-      list = list.filter(
-        (c) =>
-          c.name.toLowerCase().includes(q) ||
-          (c.phone && c.phone.includes(q)) ||
-          c.portals.some((p) => p.toLowerCase().includes(q))
-      );
+      const cleanDigits = q.replace(/\D/g, "");
+      const isDigitSearch = cleanDigits.length >= 1;
+
+      list = list.filter((c) => {
+        const nameMatch = c.name.toLowerCase().includes(q);
+        const portalMatch = c.portals.some((p) => p.toLowerCase().includes(q));
+
+        let phoneMatch = false;
+        if (c.phone) {
+          const custDigits = c.phone.replace(/\D/g, "");
+          phoneMatch =
+            c.phone.toLowerCase().includes(q) ||
+            (isDigitSearch && (custDigits.includes(cleanDigits) || custDigits.endsWith(cleanDigits)));
+        }
+
+        return nameMatch || phoneMatch || portalMatch;
+      });
     }
 
     list.sort((a, b) => {
@@ -138,7 +149,7 @@ export const CustomersTable = ({
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by customer name, phone, portal..."
+            placeholder="Search by customer phone number, name, portal..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9 h-9 text-xs sm:text-sm bg-background/80"

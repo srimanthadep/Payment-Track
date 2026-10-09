@@ -9,6 +9,7 @@ dist-ssr/
 build/
 coverage/
 .nyc_output/
+*.zip
 
 # Logs
 logs/
