@@ -292,6 +292,26 @@ export const EditTransactionDialog = ({
     const cMode = (card.customer_mode === "Online" || card.customer_mode === "Offline" ? card.customer_mode : "Offline") as "Online" | "Offline";
     const bName = card.bank_name || formData.bank_name;
 
+    // Resolve sent_to / portal
+    const resolvedSentTo =
+      card.sent_to ||
+      transactionLearningService.getSentToForCard({
+        bankName: bName,
+        cardType: cType,
+        customerId: customerValue?.id || undefined,
+        customerName: customerValue?.name || undefined,
+      }) || "";
+
+    let matchedPortalId = formData.portal_id;
+    if (resolvedSentTo) {
+      const matchingPortal = portals.find(
+        (p) => p.name.trim().toLowerCase() === resolvedSentTo.trim().toLowerCase() || p.id === resolvedSentTo
+      );
+      if (matchingPortal) {
+        matchedPortalId = matchingPortal.id;
+      }
+    }
+
     settingsService.recordDropdownSelection("transactionTypes", tType);
     if (cType) settingsService.recordDropdownSelection("cardTypes", cType);
     if (bName) settingsService.recordDropdownSelection("banks", bName);
@@ -302,11 +322,12 @@ export const EditTransactionDialog = ({
       card_type: cType,
       customer_mode: cMode,
       bank_name: bName,
+      portal_id: matchedPortalId || prev.portal_id,
     }));
 
     toast({
       title: "Card Selected 💳",
-      description: `${bName} (${cType}) auto-filled.`,
+      description: `${bName} (${cType})${resolvedSentTo ? ` • Sent to: ${resolvedSentTo}` : ""} auto-filled.`,
     });
   };
 
@@ -407,6 +428,7 @@ export const EditTransactionDialog = ({
         card_type: formData.card_type,
         transaction_type: formData.transaction_type,
         customer_mode: formData.customer_mode,
+        sent_to: selectedPortal?.name || "",
       }).catch((err) => console.warn("Failed to save customer card:", err));
     }
 

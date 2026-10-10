@@ -222,16 +222,33 @@ export const AddTransactionDialog = ({
     }
   };
 
-  // Handler for clicking a saved card chip: auto-fills all 4 fields & triggers learning
+  // Handler for clicking a saved card chip: auto-fills all fields (including sent_to) & triggers pure model prediction
   const handleSelectCustomerCard = (card: CustomerSavedCard) => {
     const tType = (card.transaction_type?.toLowerCase() === "repayment" ? "repayment" : "withdrawal") as "withdrawal" | "repayment";
     const cType = card.card_type || formData.card_type;
     const cMode = (card.customer_mode === "Online" || card.customer_mode === "Offline" ? card.customer_mode : "Offline") as "Online" | "Offline";
     const bName = card.bank_name || formData.bank_name;
 
+    // Auto-fill sent_to: from card.sent_to, or lookup from recent transaction history for this card, or fallback to current sent_to
+    const resolvedSentTo =
+      card.sent_to ||
+      transactionLearningService.getSentToForCard({
+        bankName: bName,
+        cardType: cType,
+        customerId: customerValue?.id || undefined,
+        customerName: customerValue?.name || undefined,
+      }) ||
+      formData.sent_to;
+
     settingsService.recordDropdownSelection("transactionTypes", tType);
     if (cType) settingsService.recordDropdownSelection("cardTypes", cType);
     if (bName) settingsService.recordDropdownSelection("banks", bName);
+    if (resolvedSentTo) settingsService.recordDropdownSelection("recipients", resolvedSentTo);
+
+    // Reset manual flags so prediction values are cleanly auto-filled
+    setIsCommissionManual(false);
+    setIsSiteFeeManual(false);
+    setIsImpsManual(false);
 
     setFormData((prev) => ({
       ...prev,
@@ -239,25 +256,26 @@ export const AddTransactionDialog = ({
       card_type: cType,
       customer_mode: cMode,
       bank_name: bName,
+      sent_to: resolvedSentTo || prev.sent_to,
     }));
 
-    // Auto-predict rates for the newly selected card
+    // Auto-predict rates for the newly selected card using pure prediction values (never customer's previous rates)
     applyLearningRecommendation(
       tType,
       cType,
-      formData.sent_to,
+      resolvedSentTo,
       bName,
       cMode,
       customerValue,
-      isCommissionManual,
-      isSiteFeeManual,
-      isImpsManual,
+      false,
+      false,
+      false,
       formData.amount ? parseFloat(formData.amount) : undefined
     );
 
     toast({
       title: "Card Selected 💳",
-      description: `${bName} (${cType}) auto-filled with rates.`,
+      description: `${bName} (${cType})${resolvedSentTo ? ` • Sent to: ${resolvedSentTo}` : ""} auto-filled with predicted rates.`,
     });
   };
 
@@ -459,6 +477,7 @@ export const AddTransactionDialog = ({
         card_type: formData.card_type,
         transaction_type: formData.transaction_type,
         customer_mode: formData.customer_mode,
+        sent_to: formData.sent_to,
       }).catch((err) => console.warn("Failed to save customer card:", err));
     }
 

@@ -483,7 +483,7 @@ export const CustomerCombobox: React.FC<CustomerComboboxProps> = ({
                       ? "bg-primary/10 border-primary text-primary font-semibold shadow-xs"
                       : "bg-muted/30 hover:bg-muted/70 border-border/70 hover:border-border text-foreground hover:shadow-xs"
                   )}
-                  title={`Auto-fill: ${c.bank_name} • ${c.card_type} • ${c.customer_mode} • ${c.transaction_type}`}
+                  title={`Auto-fill: ${c.bank_name} • ${c.card_type} • ${c.customer_mode} • ${c.transaction_type}${c.sent_to ? ` • Sent to: ${c.sent_to}` : ""}`}
                 >
                   <CreditCard
                     className={cn(
@@ -502,6 +502,11 @@ export const CustomerCombobox: React.FC<CustomerComboboxProps> = ({
                   {c.customer_mode && (
                     <span className="text-[10px] text-muted-foreground/80 shrink-0">
                       • {c.customer_mode}
+                    </span>
+                  )}
+                  {c.sent_to && (
+                    <span className="text-[10px] text-muted-foreground/80 shrink-0 max-w-[80px] truncate" title={`Sent to: ${c.sent_to}`}>
+                      → {c.sent_to}
                     </span>
                   )}
                   {(c.usage_count || 1) > 1 && (

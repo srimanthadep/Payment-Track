@@ -11,7 +11,7 @@ describe('TransactionLearningService - 5-Tier Hierarchical Bayesian Cascade', ()
     service = new TransactionLearningService();
   });
 
-  it('Tier 0: Recommends personalized recurring customer rate over terminal rate', () => {
+  it('Prediction never depends on customer-specific previous percentage; always predicts standard pattern rates', () => {
     const records: HistoricalTransactionRecord[] = [
       // Standard terminal rate for Axis Bank on Bharath portal: 2.0% comm / 1.55% fee
       {
@@ -42,14 +42,14 @@ describe('TransactionLearningService - 5-Tier Hierarchical Bayesian Cascade', ()
         transaction_date: new Date(),
         amount: 50000,
       },
-      // Special customer "Varun" negotiated rate: 1.9% comm / 1.55% fee
+      // Special customer "Varun" previously had a 1.9% one-time negotiated rate
       {
         id: '3',
         card_type: 'visa',
         transaction_type: 'withdrawal',
         sent_to: 'bharath',
         bank_name: 'axis bank',
-        customer_mode: 'chummi',
+        customer_mode: 'regular',
         customer_name: 'Varun',
         customer_id: 'cust-varun',
         commission_percent: 1.9,
@@ -57,39 +57,25 @@ describe('TransactionLearningService - 5-Tier Hierarchical Bayesian Cascade', ()
         transaction_date: new Date(),
         amount: 25000,
       },
-      {
-        id: '4',
-        card_type: 'visa',
-        transaction_type: 'withdrawal',
-        sent_to: 'bharath',
-        bank_name: 'axis bank',
-        customer_mode: 'chummi',
-        customer_name: 'Varun',
-        customer_id: 'cust-varun',
-        commission_percent: 1.9,
-        site_fee_percent: 1.55,
-        transaction_date: new Date(),
-        amount: 30000,
-      },
     ];
 
     service.setRecordsForTesting(records);
 
-    // Query for Varun
+    // Query for Varun: Even though Varun had a 1.9% rate previously, prediction must NEVER depend on Varun's previous rate
     const recVarun = service.getRecommendation({
       cardType: 'visa',
       transactionType: 'withdrawal',
       sentTo: 'bharath',
       bankName: 'axis bank',
-      customerMode: 'chummi',
+      customerMode: 'regular',
       customerName: 'Varun',
       customerId: 'cust-varun',
     });
 
-    expect(recVarun.source).toBe('customer_history');
-    expect(recVarun.commission).toBe(1.9);
+    // Should predict standard pattern rate 2.0%, not 1.9%
+    expect(recVarun.source).toBe('card_tx_portal_bank_mode');
+    expect(recVarun.commission).toBe(2.0);
     expect(recVarun.siteFee).toBe(1.55);
-    expect(recVarun.confidence).toBeGreaterThanOrEqual(0.7);
 
     // Query for generic customer on same terminal
     const recGeneric = service.getRecommendation({
@@ -104,6 +90,60 @@ describe('TransactionLearningService - 5-Tier Hierarchical Bayesian Cascade', ()
     expect(recGeneric.source).toBe('card_tx_portal_bank_mode');
     expect(recGeneric.commission).toBe(2.0);
     expect(recGeneric.siteFee).toBe(1.55);
+  });
+
+  it('getSentToForCard: Resolves last used sent_to portal for card from history', () => {
+    const records: HistoricalTransactionRecord[] = [
+      {
+        id: '1',
+        card_type: 'visa',
+        transaction_type: 'withdrawal',
+        sent_to: 'upender',
+        bank_name: 'sbi',
+        customer_name: 'Varun',
+        customer_id: 'c-varun',
+        commission_percent: 2.0,
+        site_fee_percent: 1.5,
+        transaction_date: new Date('2026-03-01'),
+        amount: 20000,
+      },
+      {
+        id: '2',
+        card_type: 'rupay',
+        transaction_type: 'withdrawal',
+        sent_to: 'bharath',
+        bank_name: 'hdfc',
+        customer_name: 'Other',
+        commission_percent: 2.0,
+        site_fee_percent: 0.5,
+        transaction_date: new Date('2026-03-02'),
+        amount: 10000,
+      },
+    ];
+
+    service.setRecordsForTesting(records);
+
+    // 1. Matches customer-specific card usage
+    const sentToVarun = service.getSentToForCard({
+      bankName: 'sbi',
+      cardType: 'visa',
+      customerId: 'c-varun',
+    });
+    expect(sentToVarun).toBe('upender');
+
+    // 2. Matches general bank and card usage
+    const sentToHdfc = service.getSentToForCard({
+      bankName: 'hdfc',
+      cardType: 'rupay',
+    });
+    expect(sentToHdfc).toBe('bharath');
+
+    // 3. Unknown card returns null
+    const sentToUnknown = service.getSentToForCard({
+      bankName: 'icici',
+      cardType: 'amex',
+    });
+    expect(sentToUnknown).toBeNull();
   });
 
   it('Tier 1: Distinguishes rates by bank and mode on the same portal', () => {

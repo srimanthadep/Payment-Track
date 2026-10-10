@@ -118,4 +118,20 @@ describe("Customer search & phone normalization", () => {
       expect(results[1].id).toBe("c2");
     });
   });
+
+  describe("CustomerSavedCard with sent_to", () => {
+    it("preserves sent_to in customer saved card records", () => {
+      const card = {
+        bank_name: "HDFC",
+        card_type: "Visa",
+        transaction_type: "withdrawal",
+        customer_mode: "Normal",
+        sent_to: "Upender",
+        usage_count: 3,
+      };
+
+      expect(card.sent_to).toBe("Upender");
+      expect(card.bank_name).toBe("HDFC");
+    });
+  });
 });

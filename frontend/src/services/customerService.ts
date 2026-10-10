@@ -5,6 +5,7 @@ export interface CustomerSavedCard {
   card_type: string;
   transaction_type: string;
   customer_mode: string;
+  sent_to?: string;
   last_used?: string;
   usage_count?: number;
 }
@@ -239,6 +240,7 @@ export const customerService = {
                 card_type: card.card_type || "Visa",
                 transaction_type: card.transaction_type || "withdrawal",
                 customer_mode: card.customer_mode || "Normal",
+                sent_to: card.sent_to || card.portal_name || "",
                 last_used: card.last_used,
                 usage_count: Number(card.usage_count || 1),
               }))
@@ -645,6 +647,7 @@ export const customerService = {
             card_type: c.card_type || "Visa",
             transaction_type: c.transaction_type || "withdrawal",
             customer_mode: c.customer_mode || "Normal",
+            sent_to: c.sent_to || c.portal_name || "",
             usage_count: Number(c.usage_count || 1),
             last_used: c.last_used,
           }))
@@ -655,7 +658,7 @@ export const customerService = {
       if (customerId || phone) {
         let query = supabase
           .from("transactions")
-          .select("bank_name, card_type, transaction_type, customer_mode, transaction_date")
+          .select("bank_name, card_type, transaction_type, customer_mode, transaction_date, notes, portals ( name )")
           .not("bank_name", "is", null);
 
         if (customerId) {
@@ -672,6 +675,16 @@ export const customerService = {
           const cardMap = new Map<string, CustomerSavedCard>();
           for (const t of txns) {
             if (!t.bank_name) continue;
+            let sentTo = "";
+            if (t.portals && (t.portals as any).name) {
+              sentTo = (t.portals as any).name.trim();
+            } else if (t.notes) {
+              const sentToMatch = t.notes.match(/Sent to:\s*([^|]+)/i);
+              if (sentToMatch && sentToMatch[1]) {
+                sentTo = sentToMatch[1].trim();
+              }
+            }
+
             const key = `${t.bank_name.trim().toLowerCase()}_${(t.card_type || "").toLowerCase()}_${(t.transaction_type || "").toLowerCase()}_${(t.customer_mode || "").toLowerCase()}`;
             if (!cardMap.has(key)) {
               cardMap.set(key, {
@@ -679,12 +692,16 @@ export const customerService = {
                 card_type: t.card_type || "Visa",
                 transaction_type: t.transaction_type || "withdrawal",
                 customer_mode: t.customer_mode || "Normal",
+                sent_to: sentTo,
                 usage_count: 1,
                 last_used: t.transaction_date,
               });
             } else {
               const existing = cardMap.get(key)!;
               existing.usage_count = (existing.usage_count || 1) + 1;
+              if (!existing.sent_to && sentTo) {
+                existing.sent_to = sentTo;
+              }
             }
           }
           return Array.from(cardMap.values()).sort(
@@ -709,6 +726,7 @@ export const customerService = {
       card_type?: string | null;
       transaction_type?: string | null;
       customer_mode?: string | null;
+      sent_to?: string | null;
     }
   ): Promise<void> {
     if (!customerId || !card.bank_name) return;
@@ -726,6 +744,7 @@ export const customerService = {
       const cType = (card.card_type || "Visa").trim();
       const tType = (card.transaction_type || "withdrawal").trim();
       const cMode = (card.customer_mode || "Normal").trim();
+      const sTo = (card.sent_to || "").trim();
 
       const existingIdx = rawList.findIndex(
         (item) =>
@@ -740,6 +759,7 @@ export const customerService = {
         updatedList = [...rawList];
         updatedList[existingIdx] = {
           ...updatedList[existingIdx],
+          sent_to: sTo || updatedList[existingIdx].sent_to || "",
           usage_count: (Number(updatedList[existingIdx].usage_count) || 1) + 1,
           last_used: new Date().toISOString(),
         };
@@ -751,6 +771,7 @@ export const customerService = {
             card_type: cType,
             transaction_type: tType,
             customer_mode: cMode,
+            sent_to: sTo,
             usage_count: 1,
             last_used: new Date().toISOString(),
           },

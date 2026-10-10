@@ -604,25 +604,8 @@ export class TransactionLearningService {
     const amount = params.amount;
     const context = { card, tx, portal };
 
-    // Tier 0: Recurring Customer Memory (Chummi mode or named client)
-    if (custId || custName) {
-      const custMatches = this.records.filter((r) => {
-        if (custId && r.customer_id && r.customer_id === custId) return true;
-        if (custName && r.customer_name && normalize(r.customer_name) === custName) return true;
-        return false;
-      });
-
-      if (custMatches.length > 0) {
-        // Prefer same transaction type (e.g. withdrawal vs repayment)
-        const custTxMatches = custMatches.filter((r) => normalize(r.transaction_type) === tx);
-        const targetMatches = custTxMatches.length > 0 ? custTxMatches : custMatches;
-        const custRec = this.evaluateKernelDensity(targetMatches, "customer_history", 0.3, amount, context);
-        if (custRec) {
-          custRec.confidence = Math.max(0.95, custRec.confidence);
-          return custRec;
-        }
-      }
-    }
+    // Prediction model strictly predicts standard pattern rates (Card + Tx + Portal + Bank + Mode).
+    // It NEVER depends on a specific customer's previous percentage or negotiated rate.
 
     // Tier 1: Card + Tx + Portal + Bank + Mode (Highest specificity)
     if (card && tx && portal && bank && mode) {
@@ -716,6 +699,58 @@ export class TransactionLearningService {
       source: "none",
       sampleCount: 0,
     };
+  }
+
+  /**
+   * Finds the most recent or frequent `sent_to` portal used for a given bank and card type
+   * (optionally filtered by customer) to auto-fill `sent_to` when selecting a saved card.
+   */
+  public getSentToForCard(params: {
+    bankName?: string;
+    cardType?: string;
+    customerId?: string;
+    customerName?: string;
+  }): string | null {
+    const bank = normalize(params.bankName);
+    const card = normalizeCardType(params.cardType);
+    const custId = (params.customerId || "").trim();
+    const custName = normalize(params.customerName);
+
+    // 1. Try to find recent transaction for this specific customer with this bank & card
+    if (bank && (custId || custName)) {
+      const custMatch = this.records.find((r) => {
+        const matchCust =
+          (custId && r.customer_id === custId) ||
+          (custName && normalize(r.customer_name) === custName);
+        const matchBank = normalize(r.bank_name) === bank;
+        const matchCard = !card || normalizeCardType(r.card_type) === card;
+        return matchCust && matchBank && matchCard && Boolean(r.sent_to);
+      });
+      if (custMatch?.sent_to) return custMatch.sent_to;
+    }
+
+    // 2. Try to find any transaction for this customer with sent_to
+    if (custId || custName) {
+      const anyCustMatch = this.records.find((r) => {
+        const matchCust =
+          (custId && r.customer_id === custId) ||
+          (custName && normalize(r.customer_name) === custName);
+        return matchCust && Boolean(r.sent_to);
+      });
+      if (anyCustMatch?.sent_to) return anyCustMatch.sent_to;
+    }
+
+    // 3. Fallback to general bank + card match
+    if (bank) {
+      const bankMatch = this.records.find((r) => {
+        const matchBank = normalize(r.bank_name) === bank;
+        const matchCard = !card || normalizeCardType(r.card_type) === card;
+        return matchBank && matchCard && Boolean(r.sent_to);
+      });
+      if (bankMatch?.sent_to) return bankMatch.sent_to;
+    }
+
+    return null;
   }
 
   public subscribe(listener: () => void): () => void {
@@ -846,25 +881,11 @@ export class TransactionLearningService {
       const custName = normalize(target.customer_name);
       const custId = target.customer_id;
 
-      // 1. Customer Match
+      // 1. Card + Tx + Portal + Bank + Mode
       let matches: HistoricalTransactionRecord[] = [];
       let source: TransactionFeeRecommendation["source"] = "none";
 
-      if (custId || custName) {
-        matches = training.filter((r) => {
-          if (custId && r.customer_id && r.customer_id === custId) return true;
-          if (custName && r.customer_name && normalize(r.customer_name) === custName) return true;
-          return false;
-        });
-        if (matches.length > 0) {
-          const custTxMatches = matches.filter((r) => normalize(r.transaction_type) === tx);
-          matches = custTxMatches.length > 0 ? custTxMatches : matches;
-          source = "customer_history";
-        }
-      }
-
-      // 2. Card + Tx + Portal + Bank + Mode
-      if (matches.length === 0 && bank && mode) {
+      if (bank && mode) {
         matches = training.filter(
           (r) =>
             normalizeCardType(r.card_type) === card &&
@@ -924,7 +945,7 @@ export class TransactionLearningService {
       if (isFeeOk) feeCorrect++;
       if (isCommOk && isFeeOk) bothCorrect++;
 
-      const isTopTier = source === "customer_history" || source === "card_tx_portal_bank_mode" || source === "card_tx_portal_bank" || source === "card_tx_portal";
+      const isTopTier = source === "card_tx_portal_bank_mode" || source === "card_tx_portal_bank" || source === "card_tx_portal";
       if (isTopTier) {
         tier1Count++;
         if (isCommOk) tier1CommCorrect++;
