@@ -61,6 +61,11 @@ import { format } from "date-fns";
 const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   none: { label: "No Prediction", color: "bg-muted text-muted-foreground border-border" },
   customer_history: { label: "Customer Memory", color: "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20" },
+  site_card_tx_portal_bank_mode: { label: "Site + Full Context", color: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20" },
+  site_card_tx_bank: { label: "Site + Bank", color: "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/20" },
+  site_card_tx: { label: "Site + Card", color: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/20" },
+  site_tx: { label: "Site + Tx Type", color: "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20" },
+  site_default: { label: "Site Base Rate", color: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20" },
   card_tx_portal_bank_mode: { label: "Full Context Match", color: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20" },
   card_tx_portal_bank: { label: "Bank + Portal", color: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/20" },
   card_tx_portal: { label: "Portal Match", color: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/20" },
@@ -174,13 +179,15 @@ export default function AiTracker() {
   // Filtered events
   const filteredEvents = useMemo(() => {
     return events.filter((ev) => {
-      const bothAccepted = ev.commissionAccepted && ev.siteFeeAccepted;
+      const isImpsAccepted = ev.impsAccepted ?? true;
+      const allAccepted = ev.allAccepted ?? (ev.commissionAccepted && ev.siteFeeAccepted && isImpsAccepted);
       
       // Status filter
-      if (statusFilter === "accepted" && !bothAccepted) return false;
-      if (statusFilter === "overridden" && bothAccepted) return false;
+      if (statusFilter === "accepted" && !allAccepted) return false;
+      if (statusFilter === "overridden" && allAccepted) return false;
       if (statusFilter === "commission_changed" && ev.commissionAccepted) return false;
       if (statusFilter === "site_fee_changed" && ev.siteFeeAccepted) return false;
+      if (statusFilter === "imps_changed" && isImpsAccepted) return false;
 
       // Source filter
       if (sourceFilter !== "all" && ev.predictionSource !== sourceFilter) return false;
@@ -191,6 +198,7 @@ export default function AiTracker() {
         const cardMatch = ev.cardType.toLowerCase().includes(query);
         const txMatch = ev.transactionType.toLowerCase().includes(query);
         const sentMatch = ev.sentTo.toLowerCase().includes(query);
+        const siteMatch = ev.siteName?.toLowerCase().includes(query) || false;
         const bankMatch = ev.bankName?.toLowerCase().includes(query) || false;
         const modeMatch = ev.customerMode?.toLowerCase().includes(query) || false;
         const tierMatch = ev.predictionSource.toLowerCase().includes(query);
@@ -204,6 +212,7 @@ export default function AiTracker() {
           !cardMatch &&
           !txMatch &&
           !sentMatch &&
+          !siteMatch &&
           !bankMatch &&
           !modeMatch &&
           !tierMatch &&
@@ -261,8 +270,8 @@ export default function AiTracker() {
           </div>
         </div>
 
-        {/* Top Metric Cards - 2x2 on Mobile, 4-col on Desktop */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+        {/* Top Metric Cards - 2-col on Mobile, 5-col on Desktop */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-4">
           <Card className="border shadow-sm">
             <CardHeader className="p-3 sm:p-4 pb-1.5 sm:pb-2">
               <div className="flex items-center justify-between">
@@ -290,15 +299,15 @@ export default function AiTracker() {
               </div>
               <div className="flex items-baseline gap-1.5 mt-1 flex-wrap">
                 <CardTitle className="text-xl sm:text-2xl font-bold">
-                  {stats?.acceptanceRate || 0}%
+                  {stats?.allAcceptanceRate ?? stats?.acceptanceRate ?? 0}%
                 </CardTitle>
                 <span className="text-[10px] sm:text-xs text-muted-foreground">
-                  ({stats?.totalAccepted || 0}/{stats?.totalPredictions || 0})
+                  ({stats?.allAcceptedCount ?? stats?.totalAccepted ?? 0}/{stats?.totalPredictions || 0})
                 </span>
               </div>
             </CardHeader>
             <CardContent className="p-3 sm:p-4 pt-0">
-              <Progress value={stats?.acceptanceRate || 0} className="h-1.5 sm:h-2 mt-1" />
+              <Progress value={stats?.allAcceptanceRate ?? stats?.acceptanceRate ?? 0} className="h-1.5 sm:h-2 mt-1" />
             </CardContent>
           </Card>
 
@@ -339,6 +348,26 @@ export default function AiTracker() {
             </CardHeader>
             <CardContent className="p-3 sm:p-4 pt-0">
               <Progress value={stats?.siteFeeAcceptanceRate || 0} className="h-1.5 sm:h-2 mt-1" />
+            </CardContent>
+          </Card>
+
+          <Card className="border shadow-sm">
+            <CardHeader className="p-3 sm:p-4 pb-1.5 sm:pb-2">
+              <div className="flex items-center justify-between">
+                <CardDescription className="text-[11px] sm:text-xs font-medium truncate">IMPS Match</CardDescription>
+                <IndianRupee className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
+              </div>
+              <div className="flex items-baseline gap-1.5 mt-1 flex-wrap">
+                <CardTitle className="text-xl sm:text-2xl font-bold">
+                  {stats?.impsAcceptanceRate ?? 100}%
+                </CardTitle>
+                <span className="text-[10px] sm:text-xs text-muted-foreground">
+                  ({stats?.impsAcceptedCount ?? 0}/{stats?.totalPredictions || 0})
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent className="p-3 sm:p-4 pt-0">
+              <Progress value={stats?.impsAcceptanceRate ?? 100} className="h-1.5 sm:h-2 mt-1" />
             </CardContent>
           </Card>
         </div>
@@ -382,6 +411,7 @@ export default function AiTracker() {
                       <SelectItem value="overridden">Overridden</SelectItem>
                       <SelectItem value="commission_changed">Commission Changed</SelectItem>
                       <SelectItem value="site_fee_changed">Site Fee Changed</SelectItem>
+                      <SelectItem value="imps_changed">IMPS Changed</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -399,6 +429,11 @@ export default function AiTracker() {
                         </span>
                       </SelectItem>
                       <SelectItem value="customer_history">Customer Memory</SelectItem>
+                      <SelectItem value="site_card_tx_portal_bank_mode">Site + Full Context</SelectItem>
+                      <SelectItem value="site_card_tx_bank">Site + Bank</SelectItem>
+                      <SelectItem value="site_card_tx">Site + Card</SelectItem>
+                      <SelectItem value="site_tx">Site + Tx Type</SelectItem>
+                      <SelectItem value="site_default">Site Base Rate</SelectItem>
                       <SelectItem value="card_tx_portal_bank_mode">Full Context Match</SelectItem>
                       <SelectItem value="card_tx_portal_bank">Bank + Portal</SelectItem>
                       <SelectItem value="card_tx_portal">Portal Match</SelectItem>
@@ -448,9 +483,13 @@ export default function AiTracker() {
                 {/* Mobile View: Clean, readable Card items (md:hidden) */}
                 <div className="md:hidden divide-y divide-border/60">
                   {filteredEvents.map((ev, idx) => {
-                    const bothAccepted = ev.commissionAccepted && ev.siteFeeAccepted;
+                    const isImpsAccepted = ev.impsAccepted ?? true;
+                    const allAccepted = ev.allAccepted ?? (ev.commissionAccepted && ev.siteFeeAccepted && isImpsAccepted);
                     const commDiff = Math.round((ev.actualCommission - ev.predictedCommission) * 100) / 100;
                     const feeDiff = Math.round((ev.actualSiteFee - ev.predictedSiteFee) * 100) / 100;
+                    const impsPred = ev.predictedImps ?? 0;
+                    const impsAct = ev.actualImps ?? 0;
+                    const impsDiff = Math.round((impsAct - impsPred) * 100) / 100;
                     const tierInfo = SOURCE_LABELS[ev.predictionSource] || {
                       label: ev.predictionSource || "Fallback",
                       color: "bg-muted text-muted-foreground",
@@ -475,7 +514,7 @@ export default function AiTracker() {
                             )}
                           </div>
 
-                          {bothAccepted ? (
+                          {allAccepted ? (
                             <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 font-medium text-[11px] gap-1 px-2 py-0.5">
                               <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
                               Accepted
@@ -512,15 +551,16 @@ export default function AiTracker() {
 
                         {/* Middle: What Changed / Rates Box */}
                         <div className="bg-muted/30 rounded-xl p-2.5 border border-border/50 space-y-1.5">
-                          {bothAccepted ? (
+                          {allAccepted ? (
                             <div className="space-y-1">
                               <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                                 <AiIcon className="h-3.5 w-3.5 shrink-0" />
                                 <span>Accepted exact AI suggestion</span>
                               </div>
-                              <div className="text-xs text-muted-foreground flex items-center justify-between pt-0.5">
+                              <div className="text-xs text-muted-foreground flex items-center justify-between pt-0.5 flex-wrap gap-1">
                                 <span>Commission: <strong className="text-foreground">{ev.predictedCommission}%</strong></span>
                                 <span>Site Fee: <strong className="text-foreground">{ev.predictedSiteFee}%</strong></span>
+                                <span>IMPS: <strong className="text-foreground">₹{impsPred}</strong></span>
                                 <Badge variant="outline" className="text-[10px] py-0 px-1 font-semibold text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
                                   Margin: +{Math.round((ev.predictedCommission - ev.predictedSiteFee) * 100) / 100}%
                                 </Badge>
@@ -569,6 +609,27 @@ export default function AiTracker() {
                                   </div>
                                 )}
                               </div>
+
+                              {/* IMPS / NEFT */}
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground font-medium">IMPS / NEFT:</span>
+                                {isImpsAccepted ? (
+                                  <span className="text-emerald-600 dark:text-emerald-400 text-xs font-medium flex items-center gap-1">
+                                    <Check className="h-3 w-3" /> ₹{impsPred} (Accepted)
+                                  </span>
+                                ) : (
+                                  <div className="flex items-center gap-1.5 font-mono text-xs">
+                                    <span className="text-muted-foreground line-through">₹{impsPred}</span>
+                                    <ArrowRight className="h-3 w-3 text-amber-500 shrink-0" />
+                                    <span className="font-bold text-foreground bg-amber-500/10 px-1 rounded">
+                                      ₹{impsAct}
+                                    </span>
+                                    <span className={`text-[10px] ${impsDiff > 0 ? "text-amber-600 dark:text-amber-400" : "text-blue-600 dark:text-blue-400"}`}>
+                                      ({impsDiff > 0 ? `+₹${impsDiff}` : `₹${impsDiff}`})
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -583,6 +644,11 @@ export default function AiTracker() {
                             <Badge variant="secondary" className="text-[10px] uppercase font-mono px-1.5 py-0">
                               {ev.transactionType}
                             </Badge>
+                            {ev.siteName && (
+                              <Badge variant="outline" className="text-[10px] font-medium px-1.5 py-0 bg-primary/5 text-primary border-primary/20">
+                                {ev.siteName}
+                              </Badge>
+                            )}
                             <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                               <Send className="h-2.5 w-2.5 text-primary" />
                               {ev.portalName || ev.sentTo}
@@ -653,9 +719,13 @@ export default function AiTracker() {
                     </TableHeader>
                     <TableBody>
                       {filteredEvents.map((ev, idx) => {
-                        const bothAccepted = ev.commissionAccepted && ev.siteFeeAccepted;
+                        const isImpsAccepted = ev.impsAccepted ?? true;
+                        const allAccepted = ev.allAccepted ?? (ev.commissionAccepted && ev.siteFeeAccepted && isImpsAccepted);
                         const commDiff = Math.round((ev.actualCommission - ev.predictedCommission) * 100) / 100;
                         const feeDiff = Math.round((ev.actualSiteFee - ev.predictedSiteFee) * 100) / 100;
+                        const impsPred = ev.predictedImps ?? 0;
+                        const impsAct = ev.actualImps ?? 0;
+                        const impsDiff = Math.round((impsAct - impsPred) * 100) / 100;
                         const tierInfo = SOURCE_LABELS[ev.predictionSource] || {
                           label: ev.predictionSource || "Fallback",
                           color: "bg-muted text-muted-foreground",
@@ -676,7 +746,7 @@ export default function AiTracker() {
 
                             {/* 2. Status Badge */}
                             <TableCell>
-                              {bothAccepted ? (
+                              {allAccepted ? (
                                 <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 font-medium text-[11px] gap-1 px-2 py-0.5 whitespace-nowrap">
                                   <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
                                   Accepted
@@ -726,6 +796,11 @@ export default function AiTracker() {
                                   <Badge variant="secondary" className="text-[10px] uppercase font-mono px-1.5 py-0">
                                     {ev.transactionType}
                                   </Badge>
+                                  {ev.siteName && (
+                                    <Badge variant="outline" className="text-[10px] font-medium px-1.5 py-0 bg-primary/5 text-primary border-primary/20">
+                                      {ev.siteName}
+                                    </Badge>
+                                  )}
                                   <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                                     <Send className="h-2.5 w-2.5 text-primary" />
                                     {ev.portalName || ev.sentTo}
@@ -748,14 +823,18 @@ export default function AiTracker() {
 
                             {/* 4. What Changed? Details */}
                             <TableCell>
-                              {bothAccepted ? (
+                              {allAccepted ? (
                                 <div className="space-y-0.5">
                                   <div className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                                     <AiIcon className="h-3.5 w-3.5 shrink-0" />
                                     <span>Accepted exact AI suggestion</span>
                                   </div>
-                                  <div className="text-[11px] text-muted-foreground">
-                                    Commission: <span className="font-semibold text-foreground">{ev.predictedCommission}%</span> | Site Fee: <span className="font-semibold text-foreground">{ev.predictedSiteFee}%</span>
+                                  <div className="text-[11px] text-muted-foreground flex items-center gap-2 flex-wrap">
+                                    <span>Commission: <strong className="font-semibold text-foreground">{ev.predictedCommission}%</strong></span>
+                                    <span>•</span>
+                                    <span>Site Fee: <strong className="font-semibold text-foreground">{ev.predictedSiteFee}%</strong></span>
+                                    <span>•</span>
+                                    <span>IMPS: <strong className="font-semibold text-foreground">₹{impsPred}</strong></span>
                                   </div>
                                 </div>
                               ) : (
@@ -797,6 +876,27 @@ export default function AiTracker() {
                                         </span>
                                         <span className={`text-[10px] ${feeDiff > 0 ? "text-amber-600 dark:text-amber-400" : "text-blue-600 dark:text-blue-400"}`}>
                                           ({feeDiff > 0 ? `+${feeDiff}%` : `${feeDiff}%`})
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* IMPS change */}
+                                  <div className="flex items-center gap-1.5 text-xs flex-wrap">
+                                    <span className="font-medium text-muted-foreground w-20">IMPS / NEFT:</span>
+                                    {isImpsAccepted ? (
+                                      <span className="text-emerald-600 dark:text-emerald-400 text-[11px] font-medium flex items-center gap-1">
+                                        <Check className="h-3 w-3" /> ₹{impsPred} (Accepted)
+                                      </span>
+                                    ) : (
+                                      <div className="flex items-center gap-1.5 font-mono text-[11px]">
+                                        <span className="text-muted-foreground line-through">₹{impsPred}</span>
+                                        <ArrowRight className="h-3 w-3 text-amber-500 shrink-0" />
+                                        <span className="font-bold text-foreground bg-amber-500/10 px-1 rounded">
+                                          ₹{impsAct}
+                                        </span>
+                                        <span className={`text-[10px] ${impsDiff > 0 ? "text-amber-600 dark:text-amber-400" : "text-blue-600 dark:text-blue-400"}`}>
+                                          ({impsDiff > 0 ? `+₹${impsDiff}` : `₹${impsDiff}`})
                                         </span>
                                       </div>
                                     )}
@@ -865,7 +965,11 @@ export default function AiTracker() {
         {/* ── Entire Transaction Detail Modal ────────────────────────────── */}
         <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
           <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl p-5 sm:p-6 space-y-4">
-            {selectedEvent && (
+            {selectedEvent && (() => {
+              const isSelectedImpsAccepted = selectedEvent.impsAccepted ?? true;
+              const isSelectedAllAccepted = selectedEvent.allAccepted ?? (selectedEvent.commissionAccepted && selectedEvent.siteFeeAccepted && isSelectedImpsAccepted);
+
+              return (
               <>
                 <DialogHeader className="space-y-1">
                   <div className="flex items-center justify-between gap-2">
@@ -873,7 +977,7 @@ export default function AiTracker() {
                       <FileText className="h-5 w-5 text-primary" />
                       <span>Entire Transaction Detail</span>
                     </DialogTitle>
-                    {selectedEvent.commissionAccepted && selectedEvent.siteFeeAccepted ? (
+                    {isSelectedAllAccepted ? (
                       <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-0.5">
                         <Check className="h-3 w-3 mr-1" /> AI Accepted
                       </Badge>
@@ -908,8 +1012,8 @@ export default function AiTracker() {
                     )}
                   </div>
 
-                  {/* 4-stat metrics grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-border/40 text-xs">
+                  {/* 5-stat metrics grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 pt-2 border-t border-border/40 text-xs">
                     <div className="bg-background/80 p-2 rounded-xl border border-border/40">
                       <span className="text-muted-foreground text-[10px] block">Commission Rate</span>
                       <strong className="text-foreground text-xs">{selectedEvent.actualCommission}%</strong>
@@ -917,6 +1021,10 @@ export default function AiTracker() {
                     <div className="bg-background/80 p-2 rounded-xl border border-border/40">
                       <span className="text-muted-foreground text-[10px] block">Site Fee Rate</span>
                       <strong className="text-foreground text-xs">{selectedEvent.actualSiteFee}%</strong>
+                    </div>
+                    <div className="bg-background/80 p-2 rounded-xl border border-border/40">
+                      <span className="text-muted-foreground text-[10px] block">IMPS Charges</span>
+                      <strong className="text-foreground text-xs">₹{selectedEvent.actualImps ?? 0}</strong>
                     </div>
                     <div className="bg-background/80 p-2 rounded-xl border border-border/40">
                       <span className="text-muted-foreground text-[10px] block">Card Type</span>
@@ -958,6 +1066,13 @@ export default function AiTracker() {
                       ) : (
                         <span className="text-muted-foreground/80 italic">—</span>
                       )}
+                    </div>
+
+                    <div>
+                      <span className="text-muted-foreground block text-[11px]">Gateway Site</span>
+                      <span className="font-semibold text-foreground">
+                        {selectedEvent.siteName || "Default"}
+                      </span>
                     </div>
 
                     <div>
@@ -1029,6 +1144,20 @@ export default function AiTracker() {
                       </div>
                     </div>
 
+                    <div className="flex items-center justify-between p-2 rounded-xl bg-muted/20 border border-border/40">
+                      <span className="text-muted-foreground">IMPS / NEFT Suggestion</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground font-mono">Suggested: ₹{selectedEvent.predictedImps ?? 0}</span>
+                        <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                        <span className="font-bold text-foreground font-mono">Actual: ₹{selectedEvent.actualImps ?? 0}</span>
+                        {isSelectedImpsAccepted ? (
+                          <Badge className="bg-emerald-500/10 text-emerald-700 text-[10px] px-1.5 py-0 border-emerald-500/20">Accepted</Badge>
+                        ) : (
+                          <Badge className="bg-amber-500/10 text-amber-700 text-[10px] px-1.5 py-0 border-amber-500/20">Changed</Badge>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="flex items-center justify-between pt-1">
                       <span className="text-muted-foreground">AI Intelligence Model:</span>
                       <Badge variant="outline" className={`text-xs px-2 py-0.5 border ${(SOURCE_LABELS[selectedEvent.predictionSource] || { color: "bg-muted text-muted-foreground" }).color}`}>
@@ -1065,7 +1194,8 @@ export default function AiTracker() {
                   </Button>
                 </DialogFooter>
               </>
-            )}
+              );
+            })()}
           </DialogContent>
         </Dialog>
 

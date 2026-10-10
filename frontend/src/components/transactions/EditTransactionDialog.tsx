@@ -44,7 +44,9 @@ interface EditTransactionDialogProps {
     transaction_type: string;
     amount: number;
     commission: number;
+    commission_percent?: number | null;
     site_fee: number;
+    site_fee_percent?: number | null;
     imps_charges?: number | null;
     profit?: number;
     reference_number?: string | null;
@@ -181,12 +183,19 @@ export const EditTransactionDialog = ({
       let commPct = "";
       let feePct = "";
 
+      if (transaction.commission_percent !== undefined && transaction.commission_percent !== null && Number(transaction.commission_percent) > 0) {
+        commPct = Number(transaction.commission_percent).toString();
+      }
+      if (transaction.site_fee_percent !== undefined && transaction.site_fee_percent !== null && Number(transaction.site_fee_percent) > 0) {
+        feePct = Number(transaction.site_fee_percent).toString();
+      }
+
       // Check notes for explicitly saved percentages: "Commission: 2.7%" / "Site Fee: 2.31%"
       if (transaction.notes) {
         const commMatch = transaction.notes.match(/Commission:\s*([\d.]+)%/i);
         const feeMatch = transaction.notes.match(/Site Fee:\s*([\d.]+)%/i);
-        if (commMatch) commPct = commMatch[1];
-        if (feeMatch) feePct = feeMatch[1];
+        if (!commPct && commMatch) commPct = commMatch[1];
+        if (!feePct && feeMatch) feePct = feeMatch[1];
       }
 
       const amt = Number(transaction.amount || 0);
@@ -523,6 +532,7 @@ export const EditTransactionDialog = ({
           card_type: formData.card_type,
           transaction_type: formData.transaction_type,
           sent_to: selectedPortal?.name || "Portal",
+          site_name: formData.site_name,
           bank_name: formData.bank_name,
           customer_mode: formData.customer_mode,
           customer_name: customerName || undefined,

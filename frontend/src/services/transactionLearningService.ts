@@ -10,12 +10,20 @@ export interface OverrideRecord {
   cardType?: string;
   transactionType?: string;
   sentTo?: string;
+  siteName?: string;
   bankName?: string;
   customerMode?: string;
   actualCommission: number;
   actualSiteFee: number;
+  actualImps?: number;
   predictedCommission: number;
   predictedSiteFee: number;
+  predictedImps?: number;
+  commissionAccepted?: boolean;
+  siteFeeAccepted?: boolean;
+  impsAccepted?: boolean;
+  bothAccepted?: boolean;
+  allAccepted?: boolean;
   timestamp: number;
 }
 
@@ -27,6 +35,11 @@ export interface TransactionFeeRecommendation {
   confidence: number; // 0.0 to 1.0
   source:
     | "customer_history"
+    | "site_card_tx_portal_bank_mode"
+    | "site_card_tx_bank"
+    | "site_card_tx"
+    | "site_tx"
+    | "site_default"
     | "card_tx_portal_bank_mode"
     | "card_tx_portal_bank"
     | "card_tx_portal"
@@ -44,6 +57,7 @@ export interface HistoricalTransactionRecord {
   card_type: string;
   transaction_type: string;
   sent_to: string;
+  site_name?: string;
   bank_name?: string;
   customer_mode?: string;
   customer_name?: string;
@@ -151,6 +165,7 @@ export class TransactionLearningService {
           customer_id,
           transaction_date,
           portal_id,
+          site_name,
           portals ( name )
         `)
         .order("transaction_date", { ascending: false });
@@ -170,26 +185,33 @@ export class TransactionLearningService {
         .map((row: any) => this.parseRecord(row))
         .filter((r): r is HistoricalTransactionRecord => r !== null);
 
-      // Load recent negative feedback overrides for closed-loop active learning
+      // Load recent AI tracker feedback (both overrides and verified acceptances) for closed-loop learning
       try {
-        const { data: overrideData } = await supabase
+        const { data: trackerData } = await supabase
           .from("prediction_tracking")
           .select("*")
-          .eq("both_accepted", false)
           .order("created_at", { ascending: false })
-          .limit(40);
+          .limit(60);
 
-        if (overrideData && overrideData.length > 0) {
-          this.overrides = overrideData.map((row: any) => ({
+        if (trackerData && trackerData.length > 0) {
+          this.overrides = trackerData.map((row: any) => ({
             cardType: row.card_type,
             transactionType: row.transaction_type,
             sentTo: row.sent_to,
+            siteName: row.site_name,
             bankName: row.bank_name,
             customerMode: row.customer_mode,
-            actualCommission: Number(row.actual_commission),
-            actualSiteFee: Number(row.actual_site_fee),
-            predictedCommission: Number(row.predicted_commission),
-            predictedSiteFee: Number(row.predicted_site_fee),
+            actualCommission: Number(row.actual_commission ?? 0),
+            actualSiteFee: Number(row.actual_site_fee ?? 0),
+            actualImps: row.actual_imps !== null && row.actual_imps !== undefined ? Number(row.actual_imps) : undefined,
+            predictedCommission: Number(row.predicted_commission ?? 0),
+            predictedSiteFee: Number(row.predicted_site_fee ?? 0),
+            predictedImps: row.predicted_imps !== null && row.predicted_imps !== undefined ? Number(row.predicted_imps) : undefined,
+            commissionAccepted: Boolean(row.commission_accepted),
+            siteFeeAccepted: Boolean(row.site_fee_accepted),
+            impsAccepted: row.imps_accepted !== null && row.imps_accepted !== undefined ? Boolean(row.imps_accepted) : true,
+            bothAccepted: Boolean(row.both_accepted),
+            allAccepted: row.all_accepted !== null && row.all_accepted !== undefined ? Boolean(row.all_accepted) : Boolean(row.both_accepted),
             timestamp: new Date(row.created_at).getTime(),
           }));
         }
@@ -238,6 +260,13 @@ export class TransactionLearningService {
     if (!customerMode && notes) {
       const mm = notes.match(/Mode:\s*([^|]+)/i);
       if (mm && mm[1]) customerMode = mm[1].trim();
+    }
+
+    // Determine Site Name
+    let siteName = (row.site_name || "").trim();
+    if (!siteName && notes) {
+      const sm = notes.match(/Site:\s*([^|]+)/i);
+      if (sm && sm[1]) siteName = sm[1].trim();
     }
 
     // Determine Customer Name & ID
@@ -292,6 +321,7 @@ export class TransactionLearningService {
       card_type: normalizeCardType(cardType),
       transaction_type: txType,
       sent_to: sentTo,
+      site_name: siteName,
       bank_name: bankName,
       customer_mode: customerMode,
       customer_name: customerName,
@@ -312,6 +342,7 @@ export class TransactionLearningService {
     card_type: string;
     transaction_type: string;
     sent_to: string;
+    site_name?: string;
     bank_name?: string;
     customer_mode?: string;
     customer_name?: string;
@@ -327,6 +358,7 @@ export class TransactionLearningService {
       card_type: normalizeCardType(tx.card_type),
       transaction_type: tx.transaction_type.trim(),
       sent_to: tx.sent_to.trim(),
+      site_name: (tx.site_name || "").trim(),
       bank_name: (tx.bank_name || "").trim(),
       customer_mode: (tx.customer_mode || "").trim(),
       customer_name: (tx.customer_name || "").trim(),
@@ -365,7 +397,8 @@ export class TransactionLearningService {
     candFee: number,
     card?: string,
     tx?: string,
-    portal?: string
+    portal?: string,
+    site?: string
   ): number {
     if (this.overrides.length === 0) return 0;
     const now = Date.now();
@@ -377,21 +410,40 @@ export class TransactionLearningService {
       if (ageDays > 14) continue;
       const decay = Math.max(0, 1 - ageDays / 14);
 
-      // Context matching (if card/tx specified in override, ensure compatibility)
+      // Context matching (if card/tx/portal/site specified in override, ensure compatibility)
+      if (o.siteName && site && normalize(o.siteName) !== site) continue;
       if (o.cardType && card && normalizeCardType(o.cardType) !== card) continue;
       if (o.transactionType && tx && normalize(o.transactionType) !== tx) continue;
       if (o.sentTo && portal && normalize(o.sentTo) !== portal) continue;
 
-      // If this candidate matches what the user manually selected, boost it
-      const isActual = Math.abs(candComm - o.actualCommission) <= 0.05 && Math.abs(candFee - o.actualSiteFee) <= 0.05;
-      if (isActual) {
-        adjustment += 1.5 * decay;
+      const isSiteSpecific = Boolean(o.siteName && site && normalize(o.siteName) === site);
+      const siteMultiplier = isSiteSpecific ? 1.5 : 1.0;
+
+      // 1. Positive reinforcement for verified accepted predictions (ground truth)
+      if (o.commissionAccepted && o.siteFeeAccepted) {
+        const isVerified =
+          Math.abs(candComm - o.actualCommission) <= 0.05 &&
+          Math.abs(candFee - o.actualSiteFee) <= 0.05;
+        if (isVerified) {
+          adjustment += 1.8 * decay * siteMultiplier;
+        }
+        continue;
       }
 
-      // If this candidate matches what the user rejected, penalize it
-      const isRejected = Math.abs(candComm - o.predictedCommission) <= 0.05 && Math.abs(candFee - o.predictedSiteFee) <= 0.05;
+      // 2. If this candidate matches what the user manually selected (user override), boost it strongly
+      const isActual =
+        Math.abs(candComm - o.actualCommission) <= 0.05 &&
+        Math.abs(candFee - o.actualSiteFee) <= 0.05;
+      if (isActual) {
+        adjustment += 2.2 * decay * siteMultiplier;
+      }
+
+      // 3. If this candidate matches what the user rejected, penalize it
+      const isRejected =
+        Math.abs(candComm - o.predictedCommission) <= 0.05 &&
+        Math.abs(candFee - o.predictedSiteFee) <= 0.05;
       if (isRejected && !isActual) {
-        adjustment -= 1.2 * decay;
+        adjustment -= 2.0 * decay * siteMultiplier;
       }
     }
 
@@ -407,7 +459,7 @@ export class TransactionLearningService {
     sourceName: TransactionFeeRecommendation["source"],
     minConfidence = 0.25,
     queryAmount?: number,
-    context?: { card?: string; tx?: string; portal?: string }
+    context?: { card?: string; tx?: string; portal?: string; site?: string }
   ): TransactionFeeRecommendation | null {
     if (matches.length === 0) return null;
 
@@ -474,13 +526,14 @@ export class TransactionLearningService {
         score *= 0.1;
       }
 
-      // Closed-loop override reinforcement
+      // Closed-loop active learning reinforcement
       const feedbackAdj = this.getOverrideAdjustment(
         cand.commission,
         cand.siteFee,
         context?.card,
         context?.tx,
-        context?.portal
+        context?.portal,
+        context?.site
       );
       score += feedbackAdj;
 
@@ -504,7 +557,10 @@ export class TransactionLearningService {
 
     const hasVolumeSlab = queryAmount && queryAmount > 0;
     let explanation = `Based on ${sampleCount} past transaction${sampleCount > 1 ? "s" : ""} (${Math.round(dominance * 100)}% pattern match)`;
-    if (sourceName === "customer_history") {
+    if (sourceName.startsWith("site_")) {
+      const siteDisplay = context?.site ? context.site.toUpperCase() : "Gateway";
+      explanation = `${siteDisplay} site fee rate (${sampleCount} past txn${sampleCount > 1 ? "s" : ""})`;
+    } else if (sourceName === "customer_history") {
       explanation = `Client recurring rate (${sampleCount} past visit${sampleCount > 1 ? "s" : ""})`;
     } else if (sourceName === "card_tx_portal_bank_mode" || sourceName === "card_tx_portal_bank") {
       explanation = `Bank & terminal rate from ${sampleCount} past transaction${sampleCount > 1 ? "s" : ""}`;
@@ -532,6 +588,20 @@ export class TransactionLearningService {
       }
     }
 
+    // Check if recent override specifically recorded an IMPS charge for this site
+    if (context?.site && this.overrides.length > 0) {
+      const matchingImpsOverride = this.overrides.find(
+        (o) =>
+          o.siteName &&
+          normalize(o.siteName) === normalize(context.site) &&
+          o.actualImps !== undefined &&
+          o.actualImps !== null
+      );
+      if (matchingImpsOverride && matchingImpsOverride.actualImps !== undefined) {
+        recommendedImps = matchingImpsOverride.actualImps;
+      }
+    }
+
     return {
       commission: bestPair.commission,
       siteFee: bestPair.siteFee,
@@ -548,18 +618,23 @@ export class TransactionLearningService {
   private getDynamicBaseline(
     txType: string,
     cardType?: string,
-    bankName?: string
+    bankName?: string,
+    siteName?: string
   ): { commission: number; siteFee: number } {
     const tx = normalize(txType);
+    const site = normalize(siteName);
     const matchingTx = this.records.filter((r) => normalize(r.transaction_type) === tx);
 
     if (matchingTx.length >= 3) {
-      const card = normalizeCardType(cardType);
-      const cardSubset = card ? matchingTx.filter((r) => normalizeCardType(r.card_type) === card) : [];
-      const pool = cardSubset.length >= 3 ? cardSubset : matchingTx;
+      const siteSubset = site ? matchingTx.filter((r) => normalize(r.site_name) === site) : [];
+      const pool = siteSubset.length >= 2 ? siteSubset : matchingTx;
 
-      const comms = pool.map((r) => r.commission_percent).sort((a, b) => a - b);
-      const fees = pool.map((r) => r.site_fee_percent).sort((a, b) => a - b);
+      const card = normalizeCardType(cardType);
+      const cardSubset = card ? pool.filter((r) => normalizeCardType(r.card_type) === card) : [];
+      const finalPool = cardSubset.length >= 2 ? cardSubset : pool;
+
+      const comms = finalPool.map((r) => r.commission_percent).sort((a, b) => a - b);
+      const fees = finalPool.map((r) => r.site_fee_percent).sort((a, b) => a - b);
       const mid = Math.floor(comms.length / 2);
 
       return {
@@ -582,12 +657,13 @@ export class TransactionLearningService {
   }
 
   /**
-   * Query the learning engine using the 5-Tier Bayesian Cascade with Volume & Shrinkage
+   * Query the learning engine using the Site-Aware Hierarchical Bayesian Cascade
    */
   public getRecommendation(params: {
     cardType?: string;
     transactionType?: string;
     sentTo?: string;
+    siteName?: string;
     bankName?: string;
     customerMode?: string;
     customerName?: string;
@@ -597,17 +673,84 @@ export class TransactionLearningService {
     const card = normalizeCardType(params.cardType);
     const tx = normalize(params.transactionType);
     const portal = normalize(params.sentTo);
+    const site = normalize(params.siteName);
     const bank = normalize(params.bankName);
     const mode = normalize(params.customerMode);
-    const custName = normalize(params.customerName);
-    const custId = (params.customerId || "").trim();
     const amount = params.amount;
-    const context = { card, tx, portal };
+    const context = { card, tx, portal, site };
 
-    // Prediction model strictly predicts standard pattern rates (Card + Tx + Portal + Bank + Mode).
-    // It NEVER depends on a specific customer's previous percentage or negotiated rate.
+    // SITE-AWARE CASCADE (Tiers 0 - 4: When specific gateway site is selected)
+    if (site) {
+      // Site Tier 0: Site + Card + Tx + Portal + Bank + Mode (Absolute highest specificity)
+      if (card && tx && portal && bank && mode) {
+        const s0Matches = this.records.filter(
+          (r) =>
+            normalize(r.site_name) === site &&
+            normalizeCardType(r.card_type) === card &&
+            normalize(r.transaction_type) === tx &&
+            normalize(r.sent_to) === portal &&
+            normalize(r.bank_name) === bank &&
+            normalize(r.customer_mode) === mode
+        );
+        if (s0Matches.length >= 1) {
+          const rec = this.evaluateKernelDensity(s0Matches, "site_card_tx_portal_bank_mode", 0.25, amount, context);
+          if (rec) return rec;
+        }
+      }
 
-    // Tier 1: Card + Tx + Portal + Bank + Mode (Highest specificity)
+      // Site Tier 1: Site + Card + Tx + Bank
+      if (card && tx && bank) {
+        const s1Matches = this.records.filter(
+          (r) =>
+            normalize(r.site_name) === site &&
+            normalizeCardType(r.card_type) === card &&
+            normalize(r.transaction_type) === tx &&
+            normalize(r.bank_name) === bank
+        );
+        if (s1Matches.length >= 1) {
+          const rec = this.evaluateKernelDensity(s1Matches, "site_card_tx_bank", 0.25, amount, context);
+          if (rec) return rec;
+        }
+      }
+
+      // Site Tier 2: Site + Card + Tx
+      if (card && tx) {
+        const s2Matches = this.records.filter(
+          (r) =>
+            normalize(r.site_name) === site &&
+            normalizeCardType(r.card_type) === card &&
+            normalize(r.transaction_type) === tx
+        );
+        if (s2Matches.length >= 1) {
+          const rec = this.evaluateKernelDensity(s2Matches, "site_card_tx", 0.25, amount, context);
+          if (rec) return rec;
+        }
+      }
+
+      // Site Tier 3: Site + Tx
+      if (tx) {
+        const s3Matches = this.records.filter(
+          (r) =>
+            normalize(r.site_name) === site &&
+            normalize(r.transaction_type) === tx
+        );
+        if (s3Matches.length >= 1) {
+          const rec = this.evaluateKernelDensity(s3Matches, "site_tx", 0.25, amount, context);
+          if (rec) return rec;
+        }
+      }
+
+      // Site Tier 4: Site default
+      const s4Matches = this.records.filter((r) => normalize(r.site_name) === site);
+      if (s4Matches.length >= 1) {
+        const rec = this.evaluateKernelDensity(s4Matches, "site_default", 0.25, amount, context);
+        if (rec) return rec;
+      }
+    }
+
+    // GENERAL CONTEXT CASCADE (Fallback when no site selected or site has no history)
+
+    // Tier 5: Card + Tx + Portal + Bank + Mode
     if (card && tx && portal && bank && mode) {
       const t1Matches = this.records.filter(
         (r) =>
@@ -623,7 +766,7 @@ export class TransactionLearningService {
       }
     }
 
-    // Tier 2: Card + Tx + Portal + Bank
+    // Tier 6: Card + Tx + Portal + Bank
     if (card && tx && portal && bank) {
       const t2Matches = this.records.filter(
         (r) =>
@@ -638,7 +781,7 @@ export class TransactionLearningService {
       }
     }
 
-    // Tier 3: Card + Tx + Portal
+    // Tier 7: Card + Tx + Portal
     if (card && tx && portal) {
       const t3Matches = this.records.filter(
         (r) =>
@@ -652,7 +795,7 @@ export class TransactionLearningService {
       }
     }
 
-    // Tier 4: Card + Tx
+    // Tier 8: Card + Tx
     if (card && tx) {
       const t4Matches = this.records.filter(
         (r) =>
@@ -665,7 +808,7 @@ export class TransactionLearningService {
       }
     }
 
-    // Tier 5: Card only
+    // Tier 9: Card only
     if (card) {
       const t5Matches = this.records.filter((r) => normalizeCardType(r.card_type) === card);
       if (t5Matches.length >= 1) {
@@ -674,9 +817,9 @@ export class TransactionLearningService {
       }
     }
 
-    // Tier 6: Automated Dynamic Empirical Baseline Prior (zero-history cold-start)
+    // Tier 10: Automated Dynamic Empirical Baseline Prior (zero-history cold-start)
     if (tx) {
-      const baseline = this.getDynamicBaseline(tx, card, bank);
+      const baseline = this.getDynamicBaseline(tx, card, bank, site);
       const margin = Math.round((baseline.commission - baseline.siteFee) * 100) / 100;
       return {
         commission: baseline.commission,
@@ -686,7 +829,7 @@ export class TransactionLearningService {
         confidence: 0.5,
         source: "global_baseline",
         sampleCount: 0,
-        explanation: `Dynamic empirical baseline for ${tx}`,
+        explanation: `Dynamic empirical baseline for ${tx}${site ? ` on ${site}` : ""}`,
       };
     }
 
@@ -862,6 +1005,8 @@ export class TransactionLearningService {
     let commCorrect = 0;
     let feeCorrect = 0;
     let bothCorrect = 0;
+    let impsCorrect = 0;
+    let allCorrect = 0;
     let highConfCount = 0;
     let highConfCommCorrect = 0;
     let highConfFeeCorrect = 0;
@@ -876,16 +1021,63 @@ export class TransactionLearningService {
       const card = normalizeCardType(target.card_type);
       const tx = normalize(target.transaction_type);
       const portal = normalize(target.sent_to);
+      const site = normalize(target.site_name);
       const bank = normalize(target.bank_name);
       const mode = normalize(target.customer_mode);
-      const custName = normalize(target.customer_name);
-      const custId = target.customer_id;
 
-      // 1. Card + Tx + Portal + Bank + Mode
       let matches: HistoricalTransactionRecord[] = [];
       let source: TransactionFeeRecommendation["source"] = "none";
 
-      if (bank && mode) {
+      // Site-aware cascade if site present
+      if (site) {
+        if (bank && mode) {
+          matches = training.filter(
+            (r) =>
+              normalize(r.site_name) === site &&
+              normalizeCardType(r.card_type) === card &&
+              normalize(r.transaction_type) === tx &&
+              normalize(r.sent_to) === portal &&
+              normalize(r.bank_name) === bank &&
+              normalize(r.customer_mode) === mode
+          );
+          if (matches.length >= 1) source = "site_card_tx_portal_bank_mode";
+          else matches = [];
+        }
+
+        if (matches.length === 0 && bank) {
+          matches = training.filter(
+            (r) =>
+              normalize(r.site_name) === site &&
+              normalizeCardType(r.card_type) === card &&
+              normalize(r.transaction_type) === tx &&
+              normalize(r.bank_name) === bank
+          );
+          if (matches.length >= 1) source = "site_card_tx_bank";
+          else matches = [];
+        }
+
+        if (matches.length === 0) {
+          matches = training.filter(
+            (r) =>
+              normalize(r.site_name) === site &&
+              normalizeCardType(r.card_type) === card &&
+              normalize(r.transaction_type) === tx
+          );
+          if (matches.length > 0) source = "site_card_tx";
+        }
+
+        if (matches.length === 0) {
+          matches = training.filter(
+            (r) =>
+              normalize(r.site_name) === site &&
+              normalize(r.transaction_type) === tx
+          );
+          if (matches.length > 0) source = "site_tx";
+        }
+      }
+
+      // 1. Card + Tx + Portal + Bank + Mode
+      if (matches.length === 0 && bank && mode) {
         matches = training.filter(
           (r) =>
             normalizeCardType(r.card_type) === card &&
@@ -898,7 +1090,7 @@ export class TransactionLearningService {
         else matches = [];
       }
 
-      // 3. Card + Tx + Portal + Bank
+      // 2. Card + Tx + Portal + Bank
       if (matches.length === 0 && bank) {
         matches = training.filter(
           (r) =>
@@ -911,7 +1103,7 @@ export class TransactionLearningService {
         else matches = [];
       }
 
-      // 4. Card + Tx + Portal
+      // 3. Card + Tx + Portal
       if (matches.length === 0) {
         matches = training.filter(
           (r) =>
@@ -922,7 +1114,7 @@ export class TransactionLearningService {
         if (matches.length > 0) source = "card_tx_portal";
       }
 
-      // 5. Card + Tx
+      // 4. Card + Tx
       if (matches.length === 0) {
         matches = training.filter(
           (r) =>
@@ -934,18 +1126,28 @@ export class TransactionLearningService {
 
       if (matches.length === 0) continue;
 
-      const rec = this.evaluateKernelDensity(matches, source, 0.2, target.amount, { card, tx, portal });
+      const rec = this.evaluateKernelDensity(matches, source, 0.2, target.amount, { card, tx, portal, site });
       if (!rec || rec.commission === null || rec.siteFee === null) continue;
 
       totalEvaluated++;
       const isCommOk = Math.abs(rec.commission - target.commission_percent) <= 0.05;
       const isFeeOk = Math.abs(rec.siteFee - target.site_fee_percent) <= 0.05;
+      const targetImps = Number(target.imps_charges ?? 0);
+      const isImpsOk = rec.impsCharges !== null && rec.impsCharges !== undefined
+        ? Math.abs(rec.impsCharges - targetImps) <= 0.5
+        : true;
 
       if (isCommOk) commCorrect++;
       if (isFeeOk) feeCorrect++;
       if (isCommOk && isFeeOk) bothCorrect++;
+      if (isImpsOk) impsCorrect++;
+      if (isCommOk && isFeeOk && isImpsOk) allCorrect++;
 
-      const isTopTier = source === "card_tx_portal_bank_mode" || source === "card_tx_portal_bank" || source === "card_tx_portal";
+      const isTopTier =
+        source.startsWith("site_") ||
+        source === "card_tx_portal_bank_mode" ||
+        source === "card_tx_portal_bank" ||
+        source === "card_tx_portal";
       if (isTopTier) {
         tier1Count++;
         if (isCommOk) tier1CommCorrect++;
@@ -964,6 +1166,8 @@ export class TransactionLearningService {
       commissionAccuracy: totalEvaluated > 0 ? Math.round((commCorrect / totalEvaluated) * 1000) / 10 : 0,
       siteFeeAccuracy: totalEvaluated > 0 ? Math.round((feeCorrect / totalEvaluated) * 1000) / 10 : 0,
       bothAccuracy: totalEvaluated > 0 ? Math.round((bothCorrect / totalEvaluated) * 1000) / 10 : 0,
+      impsAccuracy: totalEvaluated > 0 ? Math.round((impsCorrect / totalEvaluated) * 1000) / 10 : 0,
+      allAccuracy: totalEvaluated > 0 ? Math.round((allCorrect / totalEvaluated) * 1000) / 10 : 0,
       highConfidenceCount: highConfCount,
       highConfidenceCommAccuracy: highConfCount > 0 ? Math.round((highConfCommCorrect / highConfCount) * 1000) / 10 : 0,
       highConfidenceFeeAccuracy: highConfCount > 0 ? Math.round((highConfFeeCorrect / highConfCount) * 1000) / 10 : 0,
@@ -989,6 +1193,8 @@ export interface BacktestResults {
   commissionAccuracy: number;
   siteFeeAccuracy: number;
   bothAccuracy: number;
+  impsAccuracy?: number;
+  allAccuracy?: number;
   highConfidenceCount: number;
   highConfidenceCommAccuracy: number;
   highConfidenceFeeAccuracy: number;

@@ -26,14 +26,19 @@ describe("predictionTrackingService", () => {
       {
         id: "1",
         user_id: mockUser.id,
+        site_name: "Finkeda",
         commission_accepted: true,
         site_fee_accepted: true,
+        imps_accepted: true,
         both_accepted: true,
+        all_accepted: true,
         predicted_commission: 2.0,
         predicted_site_fee: 1.0,
+        predicted_imps: 0,
         actual_commission: 2.0,
         actual_site_fee: 1.0,
-        prediction_source: "card_tx",
+        actual_imps: 0,
+        prediction_source: "site_card_tx",
         prediction_confidence: 0.9,
         card_type: "Visa",
         transaction_type: "SWIPE",
@@ -43,14 +48,19 @@ describe("predictionTrackingService", () => {
       {
         id: "2",
         user_id: mockUser.id,
+        site_name: "Indyapay",
         commission_accepted: false,
         site_fee_accepted: true,
+        imps_accepted: false,
         both_accepted: false,
+        all_accepted: false,
         predicted_commission: 2.0,
         predicted_site_fee: 1.0,
+        predicted_imps: 0,
         actual_commission: 2.5,
         actual_site_fee: 1.0,
-        prediction_source: "card_tx",
+        actual_imps: 5,
+        prediction_source: "site_card_tx",
         prediction_confidence: 0.8,
         card_type: "Visa",
         transaction_type: "SWIPE",
@@ -76,11 +86,14 @@ describe("predictionTrackingService", () => {
     expect(stats.commissionOverriddenCount).toBe(1);
     expect(stats.siteFeeAcceptedCount).toBe(2);
     expect(stats.siteFeeOverriddenCount).toBe(0);
+    expect(stats.impsAcceptedCount).toBe(1);
+    expect(stats.impsOverriddenCount).toBe(1);
+    expect(stats.impsAcceptanceRate).toBe(50);
     expect(stats.acceptanceRate).toBe(50);
     expect(stats.commissionAcceptanceRate).toBe(50);
     expect(stats.siteFeeAcceptanceRate).toBe(100);
-    expect(stats.bySource["card_tx"].accepted).toBe(1);
-    expect(stats.bySource["card_tx"].overridden).toBe(1);
+    expect(stats.bySource["site_card_tx"].accepted).toBe(1);
+    expect(stats.bySource["site_card_tx"].overridden).toBe(1);
   });
 
   it("deletes predictions by transactionId", async () => {

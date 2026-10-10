@@ -22,6 +22,11 @@ import { useToast } from "@/hooks/use-toast";
 /** Human-friendly tier names */
 const SOURCE_LABELS: Record<string, string> = {
   customer_history: "Customer Memory",
+  site_card_tx_portal_bank_mode: "Site + Full Context",
+  site_card_tx_bank: "Site + Bank",
+  site_card_tx: "Site + Card",
+  site_tx: "Site + Tx Type",
+  site_default: "Site Base Rate",
   card_tx_portal_bank_mode: "Full Context Match",
   card_tx_portal_bank: "Bank + Portal",
   card_tx_portal: "Portal Match",
@@ -81,7 +86,7 @@ export const PredictionTrackingCard = () => {
             </CardTitle>
           </div>
           <CardDescription className="text-xs">
-            Tracks how often you accept or override AI-predicted commission &amp; site fee values.
+            Tracks how often you accept or override AI-predicted commission, site fee, and IMPS/NEFT values.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -89,7 +94,7 @@ export const PredictionTrackingCard = () => {
             <Eye className="h-8 w-8 text-amber-500/60 mx-auto" />
             <p className="text-sm font-medium text-foreground">No Tracking Data Yet</p>
             <p className="text-xs text-muted-foreground max-w-md mx-auto">
-              Prediction tracking starts automatically when you add transactions with AI-suggested commission or site fee values.
+              Prediction tracking starts automatically when you add transactions with AI-suggested commission, site fee, or IMPS charges.
               The system records whether you keep or change the predicted values.
             </p>
           </div>
@@ -116,7 +121,7 @@ export const PredictionTrackingCard = () => {
               </CardTitle>
             </div>
             <CardDescription className="text-xs sm:text-sm">
-              How often you accept or override AI-suggested commission &amp; site fee values when adding transactions.
+              How often you accept or override AI-suggested commission, site fee, and IMPS values across different sites.
             </CardDescription>
           </div>
           <Button
@@ -132,7 +137,7 @@ export const PredictionTrackingCard = () => {
 
         <CardContent className="space-y-6">
           {/* Key Metric Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
             {/* Overall Acceptance Rate */}
             <div className="p-3.5 sm:p-4 rounded-xl border bg-card/60 backdrop-blur-xs space-y-1.5">
               <div className="flex items-center justify-between text-muted-foreground">
@@ -148,7 +153,7 @@ export const PredictionTrackingCard = () => {
                   className="h-1.5 bg-emerald-500/15"
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  {stats.totalAccepted} of {stats.totalPredictions} predictions kept as-is
+                  {stats.totalAccepted} of {stats.totalPredictions} kept as-is
                 </p>
               </div>
             </div>
@@ -193,6 +198,26 @@ export const PredictionTrackingCard = () => {
               </div>
             </div>
 
+            {/* IMPS Charges Acceptance */}
+            <div className="p-3.5 sm:p-4 rounded-xl border bg-card/60 backdrop-blur-xs space-y-1.5">
+              <div className="flex items-center justify-between text-muted-foreground">
+                <span className="text-xs font-medium">IMPS Accepted</span>
+                <CheckCircle2 className="h-4 w-4 text-purple-500" />
+              </div>
+              <div className="text-xl sm:text-2xl font-bold text-foreground">
+                {stats.impsAcceptanceRate ?? 100}%
+              </div>
+              <div className="space-y-1 pt-1">
+                <Progress
+                  value={stats.impsAcceptanceRate ?? 100}
+                  className="h-1.5 bg-purple-500/15"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  {stats.impsAcceptedCount ?? 0} accepted, {stats.impsOverriddenCount ?? 0} changed
+                </p>
+              </div>
+            </div>
+
             {/* Total Overrides */}
             <div className="p-3.5 sm:p-4 rounded-xl border bg-card/60 backdrop-blur-xs space-y-1.5">
               <div className="flex items-center justify-between text-muted-foreground">
@@ -208,7 +233,7 @@ export const PredictionTrackingCard = () => {
                   className="h-1.5 bg-red-500/15"
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  Times user changed AI values before submitting
+                  Times user altered AI prediction
                 </p>
               </div>
             </div>
@@ -358,18 +383,20 @@ export const PredictionTrackingCard = () => {
             <div className="space-y-2">
               {(showRecent ? stats.recentEvents : stats.recentEvents.slice(0, 5)).map(
                 (event, idx) => {
-                  const bothAccepted = event.commissionAccepted && event.siteFeeAccepted;
+                  const allAccepted =
+                    event.allAccepted ??
+                    (event.commissionAccepted && event.siteFeeAccepted && (event.impsAccepted ?? true));
                   return (
                     <div
                       key={idx}
                       className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
-                        bothAccepted
+                        allAccepted
                           ? "bg-emerald-500/[0.03] border-emerald-500/20"
                           : "bg-red-500/[0.03] border-red-500/20"
                       }`}
                     >
                       <div className="mt-0.5 shrink-0">
-                        {bothAccepted ? (
+                        {allAccepted ? (
                           <ThumbsUp className="h-4 w-4 text-emerald-500" />
                         ) : (
                           <ThumbsDown className="h-4 w-4 text-red-400" />
@@ -378,25 +405,41 @@ export const PredictionTrackingCard = () => {
                       <div className="flex-1 min-w-0 space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs font-semibold text-foreground">
-                            {bothAccepted ? "Accepted" : "Overridden"}
+                            {allAccepted ? "Accepted" : "Overridden"}
                           </span>
                           <Badge variant="outline" className="text-[10px] h-5">
                             {event.cardType} · {event.transactionType} → {event.sentTo}
                           </Badge>
+                          {event.siteName && (
+                            <Badge
+                              variant="secondary"
+                              className="text-[10px] h-5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                            >
+                              Site: {event.siteName}
+                            </Badge>
+                          )}
                         </div>
-                        <div className="text-[11px] text-muted-foreground space-x-3">
+                        <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5">
                           <span>
                             Commission: {event.predictedCommission}%
                             {!event.commissionAccepted && (
-                              <span className="text-red-500"> → {event.actualCommission}%</span>
+                              <span className="text-red-500 font-medium"> → {event.actualCommission}%</span>
                             )}
                           </span>
                           <span>
                             Site Fee: {event.predictedSiteFee}%
                             {!event.siteFeeAccepted && (
-                              <span className="text-red-500"> → {event.actualSiteFee}%</span>
+                              <span className="text-red-500 font-medium"> → {event.actualSiteFee}%</span>
                             )}
                           </span>
+                          {event.predictedImps !== undefined && event.predictedImps !== null && (
+                            <span>
+                              IMPS: ₹{event.predictedImps}
+                              {!event.impsAccepted && event.actualImps !== undefined && (
+                                <span className="text-red-500 font-medium"> → ₹{event.actualImps}</span>
+                              )}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <Badge

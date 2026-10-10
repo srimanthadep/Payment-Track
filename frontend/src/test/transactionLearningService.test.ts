@@ -620,4 +620,156 @@ describe('TransactionLearningService - 5-Tier Hierarchical Bayesian Cascade', ()
     expect(rec.commission).toBe(2.0);
     expect(rec.siteFee).toBe(0.5);
   });
+
+  it('Site-Aware Cascade: Accurately differentiates site fee and IMPS when site_name differs', () => {
+    const records: HistoricalTransactionRecord[] = [
+      // Finkeda gateway: site fee 1.55%, IMPS ₹0
+      {
+        id: 'f1',
+        card_type: 'visa',
+        transaction_type: 'withdrawal',
+        sent_to: 'chummi',
+        site_name: 'Finkeda',
+        bank_name: 'hdfc',
+        customer_mode: 'offline',
+        commission_percent: 2.0,
+        site_fee_percent: 1.55,
+        imps_charges: 0,
+        transaction_date: new Date(),
+        amount: 50000,
+      },
+      {
+        id: 'f2',
+        card_type: 'visa',
+        transaction_type: 'withdrawal',
+        sent_to: 'chummi',
+        site_name: 'Finkeda',
+        bank_name: 'hdfc',
+        customer_mode: 'offline',
+        commission_percent: 2.0,
+        site_fee_percent: 1.55,
+        imps_charges: 0,
+        transaction_date: new Date(),
+        amount: 40000,
+      },
+      // Indyapay gateway: site fee 2.29%, IMPS ₹5
+      {
+        id: 'i1',
+        card_type: 'visa',
+        transaction_type: 'withdrawal',
+        sent_to: 'chummi',
+        site_name: 'Indyapay',
+        bank_name: 'hdfc',
+        customer_mode: 'offline',
+        commission_percent: 2.0,
+        site_fee_percent: 2.29,
+        imps_charges: 5,
+        transaction_date: new Date(),
+        amount: 50000,
+      },
+      {
+        id: 'i2',
+        card_type: 'visa',
+        transaction_type: 'withdrawal',
+        sent_to: 'chummi',
+        site_name: 'Indyapay',
+        bank_name: 'hdfc',
+        customer_mode: 'offline',
+        commission_percent: 2.0,
+        site_fee_percent: 2.29,
+        imps_charges: 5,
+        transaction_date: new Date(),
+        amount: 45000,
+      },
+    ];
+
+    service.setRecordsForTesting(records);
+
+    // Query with Finkeda
+    const recFinkeda = service.getRecommendation({
+      cardType: 'visa',
+      transactionType: 'withdrawal',
+      sentTo: 'chummi',
+      siteName: 'Finkeda',
+      bankName: 'hdfc',
+      customerMode: 'offline',
+    });
+
+    expect(recFinkeda.source).toBe('site_card_tx_portal_bank_mode');
+    expect(recFinkeda.siteFee).toBe(1.55);
+    expect(recFinkeda.impsCharges).toBe(0);
+
+    // Query with Indyapay
+    const recIndyapay = service.getRecommendation({
+      cardType: 'visa',
+      transactionType: 'withdrawal',
+      sentTo: 'chummi',
+      siteName: 'Indyapay',
+      bankName: 'hdfc',
+      customerMode: 'offline',
+    });
+
+    expect(recIndyapay.source).toBe('site_card_tx_portal_bank_mode');
+    expect(recIndyapay.siteFee).toBe(2.29);
+    expect(recIndyapay.impsCharges).toBe(5);
+  });
+
+  it('Closed-Loop Active Learning: Override feedback instantly adapts model for that site', () => {
+    const records: HistoricalTransactionRecord[] = [
+      {
+        id: '1',
+        card_type: 'visa',
+        transaction_type: 'withdrawal',
+        sent_to: 'bharath',
+        site_name: 'Indyapay',
+        commission_percent: 2.0,
+        site_fee_percent: 1.70,
+        imps_charges: 0,
+        transaction_date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+        amount: 50000,
+      },
+      {
+        id: '2',
+        card_type: 'visa',
+        transaction_type: 'withdrawal',
+        sent_to: 'bharath',
+        site_name: 'Indyapay',
+        commission_percent: 2.0,
+        site_fee_percent: 2.00,
+        imps_charges: 0,
+        transaction_date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
+        amount: 50000,
+      },
+    ];
+
+    service.setRecordsForTesting(records);
+
+    // Simulate user overriding 1.70% to 2.00% with IMPS 5 on Indyapay
+    service.recordOverrideFeedback({
+      cardType: 'visa',
+      transactionType: 'withdrawal',
+      sentTo: 'bharath',
+      siteName: 'Indyapay',
+      actualCommission: 2.0,
+      actualSiteFee: 2.00,
+      actualImps: 5,
+      predictedCommission: 2.0,
+      predictedSiteFee: 1.70,
+      predictedImps: 0,
+      commissionAccepted: true,
+      siteFeeAccepted: false,
+      impsAccepted: false,
+      timestamp: Date.now(),
+    });
+
+    const rec = service.getRecommendation({
+      cardType: 'visa',
+      transactionType: 'withdrawal',
+      sentTo: 'bharath',
+      siteName: 'Indyapay',
+    });
+
+    expect(rec.siteFee).toBe(2.00);
+    expect(rec.impsCharges).toBe(5);
+  });
 });

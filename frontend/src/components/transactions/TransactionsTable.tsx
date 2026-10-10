@@ -75,7 +75,9 @@ interface Transaction {
   transaction_type: string;
   amount: number;
   commission: number;
+  commission_percent?: number | null;
   site_fee: number;
+  site_fee_percent?: number | null;
   imps_charges?: number | null;
   profit: number;
   transaction_date: string;
@@ -92,6 +94,28 @@ interface Transaction {
     name: string;
   };
 }
+
+const formatRatePercent = (amount: number, feeOrComm: number, storedPercent?: number | null): string => {
+  if (storedPercent !== null && storedPercent !== undefined && Number(storedPercent) > 0) {
+    const num = Number(storedPercent);
+    return Number.isInteger(num) ? `${num}%` : `${num.toFixed(2).replace(/\.?0+$/, "")}%`;
+  }
+  if (amount > 0 && feeOrComm > 0) {
+    const calc = (feeOrComm / amount) * 100;
+    const rounded = Math.round(calc * 100) / 100;
+    return Number.isInteger(rounded) ? `${rounded}%` : `${rounded.toFixed(2).replace(/\.?0+$/, "")}%`;
+  }
+  return "";
+};
+
+const formatProfitMargin = (amount: number, profit: number): string => {
+  if (amount > 0 && profit !== 0) {
+    const calc = (profit / amount) * 100;
+    const rounded = Math.round(calc * 100) / 100;
+    return Number.isInteger(rounded) ? `${rounded}%` : `${rounded.toFixed(2).replace(/\.?0+$/, "")}%`;
+  }
+  return "";
+};
 
 export const TransactionsTable = ({
   userId,
@@ -139,6 +163,7 @@ export const TransactionsTable = ({
     const amount = filteredTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
     const commission = filteredTransactions.reduce((sum, t) => sum + Number(t.commission || 0), 0);
     const siteFee = filteredTransactions.reduce((sum, t) => sum + Number(t.site_fee || 0), 0);
+    const impsCharges = filteredTransactions.reduce((sum, t) => sum + Number(t.imps_charges || 0), 0);
     const profit = filteredTransactions.reduce(
       (sum, t) =>
         sum +
@@ -147,7 +172,7 @@ export const TransactionsTable = ({
           : Number(t.commission || 0) - Number(t.site_fee || 0) - Number(t.imps_charges || 0)),
       0
     );
-    return { amount, commission, siteFee, profit, count: filteredTransactions.length };
+    return { amount, commission, siteFee, impsCharges, profit, count: filteredTransactions.length };
   }, [filteredTransactions]);
 
   useEffect(() => {
@@ -161,7 +186,9 @@ export const TransactionsTable = ({
           transaction_type,
           amount,
           commission,
+          commission_percent,
           site_fee,
+          site_fee_percent,
           imps_charges,
           profit,
           transaction_date,
@@ -396,10 +423,19 @@ export const TransactionsTable = ({
     const matchedPortals = portals.filter((p) => filters.portals.includes(p.id));
     const portalNames = matchedPortals.map((p) => p.name);
     const totalAmount = filteredTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
-    const totalProfit = filteredTransactions.reduce((sum, t) => sum + Number(t.profit || t.commission || 0), 0);
+    const totalImps = filteredTransactions.reduce((sum, t) => sum + Number(t.imps_charges || 0), 0);
+    const totalProfit = filteredTransactions.reduce(
+      (sum, t) =>
+        sum +
+        (t.profit !== undefined && t.profit !== null
+          ? Number(t.profit)
+          : Number(t.commission || 0) - Number(t.site_fee || 0) - Number(t.imps_charges || 0)),
+      0
+    );
     return {
       portalNames,
       totalAmount,
+      totalImps,
       totalProfit,
       count: filteredTransactions.length,
     };
@@ -486,7 +522,10 @@ export const TransactionsTable = ({
         transaction_type,
         amount,
         commission,
+        commission_percent,
         site_fee,
+        site_fee_percent,
+        imps_charges,
         profit,
         transaction_date,
         card_type,
@@ -545,7 +584,10 @@ export const TransactionsTable = ({
           transaction_type,
           amount,
           commission,
+          commission_percent,
           site_fee,
+          site_fee_percent,
+          imps_charges,
           profit,
           transaction_date,
           card_type,
@@ -809,7 +851,17 @@ export const TransactionsTable = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              {portalFilterSummary.totalImps > 0 && (
+                <div className="flex flex-col text-right bg-background/80 px-2.5 py-1 rounded-lg border border-border/50">
+                  <span className="text-[9px] sm:text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                    Total IMPS
+                  </span>
+                  <span className="text-xs sm:text-sm font-bold text-rose-500">
+                    ₹{portalFilterSummary.totalImps.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              )}
               <div className="flex flex-col text-right bg-background/80 px-2.5 py-1 rounded-lg border border-border/50">
                 <span className="text-[9px] sm:text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
                   Net Profit
@@ -845,7 +897,17 @@ export const TransactionsTable = ({
         ) : (
           <>
             <AnimatePresence>
-              {displayedTransactions.map((transaction, index) => (
+              {displayedTransactions.map((transaction, index) => {
+                const commPct = formatRatePercent(transaction.amount, transaction.commission, transaction.commission_percent);
+                const feePct = formatRatePercent(transaction.amount, transaction.site_fee, transaction.site_fee_percent);
+                const profitVal =
+                  transaction.profit !== undefined && transaction.profit !== null
+                    ? Number(transaction.profit)
+                    : Number(transaction.commission || 0) - Number(transaction.site_fee || 0) - Number(transaction.imps_charges || 0);
+                const profitMargin = formatProfitMargin(transaction.amount, profitVal);
+                const imps = Number(transaction.imps_charges || 0);
+
+                return (
                 <motion.div
                   key={transaction.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -923,17 +985,42 @@ export const TransactionsTable = ({
                       <>
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[10px] text-muted-foreground whitespace-nowrap">Commission</span>
-                          <span className="text-success font-medium text-right">{formatCurrency(transaction.commission)}</span>
-                        </div>
-                        <div className="flex items-center justify-between gap-2 col-span-2">
-                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">Profit</span>
-                          <span className="text-success font-semibold text-right">
-                            {formatCurrency(
-                              transaction.profit !== undefined
-                                ? transaction.profit
-                                : transaction.commission - transaction.site_fee
+                          <div className="text-right">
+                            <span className="text-success font-medium">{formatCurrency(transaction.commission)}</span>
+                            {commPct && (
+                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono ml-1">
+                                ({commPct})
+                              </span>
                             )}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">Site Fee</span>
+                          <div className="text-right">
+                            <span className="text-destructive font-medium">{formatCurrency(transaction.site_fee)}</span>
+                            {feePct && (
+                              <span className="text-[10px] text-rose-500 dark:text-rose-400 font-mono ml-1">
+                                ({feePct})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">IMPS Charges</span>
+                          <span className="font-medium text-right text-rose-500">
+                            ₹{imps.toLocaleString("en-IN")}
                           </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 col-span-2 pt-1 border-t border-border/40">
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">Net Profit</span>
+                          <div className="text-right font-semibold text-success">
+                            <span>{formatCurrency(profitVal)}</span>
+                            {profitMargin && (
+                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono ml-1 font-normal">
+                                ({profitMargin})
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </>
                     )}
@@ -967,7 +1054,8 @@ export const TransactionsTable = ({
                     })()}
                   </div>
                 </motion.div>
-              ))}
+                );
+              })}
             </AnimatePresence>
 
             {/* Mobile Total Bar at the end */}
@@ -978,18 +1066,37 @@ export const TransactionsTable = ({
                   <span className="text-sm font-bold text-foreground">{formatCurrency(totals.amount)}</span>
                 </div>
                 {!isStaff && (
-                  <div className="grid grid-cols-3 gap-2 text-xs pt-2 border-t border-border/50">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-2 border-t border-border/50">
                     <div>
                       <div className="text-[10px] text-muted-foreground">Commission</div>
                       <div className="font-semibold text-success">{formatCurrency(totals.commission)}</div>
+                      {totals.amount > 0 && (
+                        <div className="text-[9px] text-muted-foreground font-mono">
+                          ({((totals.commission / totals.amount) * 100).toFixed(2)}%)
+                        </div>
+                      )}
                     </div>
                     <div>
                       <div className="text-[10px] text-muted-foreground">Site Fee</div>
                       <div className="font-semibold text-destructive">{formatCurrency(totals.siteFee)}</div>
+                      {totals.amount > 0 && (
+                        <div className="text-[9px] text-muted-foreground font-mono">
+                          ({((totals.siteFee / totals.amount) * 100).toFixed(2)}%)
+                        </div>
+                      )}
                     </div>
-                    <div className="text-right">
+                    <div>
+                      <div className="text-[10px] text-muted-foreground">IMPS Charges</div>
+                      <div className="font-semibold text-rose-500">₹{totals.impsCharges.toLocaleString("en-IN")}</div>
+                    </div>
+                    <div className="text-right sm:text-left">
                       <div className="text-[10px] text-muted-foreground">Net Profit</div>
                       <div className="font-bold text-success">{formatCurrency(totals.profit)}</div>
+                      {totals.amount > 0 && (
+                        <div className="text-[9px] text-muted-foreground font-mono">
+                          ({((totals.profit / totals.amount) * 100).toFixed(2)}%)
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1098,7 +1205,7 @@ export const TransactionsTable = ({
                     onClick={() => handleSort("site_fee")}
                   >
                     <div className="flex items-center justify-end gap-1">
-                      <span>Site Fee</span>
+                      <span>Site Fee & IMPS</span>
                       {sortConfig.key === "site_fee" ? (
                         sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
                       ) : (
@@ -1208,25 +1315,56 @@ export const TransactionsTable = ({
                   <TableCell className="text-right font-semibold">
                     {formatCurrency(transaction.amount)}
                   </TableCell>
-                  {!isStaff && (
+                  {!isStaff && (() => {
+                    const commPct = formatRatePercent(transaction.amount, transaction.commission, transaction.commission_percent);
+                    const feePct = formatRatePercent(transaction.amount, transaction.site_fee, transaction.site_fee_percent);
+                    const profitVal =
+                      transaction.profit !== undefined && transaction.profit !== null
+                        ? Number(transaction.profit)
+                        : Number(transaction.commission || 0) - Number(transaction.site_fee || 0) - Number(transaction.imps_charges || 0);
+                    const profitMargin = formatProfitMargin(transaction.amount, profitVal);
+                    const imps = Number(transaction.imps_charges || 0);
+
+                    return (
                     <>
-                      <TableCell className="text-right text-success">
-                        {formatCurrency(transaction.commission)}
+                      <TableCell className="text-right text-success whitespace-nowrap">
+                        <div className="font-medium">
+                          <span>{formatCurrency(transaction.commission)}</span>
+                          {commPct && (
+                            <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono ml-1 font-normal">
+                              ({commPct})
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
-                      <TableCell className="text-right text-destructive hidden sm:table-cell">
-                        <div>{formatCurrency(transaction.site_fee)}</div>
-                        {transaction.imps_charges && Number(transaction.imps_charges) > 0 ? (
-                          <div className="text-[10px] text-rose-500 font-medium">
-                            +₹{Number(transaction.imps_charges).toFixed(0)} IMPS
+                      <TableCell className="text-right text-destructive hidden sm:table-cell whitespace-nowrap">
+                        <div className="font-medium">
+                          <span>{formatCurrency(transaction.site_fee)}</span>
+                          {feePct && (
+                            <span className="text-[11px] text-rose-500 dark:text-rose-400 font-mono ml-1 font-normal">
+                              ({feePct})
+                            </span>
+                          )}
+                        </div>
+                        {imps > 0 ? (
+                          <div className="text-[10px] text-rose-500 font-medium mt-0.5">
+                            +₹{imps.toLocaleString("en-IN")} IMPS
                           </div>
-                        ) : null}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold text-success hidden sm:table-cell">
-                        {formatCurrency(
-                          transaction.profit !== undefined && transaction.profit !== null
-                            ? transaction.profit
-                            : transaction.commission - transaction.site_fee - Number(transaction.imps_charges || 0)
+                        ) : (
+                          <div className="text-[10px] text-muted-foreground/60 mt-0.5">
+                            ₹0 IMPS
+                          </div>
                         )}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-success hidden sm:table-cell whitespace-nowrap">
+                        <div>
+                          <span>{formatCurrency(profitVal)}</span>
+                          {profitMargin && (
+                            <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono ml-1 font-normal">
+                              ({profitMargin})
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -1248,7 +1386,8 @@ export const TransactionsTable = ({
                         </div>
                       </TableCell>
                     </>
-                  )}
+                    );
+                  })()}
                     </TableRow>
                   ))}
                   {hasMore && (
@@ -1292,14 +1431,28 @@ export const TransactionsTable = ({
                   <TableCell className="text-right font-bold text-foreground text-sm">
                     {formatCurrency(totals.amount)}
                   </TableCell>
-                  <TableCell className="text-right font-bold text-success text-sm">
-                    {formatCurrency(totals.commission)}
+                  <TableCell className="text-right font-bold text-success text-sm whitespace-nowrap">
+                    <div>{formatCurrency(totals.commission)}</div>
+                    {totals.amount > 0 && (
+                      <div className="text-[10px] text-emerald-600/80 font-mono font-normal">
+                        ({((totals.commission / totals.amount) * 100).toFixed(2)}%)
+                      </div>
+                    )}
                   </TableCell>
-                  <TableCell className="text-right font-bold text-destructive hidden sm:table-cell text-sm">
-                    {formatCurrency(totals.siteFee)}
+                  <TableCell className="text-right font-bold text-destructive hidden sm:table-cell text-sm whitespace-nowrap">
+                    <div>{formatCurrency(totals.siteFee)}</div>
+                    <div className="text-[10px] text-rose-500 font-medium font-normal">
+                      {totals.amount > 0 && <span>({((totals.siteFee / totals.amount) * 100).toFixed(2)}%) • </span>}
+                      +₹{totals.impsCharges.toLocaleString("en-IN")} IMPS
+                    </div>
                   </TableCell>
-                  <TableCell className="text-right font-bold text-success hidden sm:table-cell text-sm">
-                    {formatCurrency(totals.profit)}
+                  <TableCell className="text-right font-bold text-success hidden sm:table-cell text-sm whitespace-nowrap">
+                    <div>{formatCurrency(totals.profit)}</div>
+                    {totals.amount > 0 && (
+                      <div className="text-[10px] text-emerald-600/80 font-mono font-normal">
+                        ({((totals.profit / totals.amount) * 100).toFixed(2)}%)
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="text-right" />
                 </TableRow>

@@ -293,6 +293,11 @@ export type Database = {
           customer_phone: string | null
           portal_name: string | null
           notes: string | null
+          site_name: string | null
+          predicted_imps: number
+          actual_imps: number
+          imps_accepted: boolean
+          all_accepted: boolean
           created_at: string
         }
         Insert: {
@@ -319,6 +324,11 @@ export type Database = {
           customer_phone?: string | null
           portal_name?: string | null
           notes?: string | null
+          site_name?: string | null
+          predicted_imps?: number | null
+          actual_imps?: number | null
+          imps_accepted?: boolean | null
+          all_accepted?: boolean | null
           created_at?: string
         }
         Update: {
@@ -345,6 +355,11 @@ export type Database = {
           customer_phone?: string | null
           portal_name?: string | null
           notes?: string | null
+          site_name?: string | null
+          predicted_imps?: number | null
+          actual_imps?: number | null
+          imps_accepted?: boolean | null
+          all_accepted?: boolean | null
           created_at?: string
         }
         Relationships: [

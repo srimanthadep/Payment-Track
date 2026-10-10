@@ -171,7 +171,8 @@ export const AddTransactionDialog = ({
     manualComm = isCommissionManual,
     manualFee = isSiteFeeManual,
     manualImps = isImpsManual,
-    amountVal = formData.amount ? parseFloat(formData.amount) : undefined
+    amountVal = formData.amount ? parseFloat(formData.amount) : undefined,
+    site = formData.site_name
   ) => {
     if (!cType && !txType) return;
 
@@ -179,6 +180,7 @@ export const AddTransactionDialog = ({
       cardType: cType,
       transactionType: txType,
       sentTo: recipient,
+      siteName: site,
       bankName: bank,
       customerMode: mode,
       customerName: cust?.name || undefined,
@@ -551,6 +553,7 @@ export const AddTransactionDialog = ({
           card_type: formData.card_type,
           transaction_type: formData.transaction_type,
           sent_to: formData.sent_to,
+          site_name: formData.site_name,
           bank_name: formData.bank_name,
           customer_mode: formData.customer_mode,
           customer_name: customerName || undefined,
@@ -565,11 +568,14 @@ export const AddTransactionDialog = ({
         // Track prediction outcome for every transaction (fire-and-forget)
         const actualComm = parseFloat(formData.commission_percent) || 0;
         const actualFee = parseFloat(formData.site_fee_percent) || 0;
+        const actualImps = impsChargesAmount;
         const hasPrediction = Boolean(aiPredictedValues && aiPredictedValues.source !== "none");
         const predictedComm = hasPrediction ? aiPredictedValues?.commission ?? 0 : actualComm;
         const predictedFee = hasPrediction ? aiPredictedValues?.siteFee ?? 0 : actualFee;
+        const predictedImps = hasPrediction ? aiPredictedValues?.impsCharges ?? 0 : actualImps;
         const commAccepted = hasPrediction ? Math.abs(actualComm - predictedComm) < 0.01 : true;
         const feeAccepted = hasPrediction ? Math.abs(actualFee - predictedFee) < 0.01 : true;
+        const impsAccepted = hasPrediction ? Math.abs(actualImps - predictedImps) < 0.5 : true;
 
         predictionTrackingService.recordPrediction({
           transactionId,
@@ -578,13 +584,17 @@ export const AddTransactionDialog = ({
           customerName: customerName || undefined,
           customerPhone: customerPhone || undefined,
           portalName: formData.sent_to,
+          siteName: formData.site_name || undefined,
           notes: notesStr,
           commissionAccepted: commAccepted,
           siteFeeAccepted: feeAccepted,
+          impsAccepted: impsAccepted,
           predictedCommission: predictedComm,
           predictedSiteFee: predictedFee,
+          predictedImps: predictedImps,
           actualCommission: actualComm,
           actualSiteFee: actualFee,
+          actualImps: actualImps,
           predictionSource: hasPrediction ? aiPredictedValues!.source : "none",
           predictionConfidence: hasPrediction ? aiPredictedValues!.confidence : 0,
           cardType: formData.card_type,
@@ -596,18 +606,26 @@ export const AddTransactionDialog = ({
           // Silent — tracking should never break the main flow
         });
 
-        // Closed-loop active learning: immediately penalize rejected prediction in-memory
-        if (hasPrediction && (!commAccepted || !feeAccepted)) {
+        // Closed-loop active learning: feed back in-memory for immediate adaptive learning
+        if (hasPrediction) {
           transactionLearningService.recordOverrideFeedback({
             cardType: formData.card_type,
             transactionType: formData.transaction_type,
             sentTo: formData.sent_to,
+            siteName: formData.site_name || undefined,
             bankName: formData.bank_name || undefined,
             customerMode: formData.customer_mode,
             actualCommission: actualComm,
             actualSiteFee: actualFee,
+            actualImps: actualImps,
             predictedCommission: predictedComm,
             predictedSiteFee: predictedFee,
+            predictedImps: predictedImps,
+            commissionAccepted: commAccepted,
+            siteFeeAccepted: feeAccepted,
+            impsAccepted: impsAccepted,
+            bothAccepted: commAccepted && feeAccepted,
+            allAccepted: commAccepted && feeAccepted && impsAccepted,
             timestamp: Date.now(),
           });
         }
@@ -960,10 +978,24 @@ export const AddTransactionDialog = ({
               <Select
                 value={formData.site_name || "none"}
                 onValueChange={(val) => {
+                  const newSite = val === "none" ? "" : val;
                   if (val && val !== "none") {
                     settingsService.recordDropdownSelection("sites", val);
                   }
-                  setFormData((prev) => ({ ...prev, site_name: val === "none" ? "" : val }));
+                  setFormData((prev) => ({ ...prev, site_name: newSite }));
+                  applyLearningRecommendation(
+                    formData.transaction_type,
+                    formData.card_type,
+                    formData.sent_to,
+                    formData.bank_name,
+                    formData.customer_mode,
+                    customerValue,
+                    isCommissionManual,
+                    isSiteFeeManual,
+                    isImpsManual,
+                    formData.amount ? parseFloat(formData.amount) : undefined,
+                    newSite
+                  );
                 }}
               >
                 <SelectTrigger id="site_name">

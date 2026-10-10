@@ -37,6 +37,7 @@ import {
   RecipientOption,
   TransactionTypeOption,
   BankOption,
+  SiteOption,
 } from "@/services/settingsService";
 import { useToast } from "@/hooks/use-toast";
 
@@ -52,10 +53,12 @@ export const LearningInsightsCard = () => {
   const [recipients, setRecipients] = useState<RecipientOption[]>([]);
   const [txTypes, setTxTypes] = useState<TransactionTypeOption[]>([]);
   const [banks, setBanks] = useState<BankOption[]>([]);
+  const [sites, setSites] = useState<SiteOption[]>([]);
 
   const [testCard, setTestCard] = useState("");
   const [testTx, setTestTx] = useState("withdrawal");
   const [testRecipient, setTestRecipient] = useState("");
+  const [testSite, setTestSite] = useState("");
   const [testBank, setTestBank] = useState("");
   const [testMode, setTestMode] = useState<"Offline" | "Online">("Offline");
   const [testAmount, setTestAmount] = useState<string>("50000");
@@ -76,13 +79,16 @@ export const LearningInsightsCard = () => {
       const r = settingsService.getRecipients();
       const t = settingsService.getTransactionTypes();
       const b = settingsService.getBanks();
+      const s = settingsService.getSites();
       setCardTypes(c);
       setRecipients(r);
       setTxTypes(t);
       setBanks(b);
+      setSites(s);
 
       if (c.length > 0) setTestCard(c[0].name);
       if (r.length > 0) setTestRecipient(r[0].name);
+      if (s.length > 0) setTestSite(s[0].name);
     };
 
     init();
@@ -99,13 +105,14 @@ export const LearningInsightsCard = () => {
         cardType: testCard,
         transactionType: testTx,
         sentTo: testRecipient,
+        siteName: testSite || undefined,
         bankName: testBank || undefined,
         customerMode: testMode,
         amount: testAmount ? parseFloat(testAmount) : undefined,
       });
       setTestResult(rec);
     }
-  }, [testCard, testTx, testRecipient, testBank, testMode, testAmount]);
+  }, [testCard, testTx, testRecipient, testSite, testBank, testMode, testAmount]);
 
   const handleRunBacktest = () => {
     setIsRunningBacktest(true);
@@ -259,7 +266,7 @@ export const LearningInsightsCard = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-7 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Card Type</Label>
               <Select value={testCard} onValueChange={setTestCard}>
@@ -302,6 +309,23 @@ export const LearningInsightsCard = () => {
                   {recipients.map((r) => (
                     <SelectItem key={r.id} value={r.name} className="text-xs">
                       {r.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Gateway Site</Label>
+              <Select value={testSite || "all"} onValueChange={(v) => setTestSite(v === "all" ? "" : v)}>
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="Any / Default" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-xs text-muted-foreground">Any / Default</SelectItem>
+                  {sites.filter((s) => Boolean(s.name)).map((s) => (
+                    <SelectItem key={s.id} value={s.name} className="text-xs">
+                      {s.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -369,6 +393,13 @@ export const LearningInsightsCard = () => {
               </div>
               <div className="h-8 w-px bg-border/60" />
               <div>
+                <span className="text-xs text-muted-foreground block">Predicted IMPS</span>
+                <span className="text-lg font-bold text-foreground">
+                  ₹{testResult?.impsCharges ?? 0}
+                </span>
+              </div>
+              <div className="h-8 w-px bg-border/60" />
+              <div>
                 <span className="text-xs text-muted-foreground block">Net Profit Margin</span>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   {testResult && testResult.commission !== null ? (
@@ -397,17 +428,27 @@ export const LearningInsightsCard = () => {
                 <span className="font-semibold text-foreground">
                   {testResult?.source === "customer_history"
                     ? "Tier 0: Recurring Client Rate"
-                    : testResult?.source === "card_tx_portal_bank_mode"
-                      ? "Tier 1: Bank & Channel Specific Rate"
-                      : testResult?.source === "card_tx_portal_bank"
-                        ? "Tier 2: Bank Terminal Rate"
-                        : testResult?.source === "card_tx_portal"
-                          ? "Tier 3: Portal General Match"
-                          : testResult?.source === "card_tx"
-                            ? "Tier 4: Card & Tx Fallback"
-                            : testResult?.source === "global_baseline"
-                              ? "Tier 5: Automated Empirical Baseline"
-                              : "No Pattern Discovered"}
+                    : testResult?.source === "site_card_tx_portal_bank_mode"
+                      ? "Site Tier 0: Site + Full Context Match"
+                      : testResult?.source === "site_card_tx_bank"
+                        ? "Site Tier 1: Site + Card + Bank"
+                        : testResult?.source === "site_card_tx"
+                          ? "Site Tier 2: Site + Card Match"
+                          : testResult?.source === "site_tx"
+                            ? "Site Tier 3: Site Gateway Rate"
+                            : testResult?.source === "site_default"
+                              ? "Site Tier 4: Site Base Rate"
+                              : testResult?.source === "card_tx_portal_bank_mode"
+                                ? "Tier 1: Bank & Channel Specific Rate"
+                                : testResult?.source === "card_tx_portal_bank"
+                                  ? "Tier 2: Bank Terminal Rate"
+                                  : testResult?.source === "card_tx_portal"
+                                    ? "Tier 3: Portal General Match"
+                                    : testResult?.source === "card_tx"
+                                      ? "Tier 4: Card & Tx Fallback"
+                                      : testResult?.source === "global_baseline"
+                                        ? "Tier 5: Automated Empirical Baseline"
+                                        : "No Pattern Discovered"}
                 </span>
                 {testResult?.isVolumeAdjusted && (
                   <Badge variant="secondary" className="text-[10px] py-0 px-1 font-normal">

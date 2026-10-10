@@ -9,6 +9,7 @@ export interface PDFTransaction {
   amount: number;
   commission: number;
   site_fee: number;
+  imps_charges?: number | null;
   profit?: number;
   transaction_date: string;
   reference_number?: string | null;
@@ -82,12 +83,13 @@ export const exportToPDF = async ({
   const totalAmount = transactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
   const totalCommission = transactions.reduce((sum, t) => sum + Number(t.commission || 0), 0);
   const totalSiteFee = transactions.reduce((sum, t) => sum + Number(t.site_fee || 0), 0);
+  const totalImpsCharges = transactions.reduce((sum, t) => sum + Number(t.imps_charges || 0), 0);
   const totalProfit = transactions.reduce(
     (sum, t) =>
       sum +
       (t.profit !== undefined
         ? Number(t.profit)
-        : Number(t.commission || 0) - Number(t.site_fee || 0)),
+        : Number(t.commission || 0) - Number(t.site_fee || 0) - Number(t.imps_charges || 0)),
     0
   );
 
@@ -821,10 +823,11 @@ export const exportToPDF = async ({
 
   // Prepare Itemized Table Data
   const tableData = transactions.map((t, index) => {
+    const impsVal = Number(t.imps_charges || 0);
     const profitVal =
       t.profit !== undefined
         ? Number(t.profit)
-        : Number(t.commission || 0) - Number(t.site_fee || 0);
+        : Number(t.commission || 0) - Number(t.site_fee || 0) - impsVal;
 
     const cardTypeName = t.card_type ? getCardTypeDisplayName(t.card_type) : "-";
 
@@ -837,6 +840,11 @@ export const exportToPDF = async ({
       ? t.status.charAt(0).toUpperCase() + t.status.slice(1).toLowerCase()
       : "Completed";
 
+    const feeDisplay =
+      impsVal > 0
+        ? `${formatINR(Number(t.site_fee || 0))} (+${formatINR(impsVal, 0)})`
+        : formatINR(Number(t.site_fee || 0));
+
     return [
       (index + 1).toString(),
       dateFormatted,
@@ -845,7 +853,7 @@ export const exportToPDF = async ({
       cardTypeName,
       formatINR(Number(t.amount || 0)),
       formatINR(Number(t.commission || 0)),
-      formatINR(Number(t.site_fee || 0)),
+      feeDisplay,
       formatINR(Number(profitVal)),
     ];
   });
@@ -860,14 +868,16 @@ export const exportToPDF = async ({
       "",
       formatINR(totalAmount),
       formatINR(totalCommission),
-      formatINR(totalSiteFee),
+      totalImpsCharges > 0
+        ? `${formatINR(totalSiteFee)} (+${formatINR(totalImpsCharges, 0)})`
+        : formatINR(totalSiteFee),
       formatINR(totalProfit),
     ],
   ];
 
   // Render Itemized Table using autoTable
   autoTable(doc, {
-    head: [["S.No", "Date & Time", "Portal", "Type", "Card", "Amount (Rs)", "Comm (Rs)", "Fee (Rs)", "Profit (Rs)"]],
+    head: [["S.No", "Date & Time", "Portal", "Type", "Card", "Amount (Rs)", "Comm (Rs)", "Fee+IMPS (Rs)", "Profit (Rs)"]],
     body: tableData,
     foot: tableFoot,
     showFoot: "lastPage",
