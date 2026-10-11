@@ -205,3 +205,18 @@ All colors MUST be HSL.
   background: hsl(var(--muted-foreground) / 0.35);
 }
 
+/* Strict sizing constraints for AnimatedNotificationIcon to prevent Lottie SVG layout glitches */
+.animated-bell-icon,
+.animated-bell-icon * {
+  box-sizing: border-box;
+}
+
+.animated-bell-icon svg,
+[data-lottie-icon] svg {
+  width: 20px !important;
+  height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+  overflow: hidden !important;
+  display: block !important;
+}

@@ -223,7 +223,9 @@ export const NotificationCenter = () => {
           onMouseEnter={() => setIconHovered(true)}
           onMouseLeave={() => setIconHovered(false)}
         >
-          <AnimatedNotificationIcon isHovered={iconHovered} className="h-4.5 w-4.5 text-foreground" />
+          <div className="w-5 h-5 max-w-[20px] max-h-[20px] overflow-hidden flex items-center justify-center shrink-0 pointer-events-none">
+            <AnimatedNotificationIcon isHovered={iconHovered} className="w-5 h-5 text-foreground" />
+          </div>
           {unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground animate-in zoom-in pointer-events-none">
               {unreadCount > 9 ? "9+" : unreadCount}
