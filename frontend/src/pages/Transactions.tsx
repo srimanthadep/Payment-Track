@@ -66,6 +66,24 @@ const Transactions = () => {
     totalAmount: number;
     count: number;
   } | null>(null);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchTotalCount = async () => {
+      const targetUserId = effectiveUserId || user?.id;
+      if (!targetUserId) return;
+      const { count, error } = await supabase
+        .from("transactions")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", targetUserId);
+
+      if (!error && count !== null) {
+        setTotalCount(count);
+      }
+    };
+
+    fetchTotalCount();
+  }, [user, effectiveUserId, refreshKey]);
 
   const handleRefresh = async () => {
     setRefreshKey((k) => k + 1);
@@ -149,9 +167,16 @@ const Transactions = () => {
           {/* Header Row: Title & Switcher */}
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pb-1 border-b border-border/60">
             <div>
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
-                Transactions
-              </h1>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
+                  Transactions
+                </h1>
+                {totalCount !== null && (
+                  <span className="text-xs sm:text-sm font-normal text-muted-foreground self-center">
+                    ({totalCount.toLocaleString("en-IN")} {totalCount === 1 ? "record" : "records"})
+                  </span>
+                )}
+              </div>
               <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
                 Manage all your payment transactions
               </p>
@@ -263,6 +288,7 @@ const Transactions = () => {
               selectedDate={period === "daily" ? selectedDate : null}
               dateRange={dateRange}
               onPortalFilterSummaryChange={setPortalSummary}
+              onTotalCountChange={setTotalCount}
               isStaff={isStaff}
               key={`tx-table-${refreshKey}-${effectiveUserId || user.id}`}
             />

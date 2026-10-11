@@ -24,6 +24,7 @@ import {
   Users,
   Plus,
   UserPlus,
+  CreditCard,
 } from "lucide-react";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
@@ -294,8 +295,17 @@ export const CustomersTable = ({
                             {initials}
                           </div>
                           <div>
-                            <div className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
-                              {customer.name}
+                            <div className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors flex items-center gap-1.5 flex-wrap">
+                              <span>{customer.name}</span>
+                              {customer.saved_cards && customer.saved_cards.length > 0 && (
+                                <span
+                                  className="inline-flex items-center gap-1 text-[10px] font-normal text-muted-foreground bg-muted/70 px-1.5 py-0.2 rounded-md"
+                                  title={`${customer.saved_cards.length} saved card${customer.saved_cards.length > 1 ? "s" : ""}`}
+                                >
+                                  <CreditCard className="h-2.5 w-2.5 text-primary" />
+                                  <span>{customer.saved_cards.length} {customer.saved_cards.length === 1 ? "card" : "cards"}</span>
+                                </span>
+                              )}
                             </div>
                             {customer.phone ? (
                               <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
@@ -404,8 +414,17 @@ export const CustomersTable = ({
                         {initials}
                       </div>
                       <div>
-                        <div className="font-bold text-sm text-foreground">
-                          {customer.name}
+                        <div className="font-bold text-sm text-foreground flex items-center gap-1.5 flex-wrap">
+                          <span>{customer.name}</span>
+                          {customer.saved_cards && customer.saved_cards.length > 0 && (
+                            <span
+                              className="inline-flex items-center gap-1 text-[10px] font-normal text-muted-foreground bg-muted/70 px-1.5 py-0.2 rounded-md"
+                              title={`${customer.saved_cards.length} saved card${customer.saved_cards.length > 1 ? "s" : ""}`}
+                            >
+                              <CreditCard className="h-2.5 w-2.5 text-primary" />
+                              <span>{customer.saved_cards.length} {customer.saved_cards.length === 1 ? "card" : "cards"}</span>
+                            </span>
+                          )}
                         </div>
                         {customer.phone ? (
                           <div className="text-xs text-muted-foreground flex items-center gap-1">

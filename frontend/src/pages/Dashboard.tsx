@@ -50,6 +50,9 @@ const Dashboard = () => {
     status: [],
     transactionType: [],
     cardTypes: [],
+    customerModes: [],
+    banks: [],
+    sites: [],
     amountRange: { min: null, max: null },
   });
 
@@ -96,6 +99,43 @@ const Dashboard = () => {
         });
       });
     }
+
+    if (dashboardFilters.customerModes && dashboardFilters.customerModes.length > 0) {
+      const selectedModes = dashboardFilters.customerModes.map((m) => m.toLowerCase());
+      filtered = filtered.filter((t) => {
+        let mode = t.customer_mode || "";
+        if (!mode && t.notes) {
+          const match = t.notes.match(/Mode:\s*(Online|Offline)/i);
+          if (match) mode = match[1];
+        }
+        return mode ? selectedModes.includes(mode.toLowerCase()) : false;
+      });
+    }
+
+    if (dashboardFilters.sites && dashboardFilters.sites.length > 0) {
+      const selectedSites = dashboardFilters.sites.map((s) => s.toLowerCase());
+      filtered = filtered.filter((t) => {
+        let site = t.site_name || "";
+        if (!site && t.notes) {
+          const match = t.notes.match(/Site:\s*([^|]+)/i);
+          if (match) site = match[1].trim();
+        }
+        return site ? selectedSites.includes(site.toLowerCase()) : false;
+      });
+    }
+
+    if (dashboardFilters.banks && dashboardFilters.banks.length > 0) {
+      const selectedBanks = dashboardFilters.banks.map((b) => b.toLowerCase());
+      filtered = filtered.filter((t) => {
+        let bank = t.bank_name || "";
+        if (!bank && t.notes) {
+          const match = t.notes.match(/Bank:\s*([^|]+)/i);
+          if (match) bank = match[1].trim();
+        }
+        return bank ? selectedBanks.includes(bank.toLowerCase()) : false;
+      });
+    }
+
     if (dashboardFilters.dateRange?.from && dashboardFilters.dateRange?.to) {
       const from = new Date(dashboardFilters.dateRange.from);
       from.setHours(0, 0, 0, 0);
@@ -215,7 +255,7 @@ const Dashboard = () => {
     startOfDay.setHours(0, 0, 0, 0);
     supabase
       .from("transactions")
-      .select("amount, profit, commission, site_fee, transaction_date, portal_id, transaction_type, card_type")
+      .select("amount, profit, commission, site_fee, transaction_date, portal_id, transaction_type, card_type, customer_mode, bank_name, site_name, notes")
       .eq("user_id", user.id)
       .gte("transaction_date", thirtyDaysAgo.toISOString())
       .then(({ data }) => {

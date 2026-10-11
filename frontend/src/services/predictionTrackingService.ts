@@ -86,7 +86,7 @@ class PredictionTrackingService {
 
       const impsAccepted = event.impsAccepted !== undefined ? event.impsAccepted : true;
       const bothAccepted = event.commissionAccepted && event.siteFeeAccepted;
-      const allAccepted = event.allAccepted !== undefined ? event.allAccepted : (bothAccepted && impsAccepted);
+      const allAccepted = bothAccepted && impsAccepted;
       const status = allAccepted ? "accepted" : "overridden";
 
       // 1. Primary: Try inserting into dedicated prediction_tracking table
@@ -248,18 +248,20 @@ class PredictionTrackingService {
     const recentEvents: PredictionEvent[] = [];
 
     for (const r of rows) {
-      const bothAccepted = r.both_accepted === true;
+      const isCommAccepted = r.commission_accepted === true;
+      const isFeeAccepted = r.site_fee_accepted === true;
       const isImpsAccepted = r.imps_accepted !== false;
-      const isAllAccepted = r.all_accepted === true || (bothAccepted && isImpsAccepted);
+      const bothAccepted = isCommAccepted && isFeeAccepted;
+      const isAllAccepted = bothAccepted && isImpsAccepted;
 
       if (bothAccepted) totalAccepted++;
       if (isAllAccepted) allAcceptedCount++;
       if (!isAllAccepted) totalOverridden++;
 
-      if (r.commission_accepted) commAccepted++;
+      if (isCommAccepted) commAccepted++;
       else commOverridden++;
 
-      if (r.site_fee_accepted) feeAccepted++;
+      if (isFeeAccepted) feeAccepted++;
       else feeOverridden++;
 
       if (isImpsAccepted) impsAccepted++;
@@ -268,7 +270,7 @@ class PredictionTrackingService {
       const src = r.prediction_source || "unknown";
       if (!bySource[src]) bySource[src] = { accepted: 0, overridden: 0, total: 0 };
       bySource[src].total++;
-      if (bothAccepted) bySource[src].accepted++;
+      if (isAllAccepted) bySource[src].accepted++;
       else bySource[src].overridden++;
 
       if (recentEvents.length < 25) {
@@ -282,8 +284,8 @@ class PredictionTrackingService {
           portalName: r.portal_name || undefined,
           siteName: r.site_name || undefined,
           notes: r.notes || undefined,
-          commissionAccepted: r.commission_accepted,
-          siteFeeAccepted: r.site_fee_accepted,
+          commissionAccepted: isCommAccepted,
+          siteFeeAccepted: isFeeAccepted,
           impsAccepted: isImpsAccepted,
           allAccepted: isAllAccepted,
           predictedCommission: Number(r.predicted_commission),
@@ -341,18 +343,20 @@ class PredictionTrackingService {
 
     for (const row of rows) {
       const m = row.metadata as any;
-      const bothAccepted = m.both_accepted === true;
+      const isCommAccepted = m.commission_accepted === true;
+      const isFeeAccepted = m.site_fee_accepted === true;
       const isImpsAccepted = m.imps_accepted !== false;
-      const isAllAccepted = m.all_accepted === true || (bothAccepted && isImpsAccepted);
+      const bothAccepted = isCommAccepted && isFeeAccepted;
+      const isAllAccepted = bothAccepted && isImpsAccepted;
 
       if (bothAccepted) totalAccepted++;
       if (isAllAccepted) allAcceptedCount++;
       if (!isAllAccepted) totalOverridden++;
 
-      if (m.commission_accepted) commAccepted++;
+      if (isCommAccepted) commAccepted++;
       else commOverridden++;
 
-      if (m.site_fee_accepted) feeAccepted++;
+      if (isFeeAccepted) feeAccepted++;
       else feeOverridden++;
 
       if (isImpsAccepted) impsAccepted++;
@@ -361,13 +365,13 @@ class PredictionTrackingService {
       const src = m.prediction_source || "unknown";
       if (!bySource[src]) bySource[src] = { accepted: 0, overridden: 0, total: 0 };
       bySource[src].total++;
-      if (bothAccepted) bySource[src].accepted++;
+      if (isAllAccepted) bySource[src].accepted++;
       else bySource[src].overridden++;
 
       if (recentEvents.length < 25) {
         recentEvents.push({
-          commissionAccepted: m.commission_accepted,
-          siteFeeAccepted: m.site_fee_accepted,
+          commissionAccepted: isCommAccepted,
+          siteFeeAccepted: isFeeAccepted,
           impsAccepted: isImpsAccepted,
           allAccepted: isAllAccepted,
           predictedCommission: m.predicted_commission,
@@ -430,35 +434,42 @@ class PredictionTrackingService {
         .limit(limit);
 
       if (!dedicatedError && dedicatedData && dedicatedData.length > 0) {
-        return dedicatedData.map((r) => ({
-          id: r.id,
-          transactionId: r.transaction_id || undefined,
-          amount: r.amount !== null && r.amount !== undefined ? Number(r.amount) : undefined,
-          profit: r.profit !== null && r.profit !== undefined ? Number(r.profit) : undefined,
-          customerName: r.customer_name || undefined,
-          customerPhone: r.customer_phone || undefined,
-          portalName: r.portal_name || undefined,
-          siteName: r.site_name || undefined,
-          notes: r.notes || undefined,
-          commissionAccepted: r.commission_accepted,
-          siteFeeAccepted: r.site_fee_accepted,
-          impsAccepted: r.imps_accepted !== false,
-          allAccepted: r.all_accepted === true,
-          predictedCommission: Number(r.predicted_commission),
-          predictedSiteFee: Number(r.predicted_site_fee),
-          predictedImps: r.predicted_imps !== null && r.predicted_imps !== undefined ? Number(r.predicted_imps) : 0,
-          actualCommission: Number(r.actual_commission),
-          actualSiteFee: Number(r.actual_site_fee),
-          actualImps: r.actual_imps !== null && r.actual_imps !== undefined ? Number(r.actual_imps) : 0,
-          predictionSource: r.prediction_source,
-          predictionConfidence: Number(r.prediction_confidence),
-          cardType: r.card_type,
-          transactionType: r.transaction_type,
-          sentTo: r.sent_to,
-          bankName: r.bank_name || undefined,
-          customerMode: r.customer_mode || undefined,
-          createdAt: r.created_at,
-        }));
+        return dedicatedData.map((r) => {
+          const isCommAccepted = r.commission_accepted === true;
+          const isFeeAccepted = r.site_fee_accepted === true;
+          const isImpsAccepted = r.imps_accepted !== false;
+          const isAllAccepted = isCommAccepted && isFeeAccepted && isImpsAccepted;
+
+          return {
+            id: r.id,
+            transactionId: r.transaction_id || undefined,
+            amount: r.amount !== null && r.amount !== undefined ? Number(r.amount) : undefined,
+            profit: r.profit !== null && r.profit !== undefined ? Number(r.profit) : undefined,
+            customerName: r.customer_name || undefined,
+            customerPhone: r.customer_phone || undefined,
+            portalName: r.portal_name || undefined,
+            siteName: r.site_name || undefined,
+            notes: r.notes || undefined,
+            commissionAccepted: isCommAccepted,
+            siteFeeAccepted: isFeeAccepted,
+            impsAccepted: isImpsAccepted,
+            allAccepted: isAllAccepted,
+            predictedCommission: Number(r.predicted_commission),
+            predictedSiteFee: Number(r.predicted_site_fee),
+            predictedImps: r.predicted_imps !== null && r.predicted_imps !== undefined ? Number(r.predicted_imps) : 0,
+            actualCommission: Number(r.actual_commission),
+            actualSiteFee: Number(r.actual_site_fee),
+            actualImps: r.actual_imps !== null && r.actual_imps !== undefined ? Number(r.actual_imps) : 0,
+            predictionSource: r.prediction_source,
+            predictionConfidence: Number(r.prediction_confidence),
+            cardType: r.card_type,
+            transactionType: r.transaction_type,
+            sentTo: r.sent_to,
+            bankName: r.bank_name || undefined,
+            customerMode: r.customer_mode || undefined,
+            createdAt: r.created_at,
+          };
+        });
       }
 
       // 2. Fallback: activity_logs
@@ -476,12 +487,17 @@ class PredictionTrackingService {
         .filter((row: any) => row.metadata?.prediction_event === true)
         .map((row: any) => {
           const m = row.metadata;
+          const isCommAccepted = m.commission_accepted === true;
+          const isFeeAccepted = m.site_fee_accepted === true;
+          const isImpsAccepted = m.imps_accepted !== false;
+          const isAllAccepted = isCommAccepted && isFeeAccepted && isImpsAccepted;
+
           return {
             id: row.id,
-            commissionAccepted: m.commission_accepted,
-            siteFeeAccepted: m.site_fee_accepted,
-            impsAccepted: m.imps_accepted !== false,
-            allAccepted: m.all_accepted === true,
+            commissionAccepted: isCommAccepted,
+            siteFeeAccepted: isFeeAccepted,
+            impsAccepted: isImpsAccepted,
+            allAccepted: isAllAccepted,
             predictedCommission: Number(m.predicted_commission),
             predictedSiteFee: Number(m.predicted_site_fee),
             predictedImps: m.predicted_imps !== undefined ? Number(m.predicted_imps) : 0,
@@ -575,6 +591,89 @@ class PredictionTrackingService {
       return !activityError;
     } catch {
       return false;
+    }
+  }
+
+  /**
+   * Updates an existing prediction tracking record when a transaction is edited.
+   * Recalculates commission_accepted, site_fee_accepted, imps_accepted, both_accepted, all_accepted.
+   */
+  async updatePredictionForTransaction(
+    transactionId: string,
+    updates: {
+      amount?: number;
+      profit?: number;
+      actualCommission?: number;
+      actualSiteFee?: number;
+      actualImps?: number;
+      customerName?: string;
+      customerPhone?: string;
+      siteName?: string;
+      bankName?: string;
+      notes?: string;
+      cardType?: string;
+      transactionType?: string;
+      sentTo?: string;
+      customerMode?: string;
+    }
+  ): Promise<void> {
+    try {
+      if (!transactionId) return;
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: existingRows } = await supabase
+        .from("prediction_tracking")
+        .select("*")
+        .eq("transaction_id", transactionId)
+        .eq("user_id", user.id);
+
+      if (existingRows && existingRows.length > 0) {
+        for (const existing of existingRows) {
+          const actualComm = updates.actualCommission !== undefined ? updates.actualCommission : Number(existing.actual_commission);
+          const actualFee = updates.actualSiteFee !== undefined ? updates.actualSiteFee : Number(existing.actual_site_fee);
+          const actualImps = updates.actualImps !== undefined ? updates.actualImps : Number(existing.actual_imps || 0);
+
+          const predComm = Number(existing.predicted_commission);
+          const predFee = Number(existing.predicted_site_fee);
+          const predImps = Number(existing.predicted_imps || 0);
+
+          const commAccepted = Math.abs(actualComm - predComm) < 0.01;
+          const feeAccepted = Math.abs(actualFee - predFee) < 0.01;
+          const impsAccepted = Math.abs(actualImps - predImps) < 0.5;
+          const bothAccepted = commAccepted && feeAccepted;
+          const allAccepted = bothAccepted && impsAccepted;
+
+          await supabase
+            .from("prediction_tracking")
+            .update({
+              amount: updates.amount !== undefined ? updates.amount : existing.amount,
+              profit: updates.profit !== undefined ? updates.profit : existing.profit,
+              actual_commission: actualComm,
+              actual_site_fee: actualFee,
+              actual_imps: actualImps,
+              commission_accepted: commAccepted,
+              site_fee_accepted: feeAccepted,
+              imps_accepted: impsAccepted,
+              both_accepted: bothAccepted,
+              all_accepted: allAccepted,
+              customer_name: updates.customerName !== undefined ? updates.customerName : existing.customer_name,
+              customer_phone: updates.customerPhone !== undefined ? updates.customerPhone : existing.customer_phone,
+              site_name: updates.siteName !== undefined ? updates.siteName : existing.site_name,
+              bank_name: updates.bankName !== undefined ? updates.bankName : existing.bank_name,
+              notes: updates.notes !== undefined ? updates.notes : existing.notes,
+              card_type: updates.cardType !== undefined ? updates.cardType : existing.card_type,
+              transaction_type: updates.transactionType !== undefined ? updates.transactionType : existing.transaction_type,
+              sent_to: updates.sentTo !== undefined ? updates.sentTo : existing.sent_to,
+              customer_mode: updates.customerMode !== undefined ? updates.customerMode : existing.customer_mode,
+            })
+            .eq("id", existing.id);
+        }
+      }
+    } catch (err) {
+      console.warn("Could not sync transaction update to prediction tracking:", err);
     }
   }
 }

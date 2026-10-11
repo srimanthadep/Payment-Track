@@ -115,7 +115,7 @@ export const DailyProfitTracker = ({ variant = "default" }: DailyProfitTrackerPr
 
     const { data, error } = await supabase
       .from("transactions")
-      .select("commission, site_fee")
+      .select("commission, site_fee, imps_charges, profit")
       .eq("user_id", effectiveUserId)
       .eq("portal_id", selfPortalId)
       .gte("transaction_date", dayStart.toISOString())
@@ -123,7 +123,11 @@ export const DailyProfitTracker = ({ variant = "default" }: DailyProfitTrackerPr
 
     if (!error && data) {
       const totalProfit = data.reduce(
-        (sum, t) => sum + (Number(t.commission || 0) - Number(t.site_fee || 0)),
+        (sum, t: any) =>
+          sum +
+          (t.profit !== undefined && t.profit !== null
+            ? Number(t.profit)
+            : Number(t.commission || 0) - Number(t.site_fee || 0) - Number(t.imps_charges || 0)),
         0
       );
       setProfit(totalProfit);

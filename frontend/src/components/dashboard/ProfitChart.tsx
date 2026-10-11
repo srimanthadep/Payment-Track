@@ -60,7 +60,7 @@ export const ProfitChart = ({ userId, filters }: ProfitChartProps) => {
 
         let query = supabase
           .from("transactions")
-          .select("transaction_date, commission, site_fee, profit, portal_id, transaction_type, card_type, amount")
+          .select("transaction_date, commission, site_fee, profit, portal_id, transaction_type, card_type, amount, customer_mode, bank_name, site_name, notes")
           .eq("user_id", userId)
           .gte("transaction_date", startDate.toISOString());
 
@@ -111,6 +111,39 @@ export const ProfitChart = ({ userId, filters }: ProfitChartProps) => {
                   if (s === "machine_swiping" && (rawType.includes("swip") || rawType.includes("machine") || displayName.includes("swip") || displayName.includes("machine"))) return true;
                   return false;
                 });
+              });
+            }
+            if (filters.customerModes && filters.customerModes.length > 0) {
+              const selectedModes = filters.customerModes.map((m: string) => m.toLowerCase());
+              filtered = filtered.filter((t: any) => {
+                let mode = t.customer_mode || "";
+                if (!mode && t.notes) {
+                  const match = t.notes.match(/Mode:\s*(Online|Offline)/i);
+                  if (match) mode = match[1];
+                }
+                return mode ? selectedModes.includes(mode.toLowerCase()) : false;
+              });
+            }
+            if (filters.sites && filters.sites.length > 0) {
+              const selectedSites = filters.sites.map((s: string) => s.toLowerCase());
+              filtered = filtered.filter((t: any) => {
+                let site = t.site_name || "";
+                if (!site && t.notes) {
+                  const match = t.notes.match(/Site:\s*([^|]+)/i);
+                  if (match) site = match[1].trim();
+                }
+                return site ? selectedSites.includes(site.toLowerCase()) : false;
+              });
+            }
+            if (filters.banks && filters.banks.length > 0) {
+              const selectedBanks = filters.banks.map((b: string) => b.toLowerCase());
+              filtered = filtered.filter((t: any) => {
+                let bank = t.bank_name || "";
+                if (!bank && t.notes) {
+                  const match = t.notes.match(/Bank:\s*([^|]+)/i);
+                  if (match) bank = match[1].trim();
+                }
+                return bank ? selectedBanks.includes(bank.toLowerCase()) : false;
               });
             }
             if (filters.dateRange?.from && filters.dateRange?.to) {

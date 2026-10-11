@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -12,9 +12,13 @@ import {
   CheckCircle2,
   ArrowLeftRight,
   IndianRupee,
+  Users,
+  Store,
+  Landmark,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { settingsService, BankOption, SiteOption } from "@/services/settingsService";
 
 interface TransactionFiltersProps {
   portals: Array<{ id: string; name: string }>;
@@ -27,6 +31,9 @@ export interface FilterState {
   status?: string[];
   transactionType: string[];
   cardTypes: string[];
+  customerModes?: string[];
+  banks?: string[];
+  sites?: string[];
   amountRange: { min: number | null; max: number | null };
 }
 
@@ -46,8 +53,23 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
     portals: [],
     transactionType: [],
     cardTypes: [],
+    customerModes: [],
+    banks: [],
+    sites: [],
     amountRange: { min: null, max: null },
   });
+
+  const [banks, setBanks] = useState<BankOption[]>(() => settingsService.getBanks());
+  const [sites, setSites] = useState<SiteOption[]>(() => settingsService.getSites());
+
+  useEffect(() => {
+    const updateOptions = () => {
+      setBanks(settingsService.getBanks());
+      setSites(settingsService.getSites());
+    };
+    updateOptions();
+    return settingsService.subscribe(updateOptions);
+  }, []);
 
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
 
@@ -64,7 +86,6 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
     updateFilters({ portals: updated });
   };
 
-
   const toggleTransactionType = (type: string) => {
     const updated = filters.transactionType.includes(type)
       ? filters.transactionType.filter((t) => t !== type)
@@ -78,6 +99,30 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
       ? current.filter((c) => c !== cardTypeId)
       : [...current, cardTypeId];
     updateFilters({ cardTypes: updated });
+  };
+
+  const toggleCustomerMode = (mode: string) => {
+    const current = filters.customerModes || [];
+    const updated = current.includes(mode)
+      ? current.filter((m) => m !== mode)
+      : [...current, mode];
+    updateFilters({ customerModes: updated });
+  };
+
+  const toggleBank = (bankName: string) => {
+    const current = filters.banks || [];
+    const updated = current.includes(bankName)
+      ? current.filter((b) => b !== bankName)
+      : [...current, bankName];
+    updateFilters({ banks: updated });
+  };
+
+  const toggleSite = (siteName: string) => {
+    const current = filters.sites || [];
+    const updated = current.includes(siteName)
+      ? current.filter((s) => s !== siteName)
+      : [...current, siteName];
+    updateFilters({ sites: updated });
   };
 
   const setQuickDateRange = (preset: string) => {
@@ -121,6 +166,9 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
       portals: [],
       transactionType: [],
       cardTypes: [],
+      customerModes: [],
+      banks: [],
+      sites: [],
       amountRange: { min: null, max: null },
     };
     setFilters(cleared);
@@ -128,11 +176,14 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
   };
 
   const hasActiveFilters =
-    filters.dateRange.from ||
-    filters.dateRange.to ||
+    Boolean(filters.dateRange.from) ||
+    Boolean(filters.dateRange.to) ||
     filters.portals.length > 0 ||
     filters.transactionType.length > 0 ||
     (filters.cardTypes && filters.cardTypes.length > 0) ||
+    (filters.customerModes && filters.customerModes.length > 0) ||
+    (filters.banks && filters.banks.length > 0) ||
+    (filters.sites && filters.sites.length > 0) ||
     filters.amountRange.min !== null ||
     filters.amountRange.max !== null;
 
@@ -372,6 +423,153 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
                     </div>
                   </label>
                 ))}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {/* Customer Mode Filter */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn(
+                "h-9 text-xs sm:text-sm w-full sm:w-auto font-medium transition-colors px-2 sm:px-3",
+                (filters.customerModes?.length ?? 0) > 0
+                  ? "bg-primary/10 border-primary/30 text-primary"
+                  : "bg-background hover:bg-accent/50"
+              )}
+            >
+              <Users className="mr-1.5 h-3.5 w-3.5 text-primary flex-shrink-0" />
+              <span>Mode {(filters.customerModes?.length ?? 0) > 0 && `(${filters.customerModes.length})`}</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-48 p-3 rounded-xl shadow-lg border-border/80" align="start">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Customer Mode</Label>
+                {(filters.customerModes?.length ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => updateFilters({ customerModes: [] })}
+                    className="text-[11px] text-primary hover:underline font-medium"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="space-y-1">
+                {["Online", "Offline"].map((mode) => (
+                  <label key={mode} className="flex items-center space-x-2 cursor-pointer p-1.5 hover:bg-muted/70 rounded-md transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={filters.customerModes?.includes(mode) || false}
+                      onChange={() => toggleCustomerMode(mode)}
+                      className="rounded accent-primary"
+                    />
+                    <span className="text-xs font-medium">{mode}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {/* Site Filter */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn(
+                "h-9 text-xs sm:text-sm w-full sm:w-auto font-medium transition-colors px-2 sm:px-3",
+                (filters.sites?.length ?? 0) > 0
+                  ? "bg-primary/10 border-primary/30 text-primary"
+                  : "bg-background hover:bg-accent/50"
+              )}
+            >
+              <Store className="mr-1.5 h-3.5 w-3.5 text-primary flex-shrink-0" />
+              <span>Site {(filters.sites?.length ?? 0) > 0 && `(${filters.sites.length})`}</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-3 rounded-xl shadow-lg border-border/80" align="start">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Select Sites</Label>
+                {(filters.sites?.length ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => updateFilters({ sites: [] })}
+                    className="text-[11px] text-primary hover:underline font-medium"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="max-h-48 overflow-y-auto space-y-1">
+                {sites.map((site) => (
+                  <label key={site.id} className="flex items-center space-x-2 cursor-pointer p-1.5 hover:bg-muted/70 rounded-md transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={filters.sites?.includes(site.name) || false}
+                      onChange={() => toggleSite(site.name)}
+                      className="rounded accent-primary"
+                    />
+                    <span className="text-xs font-medium truncate">{site.name}</span>
+                  </label>
+                ))}
+                {sites.length === 0 && (
+                  <p className="text-xs text-muted-foreground py-2 text-center">No sites configured</p>
+                )}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {/* Bank Credit Card Filter */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn(
+                "h-9 text-xs sm:text-sm w-full sm:w-auto font-medium transition-colors px-2 sm:px-3",
+                (filters.banks?.length ?? 0) > 0
+                  ? "bg-primary/10 border-primary/30 text-primary"
+                  : "bg-background hover:bg-accent/50"
+              )}
+            >
+              <Landmark className="mr-1.5 h-3.5 w-3.5 text-primary flex-shrink-0" />
+              <span>Bank {(filters.banks?.length ?? 0) > 0 && `(${filters.banks.length})`}</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-3 rounded-xl shadow-lg border-border/80" align="start">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Select Banks</Label>
+                {(filters.banks?.length ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => updateFilters({ banks: [] })}
+                    className="text-[11px] text-primary hover:underline font-medium"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="max-h-52 overflow-y-auto space-y-1">
+                {banks.map((bank) => (
+                  <label key={bank.id} className="flex items-center space-x-2 cursor-pointer p-1.5 hover:bg-muted/70 rounded-md transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={filters.banks?.includes(bank.name) || false}
+                      onChange={() => toggleBank(bank.name)}
+                      className="rounded accent-primary"
+                    />
+                    <span className="text-xs font-medium truncate">{bank.name}</span>
+                  </label>
+                ))}
+                {banks.length === 0 && (
+                  <p className="text-xs text-muted-foreground py-2 text-center">No banks configured</p>
+                )}
               </div>
             </div>
           </PopoverContent>

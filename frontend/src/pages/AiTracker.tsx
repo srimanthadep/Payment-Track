@@ -61,12 +61,12 @@ import { format } from "date-fns";
 const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   none: { label: "No Prediction", color: "bg-muted text-muted-foreground border-border" },
   customer_history: { label: "Customer Memory", color: "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20" },
-  site_card_tx_portal_bank_mode: { label: "Site + Full Context", color: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20" },
+  site_card_tx_portal_bank_mode: { label: "Site + Context", color: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20" },
   site_card_tx_bank: { label: "Site + Bank", color: "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/20" },
   site_card_tx: { label: "Site + Card", color: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/20" },
   site_tx: { label: "Site + Tx Type", color: "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20" },
   site_default: { label: "Site Base Rate", color: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20" },
-  card_tx_portal_bank_mode: { label: "Full Context Match", color: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20" },
+  card_tx_portal_bank_mode: { label: "Full Context", color: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20" },
   card_tx_portal_bank: { label: "Bank + Portal", color: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/20" },
   card_tx_portal: { label: "Portal Match", color: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/20" },
   card_tx: { label: "Card + Type", color: "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20" },
@@ -179,8 +179,8 @@ export default function AiTracker() {
   // Filtered events
   const filteredEvents = useMemo(() => {
     return events.filter((ev) => {
-      const isImpsAccepted = ev.impsAccepted ?? true;
-      const allAccepted = ev.allAccepted ?? (ev.commissionAccepted && ev.siteFeeAccepted && isImpsAccepted);
+      const isImpsAccepted = ev.impsAccepted !== false;
+      const allAccepted = Boolean(ev.commissionAccepted && ev.siteFeeAccepted && isImpsAccepted);
       
       // Status filter
       if (statusFilter === "accepted" && !allAccepted) return false;
@@ -483,8 +483,8 @@ export default function AiTracker() {
                 {/* Mobile View: Clean, readable Card items (md:hidden) */}
                 <div className="md:hidden divide-y divide-border/60">
                   {filteredEvents.map((ev, idx) => {
-                    const isImpsAccepted = ev.impsAccepted ?? true;
-                    const allAccepted = ev.allAccepted ?? (ev.commissionAccepted && ev.siteFeeAccepted && isImpsAccepted);
+                    const isImpsAccepted = ev.impsAccepted !== false;
+                    const allAccepted = Boolean(ev.commissionAccepted && ev.siteFeeAccepted && isImpsAccepted);
                     const commDiff = Math.round((ev.actualCommission - ev.predictedCommission) * 100) / 100;
                     const feeDiff = Math.round((ev.actualSiteFee - ev.predictedSiteFee) * 100) / 100;
                     const impsPred = ev.predictedImps ?? 0;
@@ -708,7 +708,7 @@ export default function AiTracker() {
                         <TableHead className="text-xs w-[120px]">Status</TableHead>
                         <TableHead className="text-xs min-w-[200px]">Transaction & Customer</TableHead>
                         <TableHead className="text-xs min-w-[240px]">What Changed? (AI vs Actual)</TableHead>
-                        <TableHead className="text-xs w-[150px]">
+                        <TableHead className="text-xs w-[140px] whitespace-nowrap">
                           <div className="flex items-center gap-1.5">
                             <AiIcon className="h-3.5 w-3.5" />
                             <span>AI Source Tier</span>
@@ -719,8 +719,8 @@ export default function AiTracker() {
                     </TableHeader>
                     <TableBody>
                       {filteredEvents.map((ev, idx) => {
-                        const isImpsAccepted = ev.impsAccepted ?? true;
-                        const allAccepted = ev.allAccepted ?? (ev.commissionAccepted && ev.siteFeeAccepted && isImpsAccepted);
+                        const isImpsAccepted = ev.impsAccepted !== false;
+                        const allAccepted = Boolean(ev.commissionAccepted && ev.siteFeeAccepted && isImpsAccepted);
                         const commDiff = Math.round((ev.actualCommission - ev.predictedCommission) * 100) / 100;
                         const feeDiff = Math.round((ev.actualSiteFee - ev.predictedSiteFee) * 100) / 100;
                         const impsPred = ev.predictedImps ?? 0;
@@ -906,13 +906,16 @@ export default function AiTracker() {
                             </TableCell>
 
                             {/* 5. AI Source Tier & Confidence */}
-                            <TableCell>
+                            <TableCell className="whitespace-nowrap">
                               <div className="space-y-1">
-                                <Badge variant="outline" className={`text-[10px] px-2 py-0.5 border ${tierInfo.color} inline-flex items-center gap-1.5`}>
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[10px] px-2 py-0.5 border ${tierInfo.color} inline-flex items-center gap-1.5 whitespace-nowrap rounded-md font-medium shadow-none`}
+                                >
                                   <AiIcon className="h-2.5 w-2.5 shrink-0" />
                                   <span>{tierInfo.label}</span>
                                 </Badge>
-                                <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <div className="flex items-center gap-1 text-[10px] text-muted-foreground whitespace-nowrap">
                                   <span>Confidence:</span>
                                   <span className="font-semibold text-foreground">
                                     {Math.round(ev.predictionConfidence * 100)}%
@@ -966,8 +969,8 @@ export default function AiTracker() {
         <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
           <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl p-5 sm:p-6 space-y-4">
             {selectedEvent && (() => {
-              const isSelectedImpsAccepted = selectedEvent.impsAccepted ?? true;
-              const isSelectedAllAccepted = selectedEvent.allAccepted ?? (selectedEvent.commissionAccepted && selectedEvent.siteFeeAccepted && isSelectedImpsAccepted);
+              const isSelectedImpsAccepted = selectedEvent.impsAccepted !== false;
+              const isSelectedAllAccepted = Boolean(selectedEvent.commissionAccepted && selectedEvent.siteFeeAccepted && isSelectedImpsAccepted);
 
               return (
               <>

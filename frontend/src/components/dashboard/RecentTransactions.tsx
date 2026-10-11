@@ -21,6 +21,10 @@ interface Transaction {
   transaction_date: string;
   portal_id: string;
   card_type: string | null;
+  customer_mode?: string | null;
+  bank_name?: string | null;
+  site_name?: string | null;
+  notes?: string | null;
   portals: {
     name: string;
   };
@@ -41,6 +45,9 @@ export const RecentTransactions = ({ userId, filters }: RecentTransactionsProps)
           filters.portals.length > 0 ||
           filters.transactionType.length > 0 ||
           (filters.cardTypes && filters.cardTypes.length > 0) ||
+          (filters.customerModes && filters.customerModes.length > 0) ||
+          (filters.sites && filters.sites.length > 0) ||
+          (filters.banks && filters.banks.length > 0) ||
           filters.amountRange.min !== null ||
           filters.amountRange.max !== null ||
           filters.dateRange.from || filters.dateRange.to
@@ -57,6 +64,10 @@ export const RecentTransactions = ({ userId, filters }: RecentTransactionsProps)
             transaction_date,
             portal_id,
             card_type,
+            customer_mode,
+            bank_name,
+            site_name,
+            notes,
             portals (
               name
             )
@@ -107,6 +118,39 @@ export const RecentTransactions = ({ userId, filters }: RecentTransactionsProps)
                   if (s === "machine_swiping" && (rawType.includes("swip") || rawType.includes("machine") || displayName.includes("swip") || displayName.includes("machine"))) return true;
                   return false;
                 });
+              });
+            }
+            if (filters.customerModes && filters.customerModes.length > 0) {
+              const selectedModes = filters.customerModes.map((m) => m.toLowerCase());
+              result = result.filter((t) => {
+                let mode = t.customer_mode || "";
+                if (!mode && t.notes) {
+                  const match = t.notes.match(/Mode:\s*(Online|Offline)/i);
+                  if (match) mode = match[1];
+                }
+                return mode ? selectedModes.includes(mode.toLowerCase()) : false;
+              });
+            }
+            if (filters.sites && filters.sites.length > 0) {
+              const selectedSites = filters.sites.map((s) => s.toLowerCase());
+              result = result.filter((t) => {
+                let site = t.site_name || "";
+                if (!site && t.notes) {
+                  const match = t.notes.match(/Site:\s*([^|]+)/i);
+                  if (match) site = match[1].trim();
+                }
+                return site ? selectedSites.includes(site.toLowerCase()) : false;
+              });
+            }
+            if (filters.banks && filters.banks.length > 0) {
+              const selectedBanks = filters.banks.map((b) => b.toLowerCase());
+              result = result.filter((t) => {
+                let bank = t.bank_name || "";
+                if (!bank && t.notes) {
+                  const match = t.notes.match(/Bank:\s*([^|]+)/i);
+                  if (match) bank = match[1].trim();
+                }
+                return bank ? selectedBanks.includes(bank.toLowerCase()) : false;
               });
             }
             if (filters.dateRange?.from && filters.dateRange?.to) {

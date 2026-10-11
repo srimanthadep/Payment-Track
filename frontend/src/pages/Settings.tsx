@@ -1180,22 +1180,6 @@ const Settings = () => {
           {/* ===================== TAB: AI LEARNING & ACCURACY ===================== */}
           <TabsContent value="ai-learning" className="space-y-6">
             <LearningInsightsCard />
-            <Card className="border shadow-sm bg-gradient-to-r from-primary/5 via-background to-background">
-              <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <AiIcon className="h-6 w-6 shrink-0 mt-0.5" />
-                  <div>
-                    <h3 className="font-semibold text-sm text-foreground">AI Prediction Tracker is now on a dedicated page!</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      View every transaction, check accepted AI suggestions vs overrides, and inspect exact rate differences.
-                    </p>
-                  </div>
-                </div>
-                <Button size="sm" onClick={() => navigate("/ai-tracker")} className="shrink-0 gap-2">
-                  Open AI Tracker <ArrowRight className="h-4 w-4" />
-                </Button>
-              </CardContent>
-            </Card>
           </TabsContent>
 
           {/* ===================== TAB 3: BACKUP & RESET ===================== */}

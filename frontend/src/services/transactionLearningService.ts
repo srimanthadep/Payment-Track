@@ -146,42 +146,61 @@ export class TransactionLearningService {
    */
   public async fetchAndIndexTransactions(): Promise<void> {
     try {
-      const { data, error } = await supabase
-        .from("transactions")
-        .select(`
-          id,
-          card_type,
-          transaction_type,
-          amount,
-          commission,
-          commission_percent,
-          site_fee,
-          site_fee_percent,
-          imps_charges,
-          notes,
-          bank_name,
-          customer_mode,
-          customer_name,
-          customer_id,
-          transaction_date,
-          portal_id,
-          site_name,
-          portals ( name )
-        `)
-        .order("transaction_date", { ascending: false });
+      let allRows: any[] = [];
+      let from = 0;
+      const PAGE_SIZE = 1000;
+      let hasMore = true;
 
-      if (error) {
-        // Do not crash or permanently mark initialized on RLS/auth errors
-        return;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("transactions")
+          .select(`
+            id,
+            card_type,
+            transaction_type,
+            amount,
+            commission,
+            commission_percent,
+            site_fee,
+            site_fee_percent,
+            imps_charges,
+            notes,
+            bank_name,
+            customer_mode,
+            customer_name,
+            customer_id,
+            transaction_date,
+            portal_id,
+            site_name,
+            portals ( name )
+          `)
+          .order("transaction_date", { ascending: false })
+          .range(from, from + PAGE_SIZE - 1);
+
+        if (error) {
+          // Do not crash or permanently mark initialized on RLS/auth errors
+          return;
+        }
+
+        if (data && data.length > 0) {
+          allRows = allRows.concat(data);
+          if (data.length < PAGE_SIZE) {
+            hasMore = false;
+          } else {
+            from += PAGE_SIZE;
+          }
+        } else {
+          hasMore = false;
+        }
       }
 
-      if (!data || data.length === 0) {
+      if (allRows.length === 0) {
         this.records = [];
         this.isInitialized = true;
         return;
       }
 
-      this.records = data
+      this.records = allRows
         .map((row: any) => this.parseRecord(row))
         .filter((r): r is HistoricalTransactionRecord => r !== null);
 
@@ -211,7 +230,7 @@ export class TransactionLearningService {
             siteFeeAccepted: Boolean(row.site_fee_accepted),
             impsAccepted: row.imps_accepted !== null && row.imps_accepted !== undefined ? Boolean(row.imps_accepted) : true,
             bothAccepted: Boolean(row.both_accepted),
-            allAccepted: row.all_accepted !== null && row.all_accepted !== undefined ? Boolean(row.all_accepted) : Boolean(row.both_accepted),
+            allAccepted: Boolean(row.commission_accepted) && Boolean(row.site_fee_accepted) && (row.imps_accepted !== false),
             timestamp: new Date(row.created_at).getTime(),
           }));
         }

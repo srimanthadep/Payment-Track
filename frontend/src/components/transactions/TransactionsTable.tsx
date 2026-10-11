@@ -43,6 +43,7 @@ interface TransactionsTableProps {
   selectedDate?: Date | null;
   dateRange?: { from: Date | null; to: Date | null };
   onPortalFilterSummaryChange?: (summary: { portalNames: string[]; totalAmount: number; count: number } | null) => void;
+  onTotalCountChange?: (count: number) => void;
   isStaff?: boolean;
 }
 
@@ -122,6 +123,7 @@ export const TransactionsTable = ({
   selectedDate,
   dateRange,
   onPortalFilterSummaryChange,
+  onTotalCountChange,
   isStaff = false,
 }: TransactionsTableProps) => {
   const { toast } = useToast();
@@ -138,6 +140,9 @@ export const TransactionsTable = ({
     portals: [],
     transactionType: [],
     cardTypes: [],
+    customerModes: [],
+    banks: [],
+    sites: [],
     amountRange: { min: null, max: null },
   });
   const [sortConfig, setSortConfig] = useState<{
@@ -178,34 +183,63 @@ export const TransactionsTable = ({
   useEffect(() => {
     const fetchTransactions = async () => {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from("transactions")
-        .select(`
-          id,
-          portal_id,
-          transaction_type,
-          amount,
-          commission,
-          commission_percent,
-          site_fee,
-          site_fee_percent,
-          imps_charges,
-          profit,
-          transaction_date,
-          card_type,
-          customer_mode,
-          bank_name,
-          site_name,
-          customer_id,
-          customer_name,
-          customer_phone,
-          notes,
-          portals (
-            name
-          )
-        `)
-        .eq("user_id", userId)
-        .order("transaction_date", { ascending: false });
+      let allTx: Transaction[] = [];
+      let from = 0;
+      const PAGE_SIZE = 1000;
+      let hasMoreRows = true;
+
+      while (hasMoreRows) {
+        const { data, error } = await supabase
+          .from("transactions")
+          .select(`
+            id,
+            portal_id,
+            transaction_type,
+            amount,
+            commission,
+            commission_percent,
+            site_fee,
+            site_fee_percent,
+            imps_charges,
+            profit,
+            transaction_date,
+            card_type,
+            customer_mode,
+            bank_name,
+            site_name,
+            customer_id,
+            customer_name,
+            customer_phone,
+            notes,
+            portals (
+              name
+            )
+          `)
+          .eq("user_id", userId)
+          .order("transaction_date", { ascending: false })
+          .range(from, from + PAGE_SIZE - 1);
+
+        if (error) {
+          console.error("Error fetching transactions:", error);
+          toast({
+            title: "Error",
+            description: "Failed to fetch transactions",
+            variant: "destructive",
+          });
+          break;
+        }
+
+        if (data && data.length > 0) {
+          allTx = allTx.concat(data as Transaction[]);
+          if (data.length < PAGE_SIZE) {
+            hasMoreRows = false;
+          } else {
+            from += PAGE_SIZE;
+          }
+        } else {
+          hasMoreRows = false;
+        }
+      }
 
       // Fetch portals for filters
       const { data: portalsData } = await supabase
@@ -217,23 +251,15 @@ export const TransactionsTable = ({
         setPortals(portalsData);
       }
 
-      if (error) {
-        console.error("Error fetching transactions:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch transactions",
-          variant: "destructive",
-        });
-      } else {
-        const sortedData = [...((data as Transaction[]) || [])].sort(
-          (a, b) =>
-            new Date(b.transaction_date).getTime() -
-            new Date(a.transaction_date).getTime()
-        );
-        setTransactions(sortedData);
-        setFilteredTransactions(sortedData);
-        setHasMore(sortedData.length > itemsPerPage);
-      }
+      const sortedData = [...allTx].sort(
+        (a, b) =>
+          new Date(b.transaction_date).getTime() -
+          new Date(a.transaction_date).getTime()
+      );
+      setTransactions(sortedData);
+      setFilteredTransactions(sortedData);
+      setHasMore(sortedData.length > itemsPerPage);
+      onTotalCountChange?.(sortedData.length);
 
       setIsLoading(false);
     };
@@ -369,6 +395,45 @@ export const TransactionsTable = ({
           if (sel === "machine_swiping" && (rawType.includes("swip") || rawType.includes("machine") || displayName.includes("swip") || displayName.includes("machine"))) return true;
           return false;
         });
+      });
+    }
+
+    // Customer mode filter (Online / Offline)
+    if (filters.customerModes && filters.customerModes.length > 0) {
+      const selectedModes = filters.customerModes.map((m) => m.toLowerCase());
+      filtered = filtered.filter((t) => {
+        let mode = t.customer_mode || "";
+        if (!mode && t.notes) {
+          const match = t.notes.match(/Mode:\s*(Online|Offline)/i);
+          if (match) mode = match[1];
+        }
+        return mode ? selectedModes.includes(mode.toLowerCase()) : false;
+      });
+    }
+
+    // Site filter
+    if (filters.sites && filters.sites.length > 0) {
+      const selectedSites = filters.sites.map((s) => s.toLowerCase());
+      filtered = filtered.filter((t) => {
+        let site = t.site_name || "";
+        if (!site && t.notes) {
+          const match = t.notes.match(/Site:\s*([^|]+)/i);
+          if (match) site = match[1].trim();
+        }
+        return site ? selectedSites.includes(site.toLowerCase()) : false;
+      });
+    }
+
+    // Bank Credit Card filter
+    if (filters.banks && filters.banks.length > 0) {
+      const selectedBanks = filters.banks.map((b) => b.toLowerCase());
+      filtered = filtered.filter((t) => {
+        let bank = t.bank_name || "";
+        if (!bank && t.notes) {
+          const match = t.notes.match(/Bank:\s*([^|]+)/i);
+          if (match) bank = match[1].trim();
+        }
+        return bank ? selectedBanks.includes(bank.toLowerCase()) : false;
       });
     }
 
@@ -514,38 +579,7 @@ export const TransactionsTable = ({
 
   const handleEditUpdated = async () => {
     // Refresh transactions
-    const { data, error } = await supabase
-      .from("transactions")
-      .select(`
-        id,
-        portal_id,
-        transaction_type,
-        amount,
-        commission,
-        commission_percent,
-        site_fee,
-        site_fee_percent,
-        imps_charges,
-        profit,
-        transaction_date,
-        card_type,
-        customer_mode,
-        bank_name,
-        site_name,
-        customer_id,
-        customer_name,
-        customer_phone,
-        notes,
-        portals (
-          name
-        )
-      `)
-      .eq("user_id", userId)
-      .order("transaction_date", { ascending: false });
-
-    if (!error && data) {
-      setTransactions(data as Transaction[]);
-    }
+    await fetchTransactions();
   };
 
   const handleDeleteConfirm = async () => {
@@ -576,39 +610,7 @@ export const TransactionsTable = ({
       });
 
       // Refresh transactions
-      const { data, error: fetchError } = await supabase
-        .from("transactions")
-        .select(`
-          id,
-          portal_id,
-          transaction_type,
-          amount,
-          commission,
-          commission_percent,
-          site_fee,
-          site_fee_percent,
-          imps_charges,
-          profit,
-          transaction_date,
-          card_type,
-          customer_mode,
-          bank_name,
-          site_name,
-          customer_id,
-          customer_name,
-          customer_phone,
-          notes,
-          portals (
-            name
-          )
-        `)
-        .eq("user_id", userId)
-        .order("transaction_date", { ascending: false });
-
-      if (fetchError) throw fetchError;
-
-      setTransactions(data as Transaction[]);
-      setFilteredTransactions(data as Transaction[]);
+      await fetchTransactions();
     } catch (error) {
       console.error("Error deleting transaction:", error);
       toast({
@@ -663,6 +665,7 @@ export const TransactionsTable = ({
       toast({ title: "Deleted", description: `Deleted ${count} transactions` });
       setSelectedIds(new Set());
       setSelectAll(false);
+      await fetchTransactions();
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to delete selected", variant: "destructive" });
     }
@@ -919,7 +922,7 @@ export const TransactionsTable = ({
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       {!isStaff && (
-                        <Checkbox checked={selectedIds.has(transaction.id)} onCheckedChange={() => toggleSelect(transaction.id)} className="flex-shrink-0" />
+                        <Checkbox checked={selectedIds.has(transaction.id)} onCheckedChange={() => toggleSelect(transaction.id)} className="flex-shrink-0 rounded-[4px]" />
                       )}
                       <div className="min-w-0 flex-1">
                         {(() => {
@@ -1118,115 +1121,121 @@ export const TransactionsTable = ({
         ) : (
         <Table>
           <TableHeader>
-            <TableRow>
-              {!isStaff && <TableHead className="w-[40px]"><Checkbox checked={selectAll} onCheckedChange={toggleSelectAll} /></TableHead>}
+            <TableRow className="h-9 hover:bg-transparent border-b">
+              {!isStaff && (
+                <TableHead className="w-[36px] min-w-[36px] max-w-[36px] px-2 py-1.5 text-center">
+                  <Checkbox checked={selectAll} onCheckedChange={toggleSelectAll} className="rounded-[4px]" />
+                </TableHead>
+              )}
               <TableHead
-                className="whitespace-nowrap cursor-pointer select-none hover:text-foreground"
+                className="px-2 py-1.5 text-xs font-semibold whitespace-nowrap cursor-pointer select-none hover:text-foreground"
                 onClick={() => handleSort("date")}
               >
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5">
                   <span>Date</span>
                   {sortConfig.key === "date" ? (
-                    sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                    sortConfig.direction === "desc" ? <ArrowDown className="h-2.5 w-2.5 text-primary" /> : <ArrowUp className="h-2.5 w-2.5 text-primary" />
                   ) : (
-                    <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
+                    <ArrowUpDown className="h-2.5 w-2.5 opacity-30 hover:opacity-100" />
                   )}
                 </div>
               </TableHead>
               <TableHead
-                className="cursor-pointer select-none hover:text-foreground"
+                className="px-2 py-1.5 text-xs font-semibold whitespace-nowrap cursor-pointer select-none hover:text-foreground"
                 onClick={() => handleSort("portal")}
               >
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5">
                   <span>Portal</span>
                   {sortConfig.key === "portal" ? (
-                    sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                    sortConfig.direction === "desc" ? <ArrowDown className="h-2.5 w-2.5 text-primary" /> : <ArrowUp className="h-2.5 w-2.5 text-primary" />
                   ) : (
-                    <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
+                    <ArrowUpDown className="h-2.5 w-2.5 opacity-30 hover:opacity-100" />
                   )}
                 </div>
               </TableHead>
               <TableHead
-                className="cursor-pointer select-none hover:text-foreground"
+                className="px-2 py-1.5 text-xs font-semibold whitespace-nowrap cursor-pointer select-none hover:text-foreground"
                 onClick={() => handleSort("type")}
               >
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5">
                   <span>Type</span>
                   {sortConfig.key === "type" ? (
-                    sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                    sortConfig.direction === "desc" ? <ArrowDown className="h-2.5 w-2.5 text-primary" /> : <ArrowUp className="h-2.5 w-2.5 text-primary" />
                   ) : (
-                    <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
+                    <ArrowUpDown className="h-2.5 w-2.5 opacity-30 hover:opacity-100" />
                   )}
                 </div>
               </TableHead>
               <TableHead
-                className={`${isStaff ? "" : "hidden md:table-cell"} cursor-pointer select-none hover:text-foreground`}
+                className={`${isStaff ? "" : "hidden md:table-cell"} px-2 py-1.5 text-xs font-semibold whitespace-nowrap cursor-pointer select-none hover:text-foreground`}
                 onClick={() => handleSort("card_type")}
               >
-                <div className="flex items-center gap-1">
-                  <span>Card Type</span>
+                <div className="flex items-center gap-0.5">
+                  <span>Card</span>
                   {sortConfig.key === "card_type" ? (
-                    sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                    sortConfig.direction === "desc" ? <ArrowDown className="h-2.5 w-2.5 text-primary" /> : <ArrowUp className="h-2.5 w-2.5 text-primary" />
                   ) : (
-                    <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
+                    <ArrowUpDown className="h-2.5 w-2.5 opacity-30 hover:opacity-100" />
                   )}
                 </div>
               </TableHead>
               <TableHead
-                className="text-right cursor-pointer select-none hover:text-foreground"
+                className="px-2 py-1.5 text-right text-xs font-semibold whitespace-nowrap cursor-pointer select-none hover:text-foreground"
                 onClick={() => handleSort("amount")}
               >
-                <div className="flex items-center justify-end gap-1">
+                <div className="flex items-center justify-end gap-0.5">
                   <span>Amount</span>
                   {sortConfig.key === "amount" ? (
-                    sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                    sortConfig.direction === "desc" ? <ArrowDown className="h-2.5 w-2.5 text-primary" /> : <ArrowUp className="h-2.5 w-2.5 text-primary" />
                   ) : (
-                    <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
+                    <ArrowUpDown className="h-2.5 w-2.5 opacity-30 hover:opacity-100" />
                   )}
                 </div>
               </TableHead>
               {!isStaff && (
                 <>
                   <TableHead
-                    className="text-right cursor-pointer select-none hover:text-foreground"
+                    className="px-2 py-1.5 text-right text-xs font-semibold whitespace-nowrap cursor-pointer select-none hover:text-foreground"
                     onClick={() => handleSort("commission")}
                   >
-                    <div className="flex items-center justify-end gap-1">
+                    <div className="flex items-center justify-end gap-0.5">
                       <span>Commission</span>
                       {sortConfig.key === "commission" ? (
-                        sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                        sortConfig.direction === "desc" ? <ArrowDown className="h-2.5 w-2.5 text-primary" /> : <ArrowUp className="h-2.5 w-2.5 text-primary" />
                       ) : (
-                        <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
+                        <ArrowUpDown className="h-2.5 w-2.5 opacity-30 hover:opacity-100" />
                       )}
                     </div>
                   </TableHead>
                   <TableHead
-                    className="text-right hidden sm:table-cell cursor-pointer select-none hover:text-foreground"
+                    className="px-2 py-1.5 text-right hidden sm:table-cell text-xs font-semibold whitespace-nowrap cursor-pointer select-none hover:text-foreground"
                     onClick={() => handleSort("site_fee")}
                   >
-                    <div className="flex items-center justify-end gap-1">
-                      <span>Site Fee & IMPS</span>
+                    <div className="flex items-center justify-end gap-0.5">
+                      <span>Fee & IMPS</span>
                       {sortConfig.key === "site_fee" ? (
-                        sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                        sortConfig.direction === "desc" ? <ArrowDown className="h-2.5 w-2.5 text-primary" /> : <ArrowUp className="h-2.5 w-2.5 text-primary" />
                       ) : (
-                        <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
+                        <ArrowUpDown className="h-2.5 w-2.5 opacity-30 hover:opacity-100" />
                       )}
                     </div>
                   </TableHead>
                   <TableHead
-                    className="text-right hidden sm:table-cell cursor-pointer select-none hover:text-foreground"
+                    className="px-2 py-1.5 text-right hidden sm:table-cell text-xs font-semibold whitespace-nowrap cursor-pointer select-none hover:text-foreground"
                     onClick={() => handleSort("profit")}
                   >
-                    <div className="flex items-center justify-end gap-1">
+                    <div className="flex items-center justify-end gap-0.5">
                       <span>Profit</span>
                       {sortConfig.key === "profit" ? (
-                        sortConfig.direction === "desc" ? <ArrowDown className="h-3 w-3 text-primary" /> : <ArrowUp className="h-3 w-3 text-primary" />
+                        sortConfig.direction === "desc" ? <ArrowDown className="h-2.5 w-2.5 text-primary" /> : <ArrowUp className="h-2.5 w-2.5 text-primary" />
                       ) : (
-                        <ArrowUpDown className="h-3 w-3 opacity-30 hover:opacity-100" />
+                        <ArrowUpDown className="h-2.5 w-2.5 opacity-30 hover:opacity-100" />
                       )}
                     </div>
                   </TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="w-[64px] min-w-[64px] max-w-[64px] px-2 py-1.5 text-right text-xs font-semibold whitespace-nowrap pr-2.5">
+                    Actions
+                  </TableHead>
                 </>
               )}
             </TableRow>
@@ -1245,16 +1254,20 @@ export const TransactionsTable = ({
             ) : (
                 <>
                   {displayedTransactions.map((transaction) => (
-                <TableRow key={transaction.id}>
-                      {!isStaff && <TableCell><Checkbox checked={selectedIds.has(transaction.id)} onCheckedChange={() => toggleSelect(transaction.id)} /></TableCell>}
-                  <TableCell className="whitespace-nowrap">
+                <TableRow key={transaction.id} className="hover:bg-muted/40 transition-colors">
+                  {!isStaff && (
+                    <TableCell className="w-[36px] min-w-[36px] max-w-[36px] px-2 py-1.5 text-center">
+                      <Checkbox checked={selectedIds.has(transaction.id)} onCheckedChange={() => toggleSelect(transaction.id)} className="rounded-[4px]" />
+                    </TableCell>
+                  )}
+                  <TableCell className="px-2 py-1.5 whitespace-nowrap">
                     {(() => {
                       const { date, time } = formatDateTimeParts(transaction.transaction_date);
                       return (
                         <div className="flex flex-col">
                           <span className="font-medium text-xs text-foreground">{date}</span>
                           {time && (
-                            <span className="text-[11px] text-muted-foreground leading-tight">
+                            <span className="text-[10px] text-muted-foreground leading-tight">
                               {time}
                             </span>
                           )}
@@ -1262,37 +1275,37 @@ export const TransactionsTable = ({
                       );
                     })()}
                   </TableCell>
-                  <TableCell>
-                    <div className="font-medium text-foreground">{transaction.portals.name}</div>
+                  <TableCell className="px-2 py-1.5 max-w-[130px]">
+                    <div className="font-medium text-xs text-foreground truncate">{transaction.portals.name}</div>
                     {(() => {
                       const cust = extractCustomerInfo(transaction);
                       if (!cust) return null;
                       return (
-                        <div className="text-[11px] text-muted-foreground space-y-0.5 mt-0.5">
-                          {cust.name && <div className="truncate font-medium text-foreground/85">👤 {cust.name}</div>}
+                        <div className="text-[10px] text-muted-foreground space-y-0.5 mt-0.5 truncate">
+                          {cust.name && <div className="truncate font-medium text-foreground/80">👤 {cust.name}</div>}
                           {cust.phone && <div className="truncate text-muted-foreground">📞 {cust.phone}</div>}
                         </div>
                       );
                     })()}
                   </TableCell>
-                  <TableCell>
-                    <Badge variant={transaction.transaction_type?.toLowerCase() === "withdrawal" ? "default" : "secondary"}>
+                  <TableCell className="px-2 py-1.5 whitespace-nowrap">
+                    <Badge variant={transaction.transaction_type?.toLowerCase() === "withdrawal" ? "default" : "secondary"} className="text-[10px] px-1.5 py-0 font-normal">
                       {transaction.transaction_type
                         ? transaction.transaction_type.charAt(0).toUpperCase() + transaction.transaction_type.slice(1)
                         : "-"}
                     </Badge>
                   </TableCell>
-                  <TableCell className={`${isStaff ? "" : "hidden md:table-cell"} text-xs`}>
-                    <div className="font-medium">
+                  <TableCell className={`${isStaff ? "" : "hidden md:table-cell"} px-2 py-1.5 text-xs max-w-[130px]`}>
+                    <div className="font-medium truncate text-xs">
                       {transaction.card_type ? getCardTypeDisplayName(transaction.card_type as CardType) : "-"}
                     </div>
                     {(() => {
                       const site = transaction.site_name || (transaction.notes?.match(/Site:\s*([^|]+)/i)?.[1]?.trim());
                       if (!transaction.bank_name && !transaction.customer_mode && !site) return null;
                       return (
-                        <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <div className="text-[9px] text-muted-foreground flex items-center gap-1 mt-0.5 flex-wrap truncate">
                           {site && (
-                            <span className="px-1 py-0.2 rounded text-[9px] bg-primary/10 text-primary font-medium border border-primary/20">
+                            <span className="px-1 py-0 rounded text-[9px] bg-primary/10 text-primary font-medium border border-primary/20">
                               {site}
                             </span>
                           )}
@@ -1300,7 +1313,7 @@ export const TransactionsTable = ({
                             <span className="font-medium text-foreground/80">{transaction.bank_name}</span>
                           )}
                           {transaction.customer_mode && (
-                            <span className={`px-1 py-0.2 rounded text-[9px] ${
+                            <span className={`px-1 py-0 rounded text-[9px] ${
                               transaction.customer_mode.toLowerCase() === "online"
                                 ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
                                 : "bg-zinc-500/10 text-zinc-600 dark:text-zinc-400"
@@ -1312,7 +1325,7 @@ export const TransactionsTable = ({
                       );
                     })()}
                   </TableCell>
-                  <TableCell className="text-right font-semibold">
+                  <TableCell className="px-2 py-1.5 text-right font-semibold text-xs whitespace-nowrap">
                     {formatCurrency(transaction.amount)}
                   </TableCell>
                   {!isStaff && (() => {
@@ -1327,61 +1340,64 @@ export const TransactionsTable = ({
 
                     return (
                     <>
-                      <TableCell className="text-right text-success whitespace-nowrap">
+                      <TableCell className="px-2 py-1.5 text-right text-success whitespace-nowrap text-xs">
                         <div className="font-medium">
                           <span>{formatCurrency(transaction.commission)}</span>
                           {commPct && (
-                            <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono ml-1 font-normal">
+                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono ml-1 font-normal">
                               ({commPct})
                             </span>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right text-destructive hidden sm:table-cell whitespace-nowrap">
+                      <TableCell className="px-2 py-1.5 text-right text-destructive hidden sm:table-cell whitespace-nowrap text-xs">
                         <div className="font-medium">
                           <span>{formatCurrency(transaction.site_fee)}</span>
                           {feePct && (
-                            <span className="text-[11px] text-rose-500 dark:text-rose-400 font-mono ml-1 font-normal">
+                            <span className="text-[10px] text-rose-500 dark:text-rose-400 font-mono ml-1 font-normal">
                               ({feePct})
                             </span>
                           )}
                         </div>
                         {imps > 0 ? (
-                          <div className="text-[10px] text-rose-500 font-medium mt-0.5">
+                          <div className="text-[9px] text-rose-500 font-medium leading-tight mt-0.5">
                             +₹{imps.toLocaleString("en-IN")} IMPS
                           </div>
                         ) : (
-                          <div className="text-[10px] text-muted-foreground/60 mt-0.5">
+                          <div className="text-[9px] text-muted-foreground/60 leading-tight mt-0.5">
                             ₹0 IMPS
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-semibold text-success hidden sm:table-cell whitespace-nowrap">
+                      <TableCell className="px-2 py-1.5 text-right font-semibold text-success hidden sm:table-cell whitespace-nowrap text-xs">
                         <div>
                           <span>{formatCurrency(profitVal)}</span>
                           {profitMargin && (
-                            <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono ml-1 font-normal">
+                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono ml-1 font-normal">
                               ({profitMargin})
                             </span>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
+                      <TableCell className="w-[64px] min-w-[64px] max-w-[64px] px-2 py-1.5 text-right whitespace-nowrap pr-2.5">
+                        <div className="flex items-center justify-end gap-0.5">
                           <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon"
                             onClick={() => handleEditClick(transaction)}
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            title="Edit"
                           >
-                            <Edit className="h-4 w-4" />
+                            <Edit className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon"
                             onClick={() => handleDeleteClick(transaction.id)}
-                            className="text-destructive hover:text-destructive"
+                            className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            title="Delete"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </TableCell>
@@ -1404,57 +1420,57 @@ export const TransactionsTable = ({
             <TableFooter className="bg-muted/50 font-semibold border-t-2 border-border/80">
               {isStaff ? (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={4} className="font-bold text-foreground">
-                    <div className="flex items-center gap-2">
+                  <TableCell colSpan={4} className="px-2 py-2 font-bold text-foreground text-xs">
+                    <div className="flex items-center gap-1.5">
                       <span>Total</span>
-                      <Badge variant="outline" className="text-[11px] font-normal px-2 py-0">
-                        {totals.count} {totals.count === 1 ? "transaction" : "transactions"}
+                      <Badge variant="outline" className="text-[10px] font-normal px-1.5 py-0">
+                        {totals.count} {totals.count === 1 ? "txn" : "txns"}
                       </Badge>
                     </div>
                   </TableCell>
-                  <TableCell className="text-right font-bold text-foreground text-sm">
+                  <TableCell className="px-2 py-2 text-right font-bold text-foreground text-xs whitespace-nowrap">
                     {formatCurrency(totals.amount)}
                   </TableCell>
                 </TableRow>
               ) : (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell><div className="w-[40px]" /></TableCell>
-                  <TableCell colSpan={3} className="font-bold text-foreground">
-                    <div className="flex items-center gap-2">
+                  <TableCell className="w-[36px] min-w-[36px] max-w-[36px] px-2 py-2" />
+                  <TableCell colSpan={3} className="px-2 py-2 font-bold text-foreground text-xs">
+                    <div className="flex items-center gap-1.5">
                       <span>Total</span>
-                      <Badge variant="outline" className="text-[11px] font-normal px-2 py-0">
-                        {totals.count} {totals.count === 1 ? "transaction" : "transactions"}
+                      <Badge variant="outline" className="text-[10px] font-normal px-1.5 py-0">
+                        {totals.count.toLocaleString("en-IN")} {totals.count === 1 ? "txn" : "txns"}
                       </Badge>
                     </div>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell" />
-                  <TableCell className="text-right font-bold text-foreground text-sm">
+                  <TableCell className="hidden md:table-cell px-2 py-2" />
+                  <TableCell className="px-2 py-2 text-right font-bold text-foreground text-xs whitespace-nowrap">
                     {formatCurrency(totals.amount)}
                   </TableCell>
-                  <TableCell className="text-right font-bold text-success text-sm whitespace-nowrap">
+                  <TableCell className="px-2 py-2 text-right font-bold text-success text-xs whitespace-nowrap">
                     <div>{formatCurrency(totals.commission)}</div>
                     {totals.amount > 0 && (
-                      <div className="text-[10px] text-emerald-600/80 font-mono font-normal">
+                      <div className="text-[9px] text-emerald-600/80 font-mono font-normal">
                         ({((totals.commission / totals.amount) * 100).toFixed(2)}%)
                       </div>
                     )}
                   </TableCell>
-                  <TableCell className="text-right font-bold text-destructive hidden sm:table-cell text-sm whitespace-nowrap">
+                  <TableCell className="px-2 py-2 text-right font-bold text-destructive hidden sm:table-cell text-xs whitespace-nowrap">
                     <div>{formatCurrency(totals.siteFee)}</div>
-                    <div className="text-[10px] text-rose-500 font-medium font-normal">
+                    <div className="text-[9px] text-rose-500 font-medium font-normal">
                       {totals.amount > 0 && <span>({((totals.siteFee / totals.amount) * 100).toFixed(2)}%) • </span>}
                       +₹{totals.impsCharges.toLocaleString("en-IN")} IMPS
                     </div>
                   </TableCell>
-                  <TableCell className="text-right font-bold text-success hidden sm:table-cell text-sm whitespace-nowrap">
+                  <TableCell className="px-2 py-2 text-right font-bold text-success hidden sm:table-cell text-xs whitespace-nowrap">
                     <div>{formatCurrency(totals.profit)}</div>
                     {totals.amount > 0 && (
-                      <div className="text-[10px] text-emerald-600/80 font-mono font-normal">
+                      <div className="text-[9px] text-emerald-600/80 font-mono font-normal">
                         ({((totals.profit / totals.amount) * 100).toFixed(2)}%)
                       </div>
                     )}
                   </TableCell>
-                  <TableCell className="text-right" />
+                  <TableCell className="w-[64px] min-w-[64px] max-w-[64px] px-2 py-2 text-right pr-2.5" />
                 </TableRow>
               )}
             </TableFooter>

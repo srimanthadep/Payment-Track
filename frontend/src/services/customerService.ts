@@ -55,6 +55,7 @@ export interface CustomerProfile {
   lastTransactionDate: string;
   portals: string[];
   transactions: CustomerTransaction[];
+  saved_cards?: CustomerSavedCard[];
 }
 
 export interface CustomerSummaryStats {
@@ -63,6 +64,7 @@ export interface CustomerSummaryStats {
   totalCustomerProfit: number;
   avgCustomerLifetimeValue: number;
   topCustomer: CustomerProfile | null;
+  totalSavedCards?: number;
 }
 
 /**
@@ -432,6 +434,20 @@ export const customerService = {
 
       // Pre-populate canonical customers from customers table
       for (const c of customerRows || []) {
+        const parsedCards: CustomerSavedCard[] = Array.isArray(c.saved_cards)
+          ? (c.saved_cards as any[])
+              .filter((card) => card && card.bank_name)
+              .map((card) => ({
+                bank_name: card.bank_name,
+                card_type: card.card_type || "Visa",
+                transaction_type: card.transaction_type || "withdrawal",
+                customer_mode: card.customer_mode || "Normal",
+                sent_to: card.sent_to || card.portal_name || "",
+                last_used: card.last_used,
+                usage_count: Number(card.usage_count || 1),
+              }))
+          : [];
+
         customerMap.set(c.id, {
           id: c.id,
           name: c.name,
@@ -446,6 +462,7 @@ export const customerService = {
           lastTransactionDate: c.created_at,
           portals: [],
           transactions: [],
+          saved_cards: parsedCards,
         });
       }
 
@@ -528,6 +545,7 @@ export const customerService = {
                 lastTransactionDate: t.transaction_date,
                 portals: [],
                 transactions: [],
+                saved_cards: [],
               };
               customerMap.set(legacyKey, targetCust);
             }
@@ -591,6 +609,7 @@ export const customerService = {
         totalCustomerProfit: 0,
         avgCustomerLifetimeValue: 0,
         topCustomer: null,
+        totalSavedCards: 0,
       };
     }
 
@@ -602,6 +621,10 @@ export const customerService = {
       (top, current) => (current.totalVolume > (top?.totalVolume || 0) ? current : top),
       customers[0] || null
     );
+    const totalSavedCards = customers.reduce(
+      (sum, c) => sum + (c.saved_cards?.length || 0),
+      0
+    );
 
     return {
       totalCustomers,
@@ -609,6 +632,7 @@ export const customerService = {
       totalCustomerProfit,
       avgCustomerLifetimeValue,
       topCustomer,
+      totalSavedCards,
     };
   },
 
@@ -787,6 +811,173 @@ export const customerService = {
         .eq("id", customerId);
     } catch (err) {
       console.error("Error saving customer card:", err);
+    }
+  },
+
+  /**
+   * Explicitly adds a card to a customer's saved cards list
+   */
+  async addCustomerCard(
+    customerId: string,
+    card: CustomerSavedCard,
+    fallbackCustomer?: { userId: string; name: string; phone?: string | null }
+  ): Promise<{ data: CustomerSavedCard[] | null; newCustomerId?: string; error: any }> {
+    try {
+      let targetId = customerId;
+
+      // If virtual customer, first materialize canonical customer in DB
+      if (customerId.startsWith("phone:") || customerId.startsWith("name:")) {
+        if (!fallbackCustomer?.userId) {
+          return { data: null, error: new Error("User ID is required to create a customer.") };
+        }
+        const { data: newCust, error: createErr } = await this.createCustomer(
+          fallbackCustomer.userId,
+          fallbackCustomer.name,
+          fallbackCustomer.phone
+        );
+        if (createErr || !newCust) {
+          return { data: null, error: createErr || new Error("Failed to create customer") };
+        }
+        targetId = newCust.id;
+      }
+
+      const { data: customer, error: fetchErr } = await supabase
+        .from("customers")
+        .select("saved_cards")
+        .eq("id", targetId)
+        .single();
+
+      if (fetchErr) return { data: null, error: fetchErr };
+
+      const rawList: any[] = Array.isArray(customer?.saved_cards)
+        ? (customer.saved_cards as any[])
+        : [];
+
+      const newCard: CustomerSavedCard = {
+        bank_name: card.bank_name.trim(),
+        card_type: card.card_type.trim() || "Visa",
+        transaction_type: card.transaction_type.trim() || "withdrawal",
+        customer_mode: card.customer_mode.trim() || "Normal",
+        sent_to: (card.sent_to || "").trim(),
+        last_used: new Date().toISOString(),
+        usage_count: Number(card.usage_count) || 1,
+      };
+
+      const updatedList = [newCard, ...rawList];
+
+      const { error: updateErr } = await supabase
+        .from("customers")
+        .update({
+          saved_cards: updatedList,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", targetId);
+
+      if (updateErr) return { data: null, error: updateErr };
+
+      return {
+        data: updatedList,
+        newCustomerId: targetId !== customerId ? targetId : undefined,
+        error: null,
+      };
+    } catch (err: any) {
+      console.error("Error adding customer card:", err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * Updates an existing card at a specific index
+   */
+  async updateCustomerCard(
+    customerId: string,
+    cardIndex: number,
+    card: CustomerSavedCard
+  ): Promise<{ data: CustomerSavedCard[] | null; error: any }> {
+    try {
+      const { data: customer, error: fetchErr } = await supabase
+        .from("customers")
+        .select("saved_cards")
+        .eq("id", customerId)
+        .single();
+
+      if (fetchErr) return { data: null, error: fetchErr };
+
+      const rawList: any[] = Array.isArray(customer?.saved_cards)
+        ? (customer.saved_cards as any[])
+        : [];
+
+      if (cardIndex < 0 || cardIndex >= rawList.length) {
+        return { data: null, error: new Error("Card not found at index") };
+      }
+
+      const updatedList = [...rawList];
+      updatedList[cardIndex] = {
+        ...updatedList[cardIndex],
+        bank_name: card.bank_name.trim(),
+        card_type: card.card_type.trim() || "Visa",
+        transaction_type: card.transaction_type.trim() || "withdrawal",
+        customer_mode: card.customer_mode.trim() || "Normal",
+        sent_to: (card.sent_to || "").trim(),
+      };
+
+      const { error: updateErr } = await supabase
+        .from("customers")
+        .update({
+          saved_cards: updatedList,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", customerId);
+
+      if (updateErr) return { data: null, error: updateErr };
+
+      return { data: updatedList, error: null };
+    } catch (err: any) {
+      console.error("Error updating customer card:", err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * Deletes a card at a specific index from customer's saved cards
+   */
+  async deleteCustomerCard(
+    customerId: string,
+    cardIndex: number
+  ): Promise<{ data: CustomerSavedCard[] | null; error: any }> {
+    try {
+      const { data: customer, error: fetchErr } = await supabase
+        .from("customers")
+        .select("saved_cards")
+        .eq("id", customerId)
+        .single();
+
+      if (fetchErr) return { data: null, error: fetchErr };
+
+      const rawList: any[] = Array.isArray(customer?.saved_cards)
+        ? (customer.saved_cards as any[])
+        : [];
+
+      if (cardIndex < 0 || cardIndex >= rawList.length) {
+        return { data: null, error: new Error("Card not found at index") };
+      }
+
+      const updatedList = rawList.filter((_, idx) => idx !== cardIndex);
+
+      const { error: updateErr } = await supabase
+        .from("customers")
+        .update({
+          saved_cards: updatedList,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", customerId);
+
+      if (updateErr) return { data: null, error: updateErr };
+
+      return { data: updatedList, error: null };
+    } catch (err: any) {
+      console.error("Error deleting customer card:", err);
+      return { data: null, error: err };
     }
   },
 };

@@ -23,6 +23,9 @@ import {
   CreditCard,
   X,
   RotateCcw,
+  Users,
+  Store,
+  Landmark,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -30,6 +33,7 @@ import {
   FilterState,
   DEFAULT_CARD_FILTER_OPTIONS,
 } from "@/components/transactions/TransactionFilters";
+import { settingsService, BankOption, SiteOption } from "@/services/settingsService";
 
 interface DashboardFilterSheetProps {
   userId?: string;
@@ -43,6 +47,9 @@ const EMPTY_FILTERS: FilterState = {
   portals: [],
   transactionType: [],
   cardTypes: [],
+  customerModes: [],
+  banks: [],
+  sites: [],
   amountRange: { min: null, max: null },
 };
 
@@ -55,6 +62,17 @@ export const DashboardFilterSheet = ({
   const [open, setOpen] = useState(false);
   const [localFilters, setLocalFilters] = useState<FilterState>(filters);
   const [portals, setPortals] = useState<Array<{ id: string; name: string }>>([]);
+  const [banks, setBanks] = useState<BankOption[]>(() => settingsService.getBanks());
+  const [sites, setSites] = useState<SiteOption[]>(() => settingsService.getSites());
+
+  useEffect(() => {
+    const updateOptions = () => {
+      setBanks(settingsService.getBanks());
+      setSites(settingsService.getSites());
+    };
+    updateOptions();
+    return settingsService.subscribe(updateOptions);
+  }, []);
 
   // Fetch portals for the portal filter section
   useEffect(() => {
@@ -81,6 +99,9 @@ export const DashboardFilterSheet = ({
     if (filters.portals.length > 0) count++;
     if (filters.transactionType.length > 0) count++;
     if (filters.cardTypes && filters.cardTypes.length > 0) count++;
+    if (filters.customerModes && filters.customerModes.length > 0) count++;
+    if (filters.banks && filters.banks.length > 0) count++;
+    if (filters.sites && filters.sites.length > 0) count++;
     return count;
   }, [filters]);
 
@@ -450,6 +471,147 @@ export const DashboardFilterSheet = ({
                     </div>
                   </label>
                 ))}
+              </div>
+            </section>
+
+            <Separator />
+
+            {/* 5. Customer Mode Filter */}
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="h-4 w-4 text-primary" />
+                <Label className="text-sm font-semibold">Customer Mode</Label>
+                {(localFilters.customerModes?.length ?? 0) > 0 && (
+                  <Badge variant="secondary" className="text-[10px] h-5 px-1.5 ml-1">
+                    {localFilters.customerModes.length}
+                  </Badge>
+                )}
+                {(localFilters.customerModes?.length ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => updateLocal({ customerModes: [] })}
+                    className="ml-auto text-[11px] text-primary hover:underline font-medium"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="space-y-1">
+                {["Online", "Offline"].map((mode) => (
+                  <label
+                    key={mode}
+                    className="flex items-center space-x-2.5 cursor-pointer p-2 hover:bg-muted/70 rounded-lg transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={localFilters.customerModes?.includes(mode) || false}
+                      onChange={() =>
+                        updateLocal({
+                          customerModes: toggleInArray(
+                            localFilters.customerModes || [],
+                            mode
+                          ),
+                        })
+                      }
+                      className="rounded accent-primary h-3.5 w-3.5"
+                    />
+                    <span className="text-xs font-medium">{mode}</span>
+                  </label>
+                ))}
+              </div>
+            </section>
+
+            <Separator />
+
+            {/* 6. Site Filter */}
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <Store className="h-4 w-4 text-primary" />
+                <Label className="text-sm font-semibold">Site</Label>
+                {(localFilters.sites?.length ?? 0) > 0 && (
+                  <Badge variant="secondary" className="text-[10px] h-5 px-1.5 ml-1">
+                    {localFilters.sites.length}
+                  </Badge>
+                )}
+                {(localFilters.sites?.length ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => updateLocal({ sites: [] })}
+                    className="ml-auto text-[11px] text-primary hover:underline font-medium"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="space-y-1 max-h-44 overflow-y-auto">
+                {sites.map((site) => (
+                  <label
+                    key={site.id}
+                    className="flex items-center space-x-2.5 cursor-pointer p-2 hover:bg-muted/70 rounded-lg transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={localFilters.sites?.includes(site.name) || false}
+                      onChange={() =>
+                        updateLocal({
+                          sites: toggleInArray(localFilters.sites || [], site.name),
+                        })
+                      }
+                      className="rounded accent-primary h-3.5 w-3.5"
+                    />
+                    <span className="text-xs font-medium truncate">{site.name}</span>
+                  </label>
+                ))}
+                {sites.length === 0 && (
+                  <p className="text-xs text-muted-foreground py-2">No sites configured</p>
+                )}
+              </div>
+            </section>
+
+            <Separator />
+
+            {/* 7. Bank Credit Cards Filter */}
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <Landmark className="h-4 w-4 text-primary" />
+                <Label className="text-sm font-semibold">Bank</Label>
+                {(localFilters.banks?.length ?? 0) > 0 && (
+                  <Badge variant="secondary" className="text-[10px] h-5 px-1.5 ml-1">
+                    {localFilters.banks.length}
+                  </Badge>
+                )}
+                {(localFilters.banks?.length ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => updateLocal({ banks: [] })}
+                    className="ml-auto text-[11px] text-primary hover:underline font-medium"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="space-y-1 max-h-48 overflow-y-auto">
+                {banks.map((bank) => (
+                  <label
+                    key={bank.id}
+                    className="flex items-center space-x-2.5 cursor-pointer p-2 hover:bg-muted/70 rounded-lg transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={localFilters.banks?.includes(bank.name) || false}
+                      onChange={() =>
+                        updateLocal({
+                          banks: toggleInArray(localFilters.banks || [], bank.name),
+                        })
+                      }
+                      className="rounded accent-primary h-3.5 w-3.5"
+                    />
+                    <span className="text-xs font-medium truncate">{bank.name}</span>
+                  </label>
+                ))}
+                {banks.length === 0 && (
+                  <p className="text-xs text-muted-foreground py-2">No banks configured</p>
+                )}
               </div>
             </section>
           </div>

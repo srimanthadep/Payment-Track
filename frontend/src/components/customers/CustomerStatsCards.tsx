@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CustomerSummaryStats } from "@/services/customerService";
-import { Users, IndianRupee, TrendingUp, Sparkles } from "lucide-react";
+import { Users, IndianRupee, TrendingUp, Sparkles, CreditCard } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface CustomerStatsCardsProps {
@@ -59,12 +59,26 @@ export const CustomerStatsCards = ({
       icon: Sparkles,
       gradient: "from-amber-500 to-orange-600",
     },
+    {
+      title: "Total Saved Cards",
+      value: (stats.totalSavedCards ?? 0).toString(),
+      isCurrency: false,
+      subtitle: "Active saved cards",
+      icon: CreditCard,
+      gradient: "from-rose-500 to-pink-600",
+    },
   ];
 
   const cards = isStaff ? allCards.filter((c) => !c.staffHidden) : allCards;
 
   return (
-    <div className={`grid gap-3 sm:gap-4 ${isStaff ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2 lg:grid-cols-4"}`}>
+    <div
+      className={`grid gap-3 sm:gap-3.5 ${
+        isStaff
+          ? "grid-cols-2 sm:grid-cols-4"
+          : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+      }`}
+    >
       {cards.map((card, index) => {
         const Icon = card.icon;
         return (
@@ -86,7 +100,7 @@ export const CustomerStatsCards = ({
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
-                <div className="text-lg sm:text-2xl font-bold tracking-tight text-foreground truncate">
+                <div className="text-base sm:text-lg lg:text-xl xl:text-2xl font-bold tracking-tight text-foreground truncate" title={card.value}>
                   {card.value}
                 </div>
                 <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 truncate">

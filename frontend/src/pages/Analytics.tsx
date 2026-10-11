@@ -211,29 +211,50 @@ const Analytics = ({ defaultTab }: AnalyticsProps = {}) => {
     if (!user) return;
     if (showLoader) setIsLoading(true);
     try {
-      const { data: txData, error: txError } = await supabase
-        .from("transactions")
-        .select(`
-          id,
-          transaction_type,
-          amount,
-          commission,
-          site_fee,
-          profit,
-          card_type,
-          transaction_date,
-          portal_id,
-          portals (
-            name
-          )
-        `)
-        .eq("user_id", user.id)
-        .order("transaction_date", { ascending: true });
+      let allTx: any[] = [];
+      let from = 0;
+      const PAGE_SIZE = 1000;
+      let hasMore = true;
 
-      if (txError) {
-        console.warn("Transactions query warning:", txError.message);
+      while (hasMore) {
+        const { data: txData, error: txError } = await supabase
+          .from("transactions")
+          .select(`
+            id,
+            transaction_type,
+            amount,
+            commission,
+            site_fee,
+            profit,
+            card_type,
+            transaction_date,
+            portal_id,
+            portals (
+              name
+            )
+          `)
+          .eq("user_id", user.id)
+          .order("transaction_date", { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
+
+        if (txError) {
+          console.warn("Transactions query warning:", txError.message);
+          break;
+        }
+
+        if (txData && txData.length > 0) {
+          allTx = allTx.concat(txData);
+          if (txData.length < PAGE_SIZE) {
+            hasMore = false;
+          } else {
+            from += PAGE_SIZE;
+          }
+        } else {
+          hasMore = false;
+        }
       }
-      setTransactions(Array.isArray(txData) ? (txData as any) : []);
+
+      setTransactions(allTx);
 
       const res = await expensesService.getExpenses(user.id);
       const expList = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? (res as any) : [];

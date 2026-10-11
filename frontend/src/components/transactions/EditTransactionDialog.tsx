@@ -35,6 +35,7 @@ import { activityLogService } from "@/services/activityLogService";
 import { CustomerCombobox, CustomerValue } from "@/components/customers/CustomerCombobox";
 import { customerService, CustomerSavedCard } from "@/services/customerService";
 import { transactionLearningService } from "@/services/transactionLearningService";
+import { predictionTrackingService } from "@/services/predictionTrackingService";
 
 interface EditTransactionDialogProps {
   transaction: {
@@ -542,6 +543,24 @@ export const EditTransactionDialog = ({
           site_fee_percent: feePercent,
           imps_charges: impsAmount,
           transaction_date: formData.transaction_date,
+        });
+
+        // Sync updated transaction to AI prediction tracking
+        predictionTrackingService.updatePredictionForTransaction(transaction.id, {
+          amount: parseFloat(formData.amount),
+          profit: commAmount - feeAmount - impsAmount,
+          actualCommission: commPercent,
+          actualSiteFee: feePercent,
+          actualImps: impsAmount,
+          customerName: customerName || undefined,
+          customerPhone: customerPhone || undefined,
+          siteName: formData.site_name || undefined,
+          bankName: formData.bank_name || undefined,
+          notes: notesStr,
+          cardType: formData.card_type,
+          transactionType: formData.transaction_type,
+          sentTo: selectedPortal?.name || undefined,
+          customerMode: formData.customer_mode,
         });
 
         // Record dropdown selections for updated transaction

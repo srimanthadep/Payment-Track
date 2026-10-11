@@ -3,6 +3,7 @@ import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetDescript
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Bell, CheckCheck, Trash2, Sparkles, TrendingUp, AlertTriangle, Info, Target, Wallet, X } from "lucide-react";
+import { AnimatedNotificationIcon } from "./AnimatedNotificationIcon";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +24,7 @@ export const NotificationCenter = () => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [open, setOpen] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [iconHovered, setIconHovered] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -216,12 +218,14 @@ export const NotificationCenter = () => {
         <Button
           variant="ghost"
           size="icon"
-          className="relative h-9 w-9 rounded-xl border border-border/60 hover:bg-muted/80"
+          className="relative h-9 w-9 rounded-xl border border-border/60 hover:bg-muted/80 transition-colors"
           aria-label="Notifications"
+          onMouseEnter={() => setIconHovered(true)}
+          onMouseLeave={() => setIconHovered(false)}
         >
-          <Bell className="h-4.5 w-4.5 text-foreground" />
+          <AnimatedNotificationIcon isHovered={iconHovered} className="h-4.5 w-4.5 text-foreground" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground animate-in zoom-in">
+            <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground animate-in zoom-in pointer-events-none">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
