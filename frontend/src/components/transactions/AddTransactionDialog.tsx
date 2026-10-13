@@ -38,7 +38,10 @@ import {
   DropdownOrderingKey,
 } from "@/services/settingsService";
 import { ManageDropdownOrderDialog } from "../settings/ManageDropdownOrderDialog";
-import { transactionLearningService } from "@/services/transactionLearningService";
+import {
+  transactionLearningService,
+  TransactionFeeRecommendation,
+} from "@/services/transactionLearningService";
 import { activityLogService } from "@/services/activityLogService";
 import { predictionTrackingService } from "@/services/predictionTrackingService";
 import { CustomerCombobox, CustomerValue } from "@/components/customers/CustomerCombobox";
@@ -136,14 +139,7 @@ export const AddTransactionDialog = ({
   const [isCommissionManual, setIsCommissionManual] = useState(false);
   const [isSiteFeeManual, setIsSiteFeeManual] = useState(false);
   const [isImpsManual, setIsImpsManual] = useState(false);
-  const [recommendationInfo, setRecommendationInfo] = useState<{
-    commission: number | null;
-    siteFee: number | null;
-    impsCharges?: number | null;
-    confidence: number;
-    source: string;
-    explanation?: string;
-  } | null>(null);
+  const [recommendationInfo, setRecommendationInfo] = useState<TransactionFeeRecommendation | null>(null);
 
   // Track the AI-predicted values at the moment they were set (for acceptance tracking)
   const [aiPredictedValues, setAiPredictedValues] = useState<{
@@ -850,6 +846,7 @@ export const AddTransactionDialog = ({
                       customerValue,
                       isCommissionManual,
                       isSiteFeeManual,
+                      isImpsManual,
                       num
                     );
                   }

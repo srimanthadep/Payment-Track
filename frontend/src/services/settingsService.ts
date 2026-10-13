@@ -50,6 +50,14 @@ export interface WhatsAppSettings {
 
 export type DropdownSortMode = "manual" | "automatic";
 
+export type DropdownOrderingKey =
+  | "recipients"
+  | "sites"
+  | "banks"
+  | "cardTypes"
+  | "transactionTypes"
+  | "expenseCategories";
+
 export interface DropdownOrderingConfig {
   mode: DropdownSortMode;
   manualOrder?: string[];

@@ -1,5 +1,5 @@
 import { formatCurrency } from "@/utils/format";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Table,
@@ -180,90 +180,90 @@ export const TransactionsTable = ({
     return { amount, commission, siteFee, impsCharges, profit, count: filteredTransactions.length };
   }, [filteredTransactions]);
 
-  useEffect(() => {
-    const fetchTransactions = async () => {
-      setIsLoading(true);
-      let allTx: Transaction[] = [];
-      let from = 0;
-      const PAGE_SIZE = 1000;
-      let hasMoreRows = true;
+  const fetchTransactions = useCallback(async () => {
+    setIsLoading(true);
+    let allTx: Transaction[] = [];
+    let from = 0;
+    const PAGE_SIZE = 1000;
+    let hasMoreRows = true;
 
-      while (hasMoreRows) {
-        const { data, error } = await supabase
-          .from("transactions")
-          .select(`
-            id,
-            portal_id,
-            transaction_type,
-            amount,
-            commission,
-            commission_percent,
-            site_fee,
-            site_fee_percent,
-            imps_charges,
-            profit,
-            transaction_date,
-            card_type,
-            customer_mode,
-            bank_name,
-            site_name,
-            customer_id,
-            customer_name,
-            customer_phone,
-            notes,
-            portals (
-              name
-            )
-          `)
-          .eq("user_id", userId)
-          .order("transaction_date", { ascending: false })
-          .range(from, from + PAGE_SIZE - 1);
+    while (hasMoreRows) {
+      const { data, error } = await supabase
+        .from("transactions")
+        .select(`
+          id,
+          portal_id,
+          transaction_type,
+          amount,
+          commission,
+          commission_percent,
+          site_fee,
+          site_fee_percent,
+          imps_charges,
+          profit,
+          transaction_date,
+          card_type,
+          customer_mode,
+          bank_name,
+          site_name,
+          customer_id,
+          customer_name,
+          customer_phone,
+          notes,
+          portals (
+            name
+          )
+        `)
+        .eq("user_id", userId)
+        .order("transaction_date", { ascending: false })
+        .range(from, from + PAGE_SIZE - 1);
 
-        if (error) {
-          console.error("Error fetching transactions:", error);
-          toast({
-            title: "Error",
-            description: "Failed to fetch transactions",
-            variant: "destructive",
-          });
-          break;
-        }
+      if (error) {
+        console.error("Error fetching transactions:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch transactions",
+          variant: "destructive",
+        });
+        break;
+      }
 
-        if (data && data.length > 0) {
-          allTx = allTx.concat(data as Transaction[]);
-          if (data.length < PAGE_SIZE) {
-            hasMoreRows = false;
-          } else {
-            from += PAGE_SIZE;
-          }
-        } else {
+      if (data && data.length > 0) {
+        allTx = allTx.concat(data as Transaction[]);
+        if (data.length < PAGE_SIZE) {
           hasMoreRows = false;
+        } else {
+          from += PAGE_SIZE;
         }
+      } else {
+        hasMoreRows = false;
       }
+    }
 
-      // Fetch portals for filters
-      const { data: portalsData } = await supabase
-        .from("portals")
-        .select("id, name")
-        .eq("is_active", true);
-      
-      if (portalsData) {
-        setPortals(portalsData);
-      }
+    // Fetch portals for filters
+    const { data: portalsData } = await supabase
+      .from("portals")
+      .select("id, name")
+      .eq("is_active", true);
+    
+    if (portalsData) {
+      setPortals(portalsData);
+    }
 
-      const sortedData = [...allTx].sort(
-        (a, b) =>
-          new Date(b.transaction_date).getTime() -
-          new Date(a.transaction_date).getTime()
-      );
-      setTransactions(sortedData);
-      setFilteredTransactions(sortedData);
-      setHasMore(sortedData.length > itemsPerPage);
-      onTotalCountChange?.(sortedData.length);
+    const sortedData = [...allTx].sort(
+      (a, b) =>
+        new Date(b.transaction_date).getTime() -
+        new Date(a.transaction_date).getTime()
+    );
+    setTransactions(sortedData);
+    setFilteredTransactions(sortedData);
+    setHasMore(sortedData.length > itemsPerPage);
+    onTotalCountChange?.(sortedData.length);
 
-      setIsLoading(false);
-    };
+    setIsLoading(false);
+  }, [userId, itemsPerPage, onTotalCountChange, toast]);
 
+  useEffect(() => {
     fetchTransactions();
 
     // Set up realtime subscription
