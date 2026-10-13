@@ -60,6 +60,7 @@ import { format } from "date-fns";
 
 const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   none: { label: "No Prediction", color: "bg-muted text-muted-foreground border-border" },
+  active_regime_match: { label: "⚡ Active Rate Regime", color: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20" },
   customer_history: { label: "Customer Memory", color: "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20" },
   site_card_tx_portal_bank_mode: { label: "Site + Context", color: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20" },
   site_card_tx_bank: { label: "Site + Bank", color: "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/20" },
@@ -428,6 +429,7 @@ export default function AiTracker() {
                           <span>All AI Tiers</span>
                         </span>
                       </SelectItem>
+                      <SelectItem value="active_regime_match">⚡ Active Rate Regime</SelectItem>
                       <SelectItem value="customer_history">Customer Memory</SelectItem>
                       <SelectItem value="site_card_tx_portal_bank_mode">Site + Full Context</SelectItem>
                       <SelectItem value="site_card_tx_bank">Site + Bank</SelectItem>

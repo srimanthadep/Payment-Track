@@ -607,28 +607,26 @@ export const AddTransactionDialog = ({
         });
 
         // Closed-loop active learning: feed back in-memory for immediate adaptive learning
-        if (hasPrediction) {
-          transactionLearningService.recordOverrideFeedback({
-            cardType: formData.card_type,
-            transactionType: formData.transaction_type,
-            sentTo: formData.sent_to,
-            siteName: formData.site_name || undefined,
-            bankName: formData.bank_name || undefined,
-            customerMode: formData.customer_mode,
-            actualCommission: actualComm,
-            actualSiteFee: actualFee,
-            actualImps: actualImps,
-            predictedCommission: predictedComm,
-            predictedSiteFee: predictedFee,
-            predictedImps: predictedImps,
-            commissionAccepted: commAccepted,
-            siteFeeAccepted: feeAccepted,
-            impsAccepted: impsAccepted,
-            bothAccepted: commAccepted && feeAccepted,
-            allAccepted: commAccepted && feeAccepted && impsAccepted,
-            timestamp: Date.now(),
-          });
-        }
+        transactionLearningService.recordOverrideFeedback({
+          cardType: formData.card_type,
+          transactionType: formData.transaction_type,
+          sentTo: formData.sent_to,
+          siteName: formData.site_name || undefined,
+          bankName: formData.bank_name || undefined,
+          customerMode: formData.customer_mode,
+          actualCommission: actualComm,
+          actualSiteFee: actualFee,
+          actualImps: actualImps,
+          predictedCommission: predictedComm,
+          predictedSiteFee: predictedFee,
+          predictedImps: predictedImps,
+          commissionAccepted: commAccepted,
+          siteFeeAccepted: feeAccepted,
+          impsAccepted: impsAccepted,
+          bothAccepted: commAccepted && feeAccepted,
+          allAccepted: commAccepted && feeAccepted && impsAccepted,
+          timestamp: Date.now(),
+        });
 
         const commPct = parseFloat(formData.commission_percent) || 0;
         const feePct = parseFloat(formData.site_fee_percent) || 0;
@@ -1091,6 +1089,16 @@ export const AddTransactionDialog = ({
               </SelectContent>
             </Select>
           </div>
+
+          {/* Active Rate Regime Badge */}
+          {recommendationInfo?.source === "active_regime_match" && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-300 text-xs font-medium animate-in fade-in">
+              <span className="text-emerald-500 text-sm">⚡</span>
+              <span>
+                Active rate detected ({recommendationInfo.sampleCount} recent consecutive transactions at {recommendationInfo.commission}% / {recommendationInfo.siteFee}%)
+              </span>
+            </div>
+          )}
 
           {/* 5. Commission (%), Site Fee (%) & IMPS/NEFT Charges (₹) - Single row on all devices */}
           <div className="grid grid-cols-3 gap-2 sm:gap-3">

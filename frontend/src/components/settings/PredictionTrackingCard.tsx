@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 
 /** Human-friendly tier names */
 const SOURCE_LABELS: Record<string, string> = {
+  active_regime_match: "⚡ Active Rate Regime",
   customer_history: "Customer Memory",
   site_card_tx_portal_bank_mode: "Site + Full Context",
   site_card_tx_bank: "Site + Bank",

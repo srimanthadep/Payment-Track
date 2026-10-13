@@ -34,6 +34,7 @@ export interface TransactionFeeRecommendation {
   impsCharges?: number | null;
   confidence: number; // 0.0 to 1.0
   source:
+    | "active_regime_match"
     | "customer_history"
     | "site_card_tx_portal_bank_mode"
     | "site_card_tx_bank"
@@ -50,6 +51,7 @@ export interface TransactionFeeRecommendation {
   sampleCount: number;
   explanation?: string;
   isVolumeAdjusted?: boolean;
+  regimeStreak?: number;
 }
 
 export interface HistoricalTransactionRecord {
@@ -210,7 +212,7 @@ export class TransactionLearningService {
           .from("prediction_tracking")
           .select("*")
           .order("created_at", { ascending: false })
-          .limit(60);
+          .limit(300);
 
         if (trackerData && trackerData.length > 0) {
           this.overrides = trackerData.map((row: any) => ({
@@ -404,7 +406,7 @@ export class TransactionLearningService {
 
   public recordOverrideFeedback(override: OverrideRecord) {
     this.overrides.unshift(override);
-    if (this.overrides.length > 50) this.overrides.pop();
+    if (this.overrides.length > 300) this.overrides.pop();
   }
 
   public setOverridesForTesting(overrides: OverrideRecord[]) {
@@ -417,17 +419,21 @@ export class TransactionLearningService {
     card?: string,
     tx?: string,
     portal?: string,
-    site?: string
+    site?: string,
+    totalWeight = 1
   ): number {
     if (this.overrides.length === 0) return 0;
     const now = Date.now();
     let adjustment = 0;
+    // Volume-scaled feedback: scales proportionally with historical candidate density
+    const densityScale = Math.max(1, totalWeight * 0.35);
 
     for (const o of this.overrides) {
-      // Overrides older than 14 days decay to 0
-      const ageDays = (now - o.timestamp) / (1000 * 60 * 60 * 24);
-      if (ageDays > 14) continue;
-      const decay = Math.max(0, 1 - ageDays / 14);
+      // Overrides older than 21 days decay smoothly
+      const ageDays = Math.max(0, (now - o.timestamp) / (1000 * 60 * 60 * 24));
+      if (ageDays > 21) continue;
+      // Exponential decay: ln(2) / 5 = 0.1386 (5-day half life for feedback)
+      const decay = Math.exp(-0.1386 * ageDays);
 
       // Context matching (if card/tx/portal/site specified in override, ensure compatibility)
       if (o.siteName && site && normalize(o.siteName) !== site) continue;
@@ -444,7 +450,7 @@ export class TransactionLearningService {
           Math.abs(candComm - o.actualCommission) <= 0.05 &&
           Math.abs(candFee - o.actualSiteFee) <= 0.05;
         if (isVerified) {
-          adjustment += 1.8 * decay * siteMultiplier;
+          adjustment += 2.0 * decay * siteMultiplier * densityScale;
         }
         continue;
       }
@@ -454,7 +460,7 @@ export class TransactionLearningService {
         Math.abs(candComm - o.actualCommission) <= 0.05 &&
         Math.abs(candFee - o.actualSiteFee) <= 0.05;
       if (isActual) {
-        adjustment += 2.2 * decay * siteMultiplier;
+        adjustment += 2.5 * decay * siteMultiplier * densityScale;
       }
 
       // 3. If this candidate matches what the user rejected, penalize it
@@ -462,7 +468,7 @@ export class TransactionLearningService {
         Math.abs(candComm - o.predictedCommission) <= 0.05 &&
         Math.abs(candFee - o.predictedSiteFee) <= 0.05;
       if (isRejected && !isActual) {
-        adjustment -= 2.0 * decay * siteMultiplier;
+        adjustment -= 2.2 * decay * siteMultiplier * densityScale;
       }
     }
 
@@ -483,8 +489,8 @@ export class TransactionLearningService {
     if (matches.length === 0) return null;
 
     const now = Date.now();
-    // 30-day half-life: decayFactorPerDay = ln(2) / 30 = 0.0231
-    const decayFactorPerDay = 0.0231;
+    // 7-day half-life: decayFactorPerDay = ln(2) / 7 = 0.0990 (adapts rapidly to weekly/daily rate changes)
+    const decayFactorPerDay = 0.0990;
     const tolerance = 0.08; // 2D Euclidean distance window (covers dx=0.05, dy=0.05)
 
     // Build unique coupled candidate pairs from observed transactions
@@ -505,7 +511,7 @@ export class TransactionLearningService {
 
     let totalWeight = 0;
     const weights = matches.map((rec) => {
-      // 1. Recency decay weight
+      // 1. Recency decay weight (7-day half life)
       const daysDiff = Math.max(0, (now - rec.transaction_date.getTime()) / (1000 * 60 * 60 * 24));
       const recencyW = Math.exp(-decayFactorPerDay * daysDiff);
 
@@ -521,6 +527,25 @@ export class TransactionLearningService {
       totalWeight += w;
       return { rec, w };
     });
+
+    // Check if there is an established recent rate within the last 48 hours for discordant penalty
+    let recentActiveRate: { comm: number; fee: number } | null = null;
+    const RECENT_WINDOW_MS = 48 * 60 * 60 * 1000;
+    for (const o of this.overrides) {
+      if (now - o.timestamp <= RECENT_WINDOW_MS) {
+        if (context?.card && normalizeCardType(o.cardType) !== context.card) continue;
+        if (context?.tx && normalize(o.transactionType) !== context.tx) continue;
+        if (context?.site && normalize(o.siteName) !== context.site) continue;
+        recentActiveRate = { comm: o.actualCommission, fee: o.actualSiteFee };
+        break;
+      }
+    }
+    if (!recentActiveRate && matches.length > 0) {
+      const latestTx = matches[0];
+      if (now - latestTx.transaction_date.getTime() <= RECENT_WINDOW_MS) {
+        recentActiveRate = { comm: latestTx.commission_percent, fee: latestTx.site_fee_percent };
+      }
+    }
 
     let bestPair: RatePair | null = null;
     let maxPairWeight = -Infinity;
@@ -545,14 +570,24 @@ export class TransactionLearningService {
         score *= 0.1;
       }
 
-      // Closed-loop active learning reinforcement
+      // Discordant Historical Penalty: if user actively used a rate in the last 48h, downweight conflicting historical modes
+      if (recentActiveRate) {
+        const diffComm = Math.abs(cand.commission - recentActiveRate.comm);
+        const diffFee = Math.abs(cand.siteFee - recentActiveRate.fee);
+        if (diffComm > 0.15 || diffFee > 0.15) {
+          score *= 0.25;
+        }
+      }
+
+      // Closed-loop active learning reinforcement with volume-scaling
       const feedbackAdj = this.getOverrideAdjustment(
         cand.commission,
         cand.siteFee,
         context?.card,
         context?.tx,
         context?.portal,
-        context?.site
+        context?.site,
+        totalWeight
       );
       score += feedbackAdj;
 
@@ -607,15 +642,18 @@ export class TransactionLearningService {
       }
     }
 
-    // Check if recent override specifically recorded an IMPS charge for this site
-    if (context?.site && this.overrides.length > 0) {
-      const matchingImpsOverride = this.overrides.find(
-        (o) =>
-          o.siteName &&
-          normalize(o.siteName) === normalize(context.site) &&
-          o.actualImps !== undefined &&
-          o.actualImps !== null
-      );
+    // Check if recent override specifically recorded an IMPS charge for this site or portal
+    if (this.overrides.length > 0) {
+      const matchingImpsOverride = this.overrides.find((o) => {
+        if (o.actualImps === undefined || o.actualImps === null) return false;
+        if (context?.site) {
+          return o.siteName && normalize(o.siteName) === normalize(context.site);
+        }
+        if (context?.portal) {
+          return o.sentTo && normalize(o.sentTo) === normalize(context.portal);
+        }
+        return false;
+      });
       if (matchingImpsOverride && matchingImpsOverride.actualImps !== undefined) {
         recommendedImps = matchingImpsOverride.actualImps;
       }
@@ -676,6 +714,149 @@ export class TransactionLearningService {
   }
 
   /**
+   * Fast Tier 0: Detects if the user has recently established an Active Rate Regime
+   * for this card/site/portal context (e.g. weekly rate changes on RuPay or specific sites).
+   * If the last 2+ consecutive transactions / overrides share the same rate,
+   * it returns that rate with very high confidence (0.92 - 0.98), bypassing older historical modes.
+   */
+  public detectActiveRegime(params: {
+    card?: string;
+    tx?: string;
+    portal?: string;
+    site?: string;
+  }): TransactionFeeRecommendation | null {
+    const card = params.card;
+    const tx = params.tx;
+    const portal = params.portal;
+    const site = params.site;
+
+    if (!card && !tx) return null;
+
+    const now = Date.now();
+    const MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000; // Look within last 14 days
+
+    // Gather chronological events (most recent first) from both in-memory overrides & records
+    type ChronoEvent = {
+      comm: number;
+      fee: number;
+      imps: number;
+      timestamp: number;
+    };
+
+    const events: ChronoEvent[] = [];
+
+    // 1. From overrides (recent feedback & tracking events)
+    for (const o of this.overrides) {
+      if (now - o.timestamp > MAX_AGE_MS) continue;
+      const oCard = normalizeCardType(o.cardType);
+      const oTx = normalize(o.transactionType);
+      const oPortal = normalize(o.sentTo);
+      const oSite = normalize(o.siteName);
+
+      if (card && oCard && oCard !== card) continue;
+      if (tx && oTx && oTx !== tx) continue;
+
+      if (site) {
+        if (!oSite || oSite !== site) continue;
+      } else if (portal) {
+        if (oSite) continue; // Don't mix gateway-specific rates into non-gateway transactions
+        if (oPortal && oPortal !== portal) continue;
+      }
+
+      events.push({
+        comm: o.actualCommission,
+        fee: o.actualSiteFee,
+        imps: o.actualImps ?? 0,
+        timestamp: o.timestamp,
+      });
+    }
+
+    // 2. From historical records
+    for (const r of this.records) {
+      const rTime = r.transaction_date.getTime();
+      if (now - rTime > MAX_AGE_MS) continue;
+      const rCard = normalizeCardType(r.card_type);
+      const rTx = normalize(r.transaction_type);
+      const rPortal = normalize(r.sent_to);
+      const rSite = normalize(r.site_name);
+
+      if (card && rCard && rCard !== card) continue;
+      if (tx && rTx && rTx !== tx) continue;
+
+      if (site) {
+        if (!rSite || rSite !== site) continue;
+      } else if (portal) {
+        if (rSite) continue;
+        if (rPortal && rPortal !== portal) continue;
+      }
+
+      events.push({
+        comm: r.commission_percent,
+        fee: r.site_fee_percent,
+        imps: r.imps_charges ?? 0,
+        timestamp: rTime,
+      });
+    }
+
+    if (events.length < 2) return null;
+
+    // Sort newest to oldest
+    events.sort((a, b) => b.timestamp - a.timestamp);
+
+    // Deduplicate closely-spaced events (e.g. override + transaction with exact same timestamp/rates)
+    const deduped: ChronoEvent[] = [];
+    for (const ev of events) {
+      const prev = deduped[deduped.length - 1];
+      if (
+        prev &&
+        Math.abs(prev.timestamp - ev.timestamp) < 5000 &&
+        Math.abs(prev.comm - ev.comm) < 0.01 &&
+        Math.abs(prev.fee - ev.fee) < 0.01
+      ) {
+        continue;
+      }
+      deduped.push(ev);
+    }
+
+    if (deduped.length < 2) return null;
+
+    // Check the streak from the most recent event
+    const target = deduped[0];
+    let streak = 0;
+    const tolerance = 0.02;
+
+    for (const ev of deduped) {
+      if (
+        Math.abs(ev.comm - target.comm) <= tolerance &&
+        Math.abs(ev.fee - target.fee) <= tolerance
+      ) {
+        streak++;
+      } else {
+        break; // Streak broken
+      }
+    }
+
+    // Require at least 2 consecutive transactions/overrides to declare an active regime
+    if (streak >= 2) {
+      const confidence = streak >= 3 ? 0.98 : 0.92;
+      const margin = Math.round((target.comm - target.fee) * 100) / 100;
+      return {
+        commission: target.comm,
+        siteFee: target.fee,
+        margin,
+        impsCharges: target.imps,
+        confidence,
+        source: "active_regime_match",
+        sampleCount: streak,
+        explanation: `Active rate regime detected (${streak} recent consecutive transactions at ${target.comm}% / ${target.fee}%)`,
+        regimeStreak: streak,
+      };
+    }
+
+    return null;
+  }
+
+  /**
    * Query the learning engine using the Site-Aware Hierarchical Bayesian Cascade
    */
   public getRecommendation(params: {
@@ -697,6 +878,12 @@ export class TransactionLearningService {
     const mode = normalize(params.customerMode);
     const amount = params.amount;
     const context = { card, tx, portal, site };
+
+    // FAST TIER 0: ACTIVE REGIME DETECTOR (Detects weekly/daily rate changes on cards & sites)
+    const activeRegime = this.detectActiveRegime({ card, tx, portal, site });
+    if (activeRegime) {
+      return activeRegime;
+    }
 
     // SITE-AWARE CASCADE (Tiers 0 - 4: When specific gateway site is selected)
     if (site) {

@@ -772,4 +772,188 @@ describe('TransactionLearningService - 5-Tier Hierarchical Bayesian Cascade', ()
     expect(rec.siteFee).toBe(2.00);
     expect(rec.impsCharges).toBe(5);
   });
+
+  it('Dynamic Regime Shift: 2 consecutive overrides to a new rate lock in Active Regime (Tier 0)', () => {
+    // Simulate 50 past historical transactions with RuPay at 2.0% comm / 0.50% fee
+    const records: HistoricalTransactionRecord[] = [];
+    for (let i = 0; i < 50; i++) {
+      records.push({
+        id: `tx-old-${i}`,
+        card_type: 'rupay',
+        transaction_type: 'withdrawal',
+        sent_to: 'bharath',
+        commission_percent: 2.0,
+        site_fee_percent: 0.5,
+        imps_charges: 0,
+        transaction_date: new Date(Date.now() - (10 + i) * 24 * 60 * 60 * 1000), // 10 to 60 days ago
+        amount: 20000,
+      });
+    }
+
+    service.setRecordsForTesting(records);
+
+    // Initial prediction should be 2.0% comm / 0.5% fee
+    const initialRec = service.getRecommendation({
+      cardType: 'rupay',
+      transactionType: 'withdrawal',
+      sentTo: 'bharath',
+    });
+    expect(initialRec.commission).toBe(2.0);
+    expect(initialRec.siteFee).toBe(0.5);
+
+    // Week changes: user charges 1.50% comm / 0.00% fee on RuPay
+    // Transaction 1: User enters 1.5% comm / 0.0% fee
+    service.recordOverrideFeedback({
+      cardType: 'rupay',
+      transactionType: 'withdrawal',
+      sentTo: 'bharath',
+      actualCommission: 1.5,
+      actualSiteFee: 0.0,
+      actualImps: 0,
+      predictedCommission: 2.0,
+      predictedSiteFee: 0.5,
+      commissionAccepted: false,
+      siteFeeAccepted: false,
+      timestamp: Date.now() - 3600000, // 1 hour ago
+    });
+
+    // Transaction 2: User enters 1.5% comm / 0.0% fee again (Streak = 2)
+    service.recordOverrideFeedback({
+      cardType: 'rupay',
+      transactionType: 'withdrawal',
+      sentTo: 'bharath',
+      actualCommission: 1.5,
+      actualSiteFee: 0.0,
+      actualImps: 0,
+      predictedCommission: 2.0,
+      predictedSiteFee: 0.5,
+      commissionAccepted: false,
+      siteFeeAccepted: false,
+      timestamp: Date.now(),
+    });
+
+    // Transaction 3: AI MUST automatically predict 1.50% comm / 0.00% fee via active_regime_match!
+    const regimeRec = service.getRecommendation({
+      cardType: 'rupay',
+      transactionType: 'withdrawal',
+      sentTo: 'bharath',
+    });
+
+    expect(regimeRec.source).toBe('active_regime_match');
+    expect(regimeRec.commission).toBe(1.5);
+    expect(regimeRec.siteFee).toBe(0.0);
+    expect(regimeRec.confidence).toBeGreaterThanOrEqual(0.92);
+    expect(regimeRec.regimeStreak).toBe(2);
+  });
+
+  it('Dynamic Regime Shift: One-off rate does NOT trigger regime (protects against single exceptions)', () => {
+    // 2 standard transactions at 2.0% / 0.5%
+    const records: HistoricalTransactionRecord[] = [
+      {
+        id: '1',
+        card_type: 'rupay',
+        transaction_type: 'withdrawal',
+        sent_to: 'bharath',
+        commission_percent: 2.0,
+        site_fee_percent: 0.5,
+        transaction_date: new Date(Date.now() - 10000),
+        amount: 20000,
+      },
+      {
+        id: '2',
+        card_type: 'rupay',
+        transaction_type: 'withdrawal',
+        sent_to: 'bharath',
+        commission_percent: 2.0,
+        site_fee_percent: 0.5,
+        transaction_date: new Date(Date.now() - 20000),
+        amount: 20000,
+      },
+    ];
+
+    service.setRecordsForTesting(records);
+
+    // Single one-off discount override for friend: 1.0% / 0.0% (Streak = 1)
+    service.recordOverrideFeedback({
+      cardType: 'rupay',
+      transactionType: 'withdrawal',
+      sentTo: 'bharath',
+      actualCommission: 1.0,
+      actualSiteFee: 0.0,
+      actualImps: 0,
+      predictedCommission: 2.0,
+      predictedSiteFee: 0.5,
+      commissionAccepted: false,
+      siteFeeAccepted: false,
+      timestamp: Date.now(),
+    });
+
+    // Tier 0 active regime should NOT trigger because streak is only 1
+    const rec = service.detectActiveRegime({
+      card: 'rupay',
+      tx: 'withdrawal',
+      portal: 'bharath',
+    });
+    expect(rec).toBeNull();
+  });
+
+  it('Card Independence: Changing RuPay weekly rate does not affect Visa', () => {
+    const records: HistoricalTransactionRecord[] = [
+      {
+        id: '1',
+        card_type: 'visa',
+        transaction_type: 'withdrawal',
+        sent_to: 'bharath',
+        commission_percent: 2.7,
+        site_fee_percent: 2.25,
+        transaction_date: new Date(),
+        amount: 20000,
+      },
+      {
+        id: '2',
+        card_type: 'visa',
+        transaction_type: 'withdrawal',
+        sent_to: 'bharath',
+        commission_percent: 2.7,
+        site_fee_percent: 2.25,
+        transaction_date: new Date(),
+        amount: 20000,
+      },
+    ];
+
+    service.setRecordsForTesting(records);
+
+    // 2 consecutive overrides for RuPay to 1.5% / 0.0%
+    service.recordOverrideFeedback({
+      cardType: 'rupay',
+      transactionType: 'withdrawal',
+      sentTo: 'bharath',
+      actualCommission: 1.5,
+      actualSiteFee: 0.0,
+      actualImps: 0,
+      predictedCommission: 2.0,
+      predictedSiteFee: 0.5,
+      timestamp: Date.now() - 1000,
+    });
+    service.recordOverrideFeedback({
+      cardType: 'rupay',
+      transactionType: 'withdrawal',
+      sentTo: 'bharath',
+      actualCommission: 1.5,
+      actualSiteFee: 0.0,
+      actualImps: 0,
+      predictedCommission: 2.0,
+      predictedSiteFee: 0.5,
+      timestamp: Date.now(),
+    });
+
+    // Visa should still recommend 2.7% / 2.25%, NOT RuPay's 1.5%
+    const visaRec = service.getRecommendation({
+      cardType: 'visa',
+      transactionType: 'withdrawal',
+      sentTo: 'bharath',
+    });
+    expect(visaRec.commission).toBe(2.7);
+    expect(visaRec.siteFee).toBe(2.25);
+  });
 });
