@@ -545,9 +545,6 @@ export const StatsCards = ({
                         formatCurrency(card.value)
                       )}
                     </div>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
-                      Updated in real-time
-                    </p>
                   </CardContent>
                 </div>
               </Card>

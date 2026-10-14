@@ -573,34 +573,36 @@ export const AddTransactionDialog = ({
         const feeAccepted = hasPrediction ? Math.abs(actualFee - predictedFee) < 0.01 : true;
         const impsAccepted = hasPrediction ? Math.abs(actualImps - predictedImps) < 0.5 : true;
 
-        predictionTrackingService.recordPrediction({
-          transactionId,
-          amount: parseFloat(formData.amount) || 0,
-          profit,
-          customerName: customerName || undefined,
-          customerPhone: customerPhone || undefined,
-          portalName: formData.sent_to,
-          siteName: formData.site_name || undefined,
-          notes: notesStr,
-          commissionAccepted: commAccepted,
-          siteFeeAccepted: feeAccepted,
-          impsAccepted: impsAccepted,
-          predictedCommission: predictedComm,
-          predictedSiteFee: predictedFee,
-          predictedImps: predictedImps,
-          actualCommission: actualComm,
-          actualSiteFee: actualFee,
-          actualImps: actualImps,
-          predictionSource: hasPrediction ? aiPredictedValues!.source : "none",
-          predictionConfidence: hasPrediction ? aiPredictedValues!.confidence : 0,
-          cardType: formData.card_type,
-          transactionType: formData.transaction_type,
-          sentTo: formData.sent_to,
-          bankName: formData.bank_name || undefined,
-          customerMode: formData.customer_mode,
-        }).catch(() => {
+        try {
+          await predictionTrackingService.recordPrediction({
+            transactionId,
+            amount: parseFloat(formData.amount) || 0,
+            profit,
+            customerName: customerName || undefined,
+            customerPhone: customerPhone || undefined,
+            portalName: formData.sent_to,
+            siteName: formData.site_name || undefined,
+            notes: notesStr,
+            commissionAccepted: commAccepted,
+            siteFeeAccepted: feeAccepted,
+            impsAccepted: impsAccepted,
+            predictedCommission: predictedComm,
+            predictedSiteFee: predictedFee,
+            predictedImps: predictedImps,
+            actualCommission: actualComm,
+            actualSiteFee: actualFee,
+            actualImps: actualImps,
+            predictionSource: hasPrediction ? aiPredictedValues!.source : "none",
+            predictionConfidence: hasPrediction ? aiPredictedValues!.confidence : 0,
+            cardType: formData.card_type,
+            transactionType: formData.transaction_type,
+            sentTo: formData.sent_to,
+            bankName: formData.bank_name || undefined,
+            customerMode: formData.customer_mode,
+          });
+        } catch {
           // Silent — tracking should never break the main flow
-        });
+        }
 
         // Closed-loop active learning: feed back in-memory for immediate adaptive learning
         transactionLearningService.recordOverrideFeedback({

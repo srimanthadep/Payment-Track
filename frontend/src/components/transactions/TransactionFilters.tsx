@@ -15,6 +15,7 @@ import {
   Users,
   Store,
   Landmark,
+  Sparkles,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,7 @@ export interface FilterState {
   banks?: string[];
   sites?: string[];
   amountRange: { min: number | null; max: number | null };
+  predictionStatus?: ("accepted" | "overridden")[];
 }
 
 export const DEFAULT_CARD_FILTER_OPTIONS = [
@@ -57,6 +59,7 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
     banks: [],
     sites: [],
     amountRange: { min: null, max: null },
+    predictionStatus: [],
   });
 
   const [banks, setBanks] = useState<BankOption[]>(() => settingsService.getBanks());
@@ -125,6 +128,14 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
     updateFilters({ sites: updated });
   };
 
+  const togglePredictionStatus = (status: "accepted" | "overridden") => {
+    const current = filters.predictionStatus || [];
+    const updated = current.includes(status)
+      ? current.filter((s) => s !== status)
+      : [...current, status];
+    updateFilters({ predictionStatus: updated });
+  };
+
   const setQuickDateRange = (preset: string) => {
     const today = new Date();
     let from: Date | null = null;
@@ -170,6 +181,7 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
       banks: [],
       sites: [],
       amountRange: { min: null, max: null },
+      predictionStatus: [],
     };
     setFilters(cleared);
     onFiltersChange(cleared);
@@ -184,6 +196,7 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
     (filters.customerModes && filters.customerModes.length > 0) ||
     (filters.banks && filters.banks.length > 0) ||
     (filters.sites && filters.sites.length > 0) ||
+    (filters.predictionStatus && filters.predictionStatus.length > 0) ||
     filters.amountRange.min !== null ||
     filters.amountRange.max !== null;
 
@@ -570,6 +583,59 @@ export const TransactionFilters = ({ portals, onFiltersChange }: TransactionFilt
                 {banks.length === 0 && (
                   <p className="text-xs text-muted-foreground py-2 text-center">No banks configured</p>
                 )}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {/* AI Prediction Filter */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn(
+                "h-9 text-xs sm:text-sm w-full sm:w-auto font-medium transition-colors px-2 sm:px-3",
+                (filters.predictionStatus?.length ?? 0) > 0
+                  ? "bg-primary/10 border-primary/30 text-primary"
+                  : "bg-background hover:bg-accent/50"
+              )}
+            >
+              <Sparkles className="mr-1.5 h-3.5 w-3.5 text-primary flex-shrink-0" />
+              <span>AI Prediction {(filters.predictionStatus?.length ?? 0) > 0 && `(${filters.predictionStatus.length})`}</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-3 rounded-xl shadow-lg border-border/80" align="start">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">AI Prediction</Label>
+                {(filters.predictionStatus?.length ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => updateFilters({ predictionStatus: [] })}
+                    className="text-[11px] text-primary hover:underline font-medium"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="space-y-1">
+                {[
+                  { id: "accepted", label: "Accepted", desc: "All rates accepted as predicted", color: "text-emerald-600 dark:text-emerald-400" },
+                  { id: "overridden", label: "Overridden", desc: "One or more rates edited", color: "text-amber-600 dark:text-amber-400" },
+                ].map((item) => (
+                  <label key={item.id} className="flex items-start space-x-2 cursor-pointer p-1.5 hover:bg-muted/70 rounded-md transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={filters.predictionStatus?.includes(item.id as "accepted" | "overridden") || false}
+                      onChange={() => togglePredictionStatus(item.id as "accepted" | "overridden")}
+                      className="mt-0.5 rounded accent-primary"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className={cn("text-xs font-medium", item.color)}>{item.label}</div>
+                      <div className="text-[10px] text-muted-foreground">{item.desc}</div>
+                    </div>
+                  </label>
+                ))}
               </div>
             </div>
           </PopoverContent>

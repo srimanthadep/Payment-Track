@@ -13,11 +13,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Download, Search, Trash2, Edit, FileText, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet } from "lucide-react";
+import { Download, Search, Trash2, Edit, FileText, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, Sparkles } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { TransactionFilters, FilterState } from "./TransactionFilters";
 import { EditTransactionDialog } from "./EditTransactionDialog";
+import { PredictionOutcomeBadge, type PredictionTrackingRecord } from "./PredictionOutcomeBadge";
 import { getCardTypeDisplayName, type CardType } from "@/utils/commissionCalculator";
 import { exportToPDF } from "@/utils/pdfExport";
 import { exportTransactionsToCSV, exportTransactionsToExcel } from "@/utils/exportUtils";
@@ -131,6 +132,7 @@ export const TransactionsTable = ({
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [predictionsMap, setPredictionsMap] = useState<Record<string, PredictionTrackingRecord>>({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -250,6 +252,43 @@ export const TransactionsTable = ({
       setPortals(portalsData);
     }
 
+    // Fetch AI prediction outcomes for user's transactions
+    try {
+      const { data: predictionRows } = await supabase
+        .from("prediction_tracking")
+        .select(`
+          id,
+          transaction_id,
+          all_accepted,
+          commission_accepted,
+          site_fee_accepted,
+          imps_accepted,
+          predicted_commission,
+          actual_commission,
+          predicted_site_fee,
+          actual_site_fee,
+          predicted_imps,
+          actual_imps,
+          prediction_source,
+          prediction_confidence,
+          created_at
+        `)
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (predictionRows) {
+        const predMap: Record<string, PredictionTrackingRecord> = {};
+        predictionRows.forEach((r) => {
+          if (r.transaction_id && !predMap[r.transaction_id]) {
+            predMap[r.transaction_id] = r as PredictionTrackingRecord;
+          }
+        });
+        setPredictionsMap(predMap);
+      }
+    } catch (predErr) {
+      console.warn("Could not fetch prediction tracking outcomes:", predErr);
+    }
+
     const sortedData = [...allTx].sort(
       (a, b) =>
         new Date(b.transaction_date).getTime() -
@@ -326,7 +365,7 @@ export const TransactionsTable = ({
 
     // Text search
     if (searchQuery) {
-      const q = searchQuery.toLowerCase();
+      const q = searchQuery.toLowerCase().trim();
       filtered = filtered.filter(
         (t) =>
           t.portals.name.toLowerCase().includes(q) ||
@@ -335,7 +374,10 @@ export const TransactionsTable = ({
           (t.customer_mode && t.customer_mode.toLowerCase().includes(q)) ||
           (t.bank_name && t.bank_name.toLowerCase().includes(q)) ||
           (t.site_name && t.site_name.toLowerCase().includes(q)) ||
-          (t.notes && t.notes.toLowerCase().includes(q))
+          (t.notes && t.notes.toLowerCase().includes(q)) ||
+          (q === "accepted" && Boolean(predictionsMap[t.id]?.all_accepted)) ||
+          (q === "overridden" && Boolean(predictionsMap[t.id] && !predictionsMap[t.id].all_accepted)) ||
+          (q === "ai" && Boolean(predictionsMap[t.id]))
       );
     }
 
@@ -434,6 +476,17 @@ export const TransactionsTable = ({
           if (match) bank = match[1].trim();
         }
         return bank ? selectedBanks.includes(bank.toLowerCase()) : false;
+      });
+    }
+
+    // AI Prediction status filter
+    if (filters.predictionStatus && filters.predictionStatus.length > 0) {
+      filtered = filtered.filter((t) => {
+        const pred = predictionsMap[t.id];
+        if (!pred) return false;
+        if (filters.predictionStatus!.includes("accepted") && pred.all_accepted) return true;
+        if (filters.predictionStatus!.includes("overridden") && !pred.all_accepted) return true;
+        return false;
       });
     }
 
@@ -1055,6 +1108,14 @@ export const TransactionsTable = ({
                         </div>
                       );
                     })()}
+                    {predictionsMap[transaction.id] && (
+                      <div className="flex items-center justify-between gap-2 col-span-2 pt-1.5 border-t border-border/40 text-[10px]">
+                        <span className="text-muted-foreground flex items-center gap-1 font-medium">
+                          <Sparkles className="h-3 w-3 text-primary" /> Prediction
+                        </span>
+                        <PredictionOutcomeBadge prediction={predictionsMap[transaction.id]} variant="card" />
+                      </div>
+                    )}
                   </div>
                 </motion.div>
                 );
@@ -1289,11 +1350,16 @@ export const TransactionsTable = ({
                     })()}
                   </TableCell>
                   <TableCell className="px-2 py-1.5 whitespace-nowrap">
-                    <Badge variant={transaction.transaction_type?.toLowerCase() === "withdrawal" ? "default" : "secondary"} className="text-[10px] px-1.5 py-0 font-normal">
-                      {transaction.transaction_type
-                        ? transaction.transaction_type.charAt(0).toUpperCase() + transaction.transaction_type.slice(1)
-                        : "-"}
-                    </Badge>
+                    <div className="flex flex-col items-start gap-1">
+                      <Badge variant={transaction.transaction_type?.toLowerCase() === "withdrawal" ? "default" : "secondary"} className="text-[10px] px-1.5 py-0 font-normal">
+                        {transaction.transaction_type
+                          ? transaction.transaction_type.charAt(0).toUpperCase() + transaction.transaction_type.slice(1)
+                          : "-"}
+                      </Badge>
+                      {predictionsMap[transaction.id] && (
+                        <PredictionOutcomeBadge prediction={predictionsMap[transaction.id]} variant="table" />
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className={`${isStaff ? "" : "hidden md:table-cell"} px-2 py-1.5 text-xs max-w-[130px]`}>
                     <div className="font-medium truncate text-xs">
